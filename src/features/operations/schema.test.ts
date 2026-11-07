@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/features/ai/openai", () => ({
+  IMAGE_MODEL: "gpt-image-1.5",
+  FASHION_PROMPT_VERSION: "stylora-fashion-v1",
+  FASHION_SCHEMA_VERSION: "fashion-item.v1",
+}));
+vi.mock("@/features/preview/image", () => ({
+  renderAndStoreAvatar: vi.fn(),
+  discardPendingAvatar: vi.fn(),
+}));
 
+import { shouldReuseSavedAvatar } from "@/features/outfits/saved-avatar";
 import { fingerprintOperationInput } from "./fingerprint";
 import {
   operationRowSchema,
@@ -40,7 +50,7 @@ describe("operation identity and status", () => {
       input: {},
       promptVersion: "stylora-fashion-v1",
       schemaVersion: "fashion-item.v1",
-      model: "muse-image-1.0",
+      model: "gpt-image-1.5",
     };
     expect(startOperationSchema.safeParse(input).success).toBe(true);
     expect(
@@ -78,5 +88,33 @@ describe("operation identity and status", () => {
     });
     expect(response).not.toHaveProperty("input");
     expect(response).not.toHaveProperty("workspace_id");
+  });
+});
+
+describe("saved avatar regeneration intent", () => {
+  const requestId = "d270f645-b0d9-4c6f-8593-a154f31b98c9";
+
+  it("keeps reuse for legacy operation inputs", () => {
+    expect(shouldReuseSavedAvatar({})).toBe(true);
+    expect(
+      shouldReuseSavedAvatar({
+        saved_look_id: requestId,
+        preference_snapshot_hash: "a".repeat(64),
+      }),
+    ).toBe(true);
+  });
+
+  it("disables reuse for an explicit regeneration with a request ID", () => {
+    expect(shouldReuseSavedAvatar({ intent: "regenerate", requestId })).toBe(
+      false,
+    );
+  });
+
+  it.each([
+    { intent: "regenerate" },
+    { intent: "regenerate", requestId: "invalid" },
+    { intent: "initial", requestId },
+  ])("rejects invalid regeneration identity %#", (input) => {
+    expect(() => shouldReuseSavedAvatar(input)).toThrow();
   });
 });

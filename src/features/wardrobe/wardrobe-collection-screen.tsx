@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { Button, Icon } from "@/components/ui";
@@ -15,9 +15,12 @@ import {
   WARDROBE_RETURN_URL_KEY,
 } from "./wardrobe-navigation";
 import {
-  wardrobePreviewStore,
-  type WardrobePreviewRecord,
-} from "./wardrobe-preview";
+  displayWardrobeItem,
+  wardrobeChanged,
+  wardrobeRequest,
+} from "./client";
+import type { CanonicalWardrobeItem } from "./schema";
+type WardrobeRecord = ReturnType<typeof displayWardrobeItem>;
 import {
   wardrobeCategories,
   type WardrobeCategory,
@@ -78,7 +81,7 @@ function updateView(patch: Partial<WardrobeView>) {
   window.dispatchEvent(new Event(viewEvent));
 }
 
-function categoryCounts(records: readonly WardrobePreviewRecord[]) {
+function categoryCounts(records: readonly WardrobeRecord[]) {
   const counts = Object.fromEntries(
     wardrobeCategories
       .filter((category) => category.id !== "all")
@@ -88,11 +91,10 @@ function categoryCounts(records: readonly WardrobePreviewRecord[]) {
   return counts;
 }
 
-function matchesQuery(item: WardrobePreviewRecord, query: string) {
+function matchesQuery(item: WardrobeRecord, query: string) {
   const text = [
     item.name,
     item.subcategory ?? "",
-    item.sourceName ?? "",
     ...item.fields.flatMap((field) => [field.label, field.value]),
   ]
     .join(" ")
@@ -102,8 +104,14 @@ function matchesQuery(item: WardrobePreviewRecord, query: string) {
 
 export function WardrobeCollectionScreen({
   initialSearch = "",
+  initialItems = [],
+  initialError,
+  writesEnabled = false,
 }: {
   initialSearch?: string;
+  initialItems?: CanonicalWardrobeItem[];
+  initialError?: string;
+  writesEnabled?: boolean;
 }) {
   const router = useRouter();
   const search = useSyncExternalStore(
@@ -112,8 +120,39 @@ export function WardrobeCollectionScreen({
     () => initialSearch,
   );
   const view = parseView(search);
-  const records = wardrobePreviewStore.useValue();
-  const ready = wardrobePreviewStore.useReady();
+  const [records, setRecords] = useState(() =>
+    initialItems.map(displayWardrobeItem),
+  );
+  const [error, setError] = useState(initialError);
+  const [ready, setReady] = useState(true);
+  async function refresh() {
+    try {
+      const result = await wardrobeRequest<{ items: CanonicalWardrobeItem[] }>(
+        "",
+      );
+      setRecords(result.items.map(displayWardrobeItem));
+      setError(undefined);
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : "Your wardrobe is unavailable.",
+      );
+    } finally {
+      setReady(true);
+    }
+  }
+  useEffect(() => {
+    const reload = () => {
+      void refresh();
+    };
+    window.addEventListener(wardrobeChanged, reload);
+    window.addEventListener("focus", reload);
+    return () => {
+      window.removeEventListener(wardrobeChanged, reload);
+      window.removeEventListener("focus", reload);
+    };
+  }, []);
 
   useEffect(() => rememberWardrobeCollectionHref(), [search]);
 
@@ -177,6 +216,19 @@ export function WardrobeCollectionScreen({
 
   return (
     <>
+      {error && (
+        <div className={styles.messageCard} role="alert">
+          <p>{error}</p>
+          <Button variant="secondary" onClick={() => void refresh()}>
+            Retry wardrobe
+          </Button>
+        </div>
+      )}
+      {!writesEnabled && (
+        <p role="status">
+          This workspace is read only. Saved pieces are available to browse.
+        </p>
+      )}
       {view.status === "archived" ? (
         <section className={styles.wardrobe} aria-labelledby="archived-title">
           <p className={styles.eyebrow}>Your wardrobe</p>
@@ -256,7 +308,9 @@ export function WardrobeCollectionScreen({
             query={view.q}
             hasAnyItems={active.length > 0}
             renderItemImage={image}
-            localPreview
+            status={error ? "error" : "ready"}
+            errorMessage={error}
+            onRetry={() => void refresh()}
             onCategoryChange={(category) => updateView({ category })}
             onFilterChange={(status) => updateView({ status })}
             onQueryChange={(q) => updateView({ q })}
@@ -274,7 +328,9 @@ export function WardrobeCollectionScreen({
               {archived.length})
             </Button>
             {records.some((item) => item.isSample) && (
-              <span className={styles.sampleCaption}>Sample items share one photo.</span>
+              <span className={styles.sampleCaption}>
+                Starter items are labeled sample data.
+              </span>
             )}
           </div>
         </>

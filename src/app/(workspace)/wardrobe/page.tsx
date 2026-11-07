@@ -1,3 +1,4 @@
+import { wardrobePageState } from "@/features/wardrobe/server";
 import type { Metadata } from "next";
 import { WardrobeCollectionScreen } from "@/features/wardrobe/wardrobe-collection-screen";
 
@@ -15,5 +16,13 @@ export default async function WardrobePage({ searchParams }: PageProps) {
     if (typeof value === "string") query.set(key, value);
   }
 
-  return <WardrobeCollectionScreen initialSearch={query.toString()} />;
+  const state = await wardrobePageState();
+  return (
+    <WardrobeCollectionScreen
+      initialSearch={query.toString()}
+      initialItems={state.items}
+      initialError={state.error}
+      writesEnabled={state.writesEnabled}
+    />
+  );
 }
