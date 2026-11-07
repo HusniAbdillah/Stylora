@@ -336,6 +336,25 @@ below the latest one.
 - Not run. Hosted migrations, database or Storage commands, paid provider calls, browser end-to-end journeys and local build. CI remains the full build and suite gate.
 - Limits. The app must be open for the bounded client pump. Server crashes need a later visit and lease recovery. Provider availability, Storage and end-to-end image completion still require the coordinator’s approved integration smoke. No cloud data was changed.
 
+### Owner 4 guarded smoke preparation, 7 November 2026
+
+- Added `scripts/smoke-owner4.mjs` with explicit prepare, exercise and cleanup
+  phases. Every live phase requires `--run`, a loopback application origin,
+  enabled writes, the `dev-owner-4` workspace name and an external run journal.
+- Empty workspaces receive seven labeled sample-owned rows from the validated
+  repository dataset. Existing wardrobe rows and preferences are preserved.
+  Exercise checks the normal three-outfit Capsule flow, Preview image bytes,
+  Studio save idempotency and Preview image reuse. Its journal reserves at most
+  two text and two image requests, without automatic failed-lease retries.
+- Cleanup targets recorded run IDs and scoped relationships. It waits for active
+  leases, preserves referenced assets and journals exact private paths before
+  removing asset metadata and Storage objects.
+- Local verification: `node --check scripts/smoke-owner4.mjs` and the unflagged
+  dry run passed. No hosted reads, writes, seeding or provider calls were run by
+  this preparation agent. The coordinator owns live execution and its evidence.
+  The script calls the Studio RPC; browser verification of the save action remains
+  part of the coordinator's UI check.
+
 ## 8. Task evidence ledger
 
 Add one row per meaningful task, not one vague row for an entire owner.
