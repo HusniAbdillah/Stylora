@@ -180,7 +180,15 @@ export function CapsuleWizard({
   const [draft, setDraft] = useState<CapsuleDraft>(initialDraft);
   const [step, setStep] = useState<number>(initialStep);
   const [visited, setVisited] = useState<number>(initialVisited);
-  const [touched, setTouched] = useState(false);
+  const [touched, setTouched] = useState(() =>
+    Object.keys(EMPTY_CAPSULE_DRAFT).some((key) => {
+      const field = key as keyof CapsuleDraft;
+      return (
+        JSON.stringify(initialDraft[field]) !==
+        JSON.stringify(EMPTY_CAPSULE_DRAFT[field])
+      );
+    }),
+  );
   const [pendingTemplate, setPendingTemplate] = useState<
     CapsuleTemplateId | null | undefined
   >(undefined);
