@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#F5F2EC" />
+    <meta name="robots" content="noindex" />
+    <title>Connection unavailable · Stylora</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #f5f2ec;
+        --ink: #211f20;
+        --muted: #6e6662;
+        --crimson: #73091d;
+        --paper: #fffefc;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font:
+          1rem/1.6 system-ui,
+          sans-serif;
+      }
+      main {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        max-width: 36rem;
+        margin: auto;
+        padding: 2rem 1.5rem;
+        overflow-wrap: anywhere;
+      }
+      img {
+        border-radius: 16px;
+      }
+      h1 {
+        font:
+          400 clamp(2rem, 8vw, 3rem)/1.15 Georgia,
+          serif;
+        margin: 2rem 0 1rem;
+      }
+      p {
+        margin: 0 0 1.5rem;
+        color: var(--muted);
+      }
+      button {
+        min-height: 48px;
+        padding: 0.75rem 1.5rem;
+        border: 0;
+        border-radius: 12px;
+        background: var(--crimson);
+        color: var(--paper);
+        font: inherit;
+        cursor: pointer;
+      }
+      :focus-visible {
+        outline: 2px solid var(--crimson);
+        outline-offset: 4px;
+      }
+    </style>
+    <script src="/offline-retry.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <img src="/icons/icon-192.png" width="64" height="64" alt="Stylora" />
+      <h1>Let’s reconnect.</h1>
+      <p>
+        Stylora could not reach the network. Check your connection, then retry
+        this page. Loading your wardrobe, saving changes and generating outfits
+        need an internet connection.
+      </p>
+      <button type="button" id="retry">Retry this page</button>
+      <noscript
+        ><p>
+          Reconnect, then use your browser’s reload button to try again.
+        </p></noscript
+      >
+    </main>
+  </body>
+</html>
