@@ -10,7 +10,7 @@ import {
 import { WardrobeIntake, type WardrobeProposal } from "./wardrobe-intake";
 import {
   emptyDraft,
-  manualFields,
+  getIntakeFields,
   sampleDraft,
   wardrobeIntakeDraftStore,
   type IntakeDraft,
@@ -107,7 +107,7 @@ export function WardrobeIntakeFlow({
     category: draft.category,
     imageUrl: draft.imageUrl,
     imageKey: draft.imageKey,
-    fields: draft.fields,
+    fields: getIntakeFields(draft.fields),
   };
   const status = busy
     ? "uploading"
@@ -147,7 +147,7 @@ export function WardrobeIntakeFlow({
         imageKey: nextKey,
         name: "",
         category: "top",
-        fields: manualFields,
+        fields: [],
         isSample: false,
       }));
       if (!saved) {
@@ -226,6 +226,10 @@ export function WardrobeIntakeFlow({
     const itemId = draft.itemId ?? crypto.randomUUID();
     if (!draft.itemId && !updateDraft((current) => ({ ...current, itemId })))
       return;
+    // Earlier drafts can contain notes outside the current intake form.
+    const previousDetails = draft.fields.filter(
+      (field) => !proposal.fields.some(({ key }) => key === field.key),
+    );
     const record: WardrobePreviewRecord = {
       id: itemId,
       name: draft.name.trim(),
@@ -233,7 +237,7 @@ export function WardrobeIntakeFlow({
       inventoryStatus: "owned",
       imageUrl: draft.imageUrl ?? "",
       ...(draft.imageKey ? { imageKey: draft.imageKey } : {}),
-      fields: draft.fields
+      fields: [...proposal.fields, ...previousDetails]
         .filter((field) => field.value.trim())
         .map((field) => ({
           ...field,
@@ -284,7 +288,7 @@ export function WardrobeIntakeFlow({
       itemId: crypto.randomUUID(),
       name: "",
       category: "top",
-      fields: manualFields,
+      fields: [],
       isSample: false,
     }));
   }
@@ -340,13 +344,14 @@ export function WardrobeIntakeFlow({
           updateDraft((current) => ({ ...current, category }));
         }}
         onFieldChange={(_, key, value) => {
+          const edited = proposal.fields.find((field) => field.key === key);
+          if (!edited) return;
           updateDraft((current) => ({
             ...current,
-            fields: current.fields.map((field) =>
-              field.key === key
-                ? { ...field, value: value.slice(0, 500), source: "user" }
-                : field,
-            ),
+            fields: [
+              ...current.fields.filter((field) => field.key !== key),
+              { ...edited, value: value.slice(0, 500), source: "user" },
+            ],
           }));
         }}
         onConfirm={addItem}

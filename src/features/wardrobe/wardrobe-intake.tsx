@@ -376,7 +376,7 @@ export function WardrobeIntake({
                     <strong>{field.value || "Unknown"}</strong>
                   )}
                 </div>
-                {field.source && (
+                {field.value.trim() && field.source && (
                   <Badge tone="neutral" className={styles.sourceBadge}>
                     {field.source === "visual_inference"
                       ? "AI"
@@ -384,7 +384,9 @@ export function WardrobeIntake({
                         ? "Catalog"
                         : field.source === "user"
                           ? "You"
-                          : "Note"}
+                          : field.source === "sample"
+                            ? "Sample"
+                            : "Note"}
                   </Badge>
                 )}
                 {descriptionSource !== "manual" && field.editable !== false && (
