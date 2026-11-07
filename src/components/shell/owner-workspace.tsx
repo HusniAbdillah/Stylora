@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { z } from "zod";
@@ -25,7 +26,6 @@ import {
   operationStatusSchema,
 } from "@/features/operations/schema";
 import { getWardrobeCollectionHref } from "@/features/wardrobe/wardrobe-navigation";
-import { createPreviewStore } from "@/lib/preview/store";
 import { WorkspaceShell } from "./workspace-shell";
 import type { ActivityItem } from "./workspace-navigation";
 import styles from "./shell.module.css";
@@ -104,11 +104,7 @@ const recoverySchema = z.object({
   lookId: z.uuid().nullable(),
   selectedOptionId: z.uuid().nullable().optional(),
 });
-const railPreference = createPreviewStore<boolean | null>(
-  "navigation.rail",
-  null,
-  (value) => value === null || typeof value === "boolean",
-);
+const subscribeToHydration = () => () => {};
 
 function draftDestination(
   draft: CreateDraft,
@@ -140,9 +136,11 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
     null,
   );
   const [retrying, setRetrying] = useState<string | null>(null);
-  const [temporaryRail, setTemporaryRail] = useState<boolean>();
-  const hydrated = railPreference.useReady();
-  const collapsed = railPreference.useValue();
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
   const wardrobeHref =
     hydrated && pathname !== "/wardrobe"
       ? getWardrobeCollectionHref()
@@ -437,14 +435,6 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
         }
       : {}),
   }));
-  function toggleRail(value: boolean) {
-    try {
-      railPreference.set(value);
-      setTemporaryRail(undefined);
-    } catch {
-      setTemporaryRail(value);
-    }
-  }
 
   return (
     <WorkspaceShell
@@ -460,8 +450,6 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
       displayName={displayName}
       activity={activityItems}
       resume={resume}
-      collapsed={temporaryRail ?? collapsed ?? undefined}
-      onCollapsedChange={toggleRail}
       contextLabel="Shared workspace"
       draftStatus={
         section === "/create" && state.draft ? state.draftStatus : undefined

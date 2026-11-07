@@ -9,6 +9,7 @@ import {
   LoadingLayout,
   Logo,
   RecoveryPanel,
+  SelectField,
   StateNotice,
   Stepper,
   Toast,
@@ -40,6 +41,13 @@ function ControlsExample() {
         <Badge tone="owned">In your wardrobe</Badge>
         <Badge tone="alternative">Alternative</Badge>
         <Badge tone="missing">Missing</Badge>
+      </div>
+      <div className="max-w-xs">
+        <SelectField label="Category" defaultValue="outerwear">
+          <option value="top">Tops</option>
+          <option value="bottom">Bottoms</option>
+          <option value="outerwear">Outerwear</option>
+        </SelectField>
       </div>
       <ConfirmDialog
         open={open}

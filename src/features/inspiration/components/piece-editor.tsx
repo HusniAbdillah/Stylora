@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, Chip, ConfirmDialog, Icon } from "@/components/ui";
+import { Button, Chip, ConfirmDialog, Icon, SelectField } from "@/components/ui";
 import type { DetectedPiece, PieceEditValues } from "./types";
 import styles from "./create-presentation.module.css";
 
@@ -317,7 +317,7 @@ function PieceEditorPanel({
                 >
                   Category
                 </label>
-                <select
+                <SelectField
                   id="piece-category"
                   value={values.category}
                   onChange={(event) => {
@@ -326,16 +326,13 @@ function PieceEditorPanel({
                     );
                     if (choice) set("category")(choice.value);
                   }}
-                  className="min-h-11 w-full rounded-lg border border-secondary bg-paper px-3 text-sm"
                 >
-                  <>
-                    {categories.map((category) => (
-                      <option key={category.value} value={category.value}>
-                        {category.label}
-                      </option>
-                    ))}
-                  </>
-                </select>
+                  {categories.map((category) => (
+                    <option key={category.value} value={category.value}>
+                      {category.label}
+                    </option>
+                  ))}
+                </SelectField>
               </div>
               <EditorField
                 label="Colors"

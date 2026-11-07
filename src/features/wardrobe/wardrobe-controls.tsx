@@ -61,7 +61,7 @@ export function WardrobeFilterControls({
 }: WardrobeFilterControlsProps) {
   return (
     <div className={styles.tools}>
-      <label className={styles.search}>
+      <label className={styles.search} data-field-surface="">
         <Icon name="search" size={18} />
         <span className={styles.srOnly}>Search wardrobe</span>
         <input

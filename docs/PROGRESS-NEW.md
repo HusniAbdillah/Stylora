@@ -7,6 +7,8 @@
 - Main `dcd4f9a` was pulled with `git pull --ff-only` and merged into `o2/create-frontend` as `1384889` without conflicts. Owner 4's saved-media changes are retained.
 - Actual checks after the merge: `pnpm lint` and `pnpm typecheck` passed. Targeted ESLint on the four changed source files and `git diff --check origin/main...HEAD` also passed. The first lint attempt exposed one remaining hook violation; restructuring the response callbacks resolved it. No lint rule, test or CI configuration was disabled or weakened.
 - Frontend interaction tests, local Vitest and local production build were not run. No provider call, hosted write, fixture or cleanup was needed for this fix. Existing API and draft recovery contracts remain unchanged. The PR stays Lane B and requires human review.
+- GitHub [Check run #82](https://github.com/HusniAbdillah/Stylora/actions/runs/42347112823) succeeded for `9680788`, including `pnpm check` and `pnpm build`.
+- A subsequent main update `db2a118` introduced shared navigation, field focus and confirmation changes. Resolved four conflicts by retaining live shell profile/activity/resume behavior and the CI corrections, moving rail persistence to the updated shared sidebar, preserving the compact brand padding, and adopting the shared `SelectField` in the canonical piece editor. Post-resolution `pnpm lint` and `pnpm typecheck` both passed. This merge will trigger a fresh CI run when pushed.
 
 ## Owner 2 frontend delivery: 7 November 2026
 
@@ -199,6 +201,7 @@ below the latest one.
 
 ### Owner 1 workspace frontend · 7 November 2026, Asia/Bangkok
 
+- Shared workspace controls (D08, D22, D30, M14 and M15). Chrome at 1440, 850 and 390 px exercised sidebar toggling, persistence and navigation. At desktop and phone widths, the Wardrobe intake field outline covered the padded control and the category picker opened from its padding. A local test draft verified that clicking the confirmation backdrop or pressing Escape kept the draft and restored focus. `pnpm check` passed with 183 tests. The two opt-in hosted Wardrobe tests were skipped.
 - Wardrobe Add Item (D08, M15) uses the eight desktop fields on both screen sizes. Existing drafts keep their color, fabric and fit values under the updated labels. Extra notes from earlier drafts are retained in the saved item. `pnpm check` passed with 112 tests.
 - Work branch `o1/workspace-frontend`, base `4fd5aba`. Requirements R33–R36 and work packages O1.3–O1.6. The four application routes under `src/app/(workspace)` compose the shared shell, Wardrobe, Preferences and Profile.
 - Wardrobe supports searching, filtering, returning to the collection, reading and editing details, marking a candidate owned, and archiving and restoring pieces. Each seeded example uses the same existing `/design/images/wardrobe-ivory-shirt.webp` thumbnail. The intake keeps selected files in IndexedDB. Users can save one or more manually described pieces from a photo, or try the labeled sample item.
