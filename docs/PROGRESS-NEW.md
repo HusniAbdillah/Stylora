@@ -336,3 +336,6 @@ which data, code revision or provider behavior was verified.
   claimed by the backend smoke.
 - Latest user instruction supersedes the earlier merge authorization: open the
   PR and check CI, but leave the PR unmerged until explicitly requested.
+- A second main update, `532a463` (profile, preferences and workflow drafts),
+  also merged without conflicts. Its API routes use separate feature modules;
+  the combined revision is submitted to the PR CI gate.
