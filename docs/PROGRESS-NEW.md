@@ -957,7 +957,8 @@ which data, code revision or provider behavior was verified.
   denied direct anon access. Synthetic fixtures were rolled back.
 - Root `corepack pnpm exec vitest run src/features/products/provider.test.ts
   src/features/products/search-context.test.ts` passed seven tests. Sharing
-  schema tests passed four tests. `corepack pnpm typecheck` passed. Lint is
-  in progress; CI remains the full gate.
+  schema tests passed four tests. `corepack pnpm typecheck` and
+  `corepack pnpm lint` passed (the fast-gate equivalent; Make is unavailable
+  locally). CI remains the full build gate. PR #49 contains the integrated work.
   No additional paid provider calls were made for this implementation. Browser
   verification has not passed; prior local browser attempts timed out.
