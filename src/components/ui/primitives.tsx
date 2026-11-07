@@ -171,6 +171,7 @@ export function Logo({
   return (
     <Image
       unoptimized
+      loading="eager"
       className={classes(styles.logo, className)}
       data-mark={markOnly}
       src={`/design/brand/${markOnly ? "mark" : "lockup"}-${tone}.svg`}

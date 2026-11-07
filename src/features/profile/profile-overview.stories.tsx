@@ -24,12 +24,11 @@ const meta = {
   component: ProfileOverview,
   parameters: { layout: "fullscreen" },
   args: {
-    displayName: "Stylora Demo",
+    displayName: "Studio guest",
     stats: {
-      wardrobeItems: 18,
-      savedLooks: 4,
-      capsules: 2,
-      activeShareLinks: 1,
+      wardrobeItems: 5,
+      savedCandidates: 1,
+      archivedItems: 1,
     },
     onDisplayNameChange: () => undefined,
     onSaveName: () => undefined,
@@ -46,9 +45,8 @@ export const EmptyWorkspace: Story = {
   args: {
     stats: {
       wardrobeItems: 0,
-      savedLooks: 0,
-      capsules: 0,
-      activeShareLinks: 0,
+      savedCandidates: 0,
+      archivedItems: 0,
     },
   },
   render: (args) => <ControlledProfile {...args} />,

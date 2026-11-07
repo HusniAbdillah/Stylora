@@ -109,6 +109,15 @@ below the latest one.
   live provider, storage, Figma screen or Vercel verification was performed
   for this foundation.
 
+### Owner 1 workspace frontend · 7 November 2026, Asia/Bangkok
+
+- Work branch `o1/workspace-frontend`, base `4fd5aba`. Requirements R33–R36 and work packages O1.3–O1.6. The four application routes under `src/app/(workspace)` compose the shared shell, Wardrobe, Preferences and Profile.
+- Wardrobe supports searching, filtering, returning to the collection, reading and editing details, marking a candidate owned, and archiving and restoring pieces. Each seeded example uses the same existing `/design/images/wardrobe-ivory-shirt.webp` thumbnail. The intake keeps selected files in IndexedDB. Users can save one or more manually described pieces from a photo, or try the labeled sample item.
+- Preferences preserves optional selections and drafts across navigation and reload. Profile saves the workspace name shown in the sidebar and reads the active wardrobe count. The sample workspace keeps local navigation, item records, preferences and profile data in browser storage. Database persistence, automated descriptions and other owners’ routes remain separate integration work.
+- Chrome checks used isolated browser contexts and a fixture selected from the repository. Verified filter restoration through item detail and the sidebar, candidate promotion, invalid-file rejection, photo and manual draft reload, two pieces sharing one file, editing, photo replacement, archive and restore, Activity, reset confirmation, and workspace-name propagation. Reviewed the grid and navigation at 1440, 768, 390 and 360 px. The test browser contexts were closed after inspection. No hosted data or provider calls were used.
+
+- Final checks on Windows passed with `pnpm check` (ESLint, TypeScript and 37 tests), `pnpm build` and `pnpm build:storybook --quiet`. Both Chrome scenarios passed against the production build on loopback.
+
 ### Component library checkpoint · 2026-11-07, Asia/Bangkok
 
 - Owner 1 coordinated shared presentation for all four owners on the working tree based on `82aa65b`. O1.3–O1.6 cover the Wardrobe, preference, profile, shell and ownership controls.

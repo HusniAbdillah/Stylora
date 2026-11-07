@@ -5,6 +5,15 @@
   padding: 24px 0 48px;
 }
 
+.preferences :is(button, a):focus-visible {
+  outline: 2px solid var(--color-crimson);
+  outline-offset: 3px;
+}
+
+:global(#workspace-content) .preferences {
+  padding: 0 0 48px;
+}
+
 .header {
   display: flex;
   align-items: flex-end;
@@ -64,6 +73,9 @@
 }
 
 .sectionNav a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
   border: 1px solid var(--color-stone);
   border-radius: 999px;
   background: var(--color-paper);
@@ -344,7 +356,7 @@
 }
 
 .groupTabs button {
-  min-height: 36px;
+  min-height: 44px;
   border: 0;
   border-radius: 9px;
   background: transparent;
@@ -374,6 +386,7 @@
 }
 
 .clearLink {
+  min-height: 44px;
   border: 0;
   background: transparent;
   color: var(--color-crimson);
@@ -415,6 +428,10 @@
   justify-content: space-between;
   gap: 16px;
   padding-top: 8px;
+}
+
+.mobileSaveStatus {
+  display: none;
 }
 
 .resetDialog {
@@ -485,10 +502,21 @@
   }
 
   .saveTop,
-  .sectionNav,
-  .usage,
-  .example {
+  .sectionNav {
     display: none;
+  }
+
+  .sectionHeading {
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .usage {
+    white-space: normal;
+  }
+
+  .example {
+    display: flex;
   }
 
   .section {
@@ -624,22 +652,31 @@
     right: 0;
     bottom: 0;
     left: 0;
-    justify-content: flex-end;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
     border-top: 1px solid var(--color-stone);
     background: var(--color-paper);
     padding: 12px 16px;
   }
 
-  .footer > :first-child {
-    display: none;
+  .mobileSaveStatus {
+    display: block;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    color: var(--color-secondary);
+    font-size: 12px;
+    min-height: 16px;
   }
 
-  .resetDialog {
-    position: fixed;
-    inset: auto 0 0;
-    width: 100vw;
-    max-width: none;
-    border-radius: 22px 22px 0 0;
-    margin: 0;
+  .footer > :first-child {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .footer > :last-child {
+    grid-column: 2;
+    grid-row: 2;
   }
 }
