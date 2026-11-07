@@ -11,7 +11,9 @@ export function getConfigurationReadiness() {
   return {
     databaseConfigured: database !== null,
     writesEnabled: database?.writesEnabled ?? false,
-    modelConfigured: Boolean(process.env.MODEL_API_KEY?.trim()),
+    modelConfigured: Boolean(
+      process.env.OPENAI_API_KEY?.trim() || process.env.MODEL_API_KEY?.trim(),
+    ),
     shoppingConfigured: Boolean(process.env.SERPAPI_API_KEY?.trim()),
   };
 }
