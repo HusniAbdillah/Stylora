@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { Button } from "@/components/ui";
+import { Button, Icon } from "@/components/ui";
 import { WardrobeGrid } from "./wardrobe-grid";
 import { WardrobeIntakeFlow } from "./wardrobe-intake-flow";
 import { WardrobePreviewImage } from "./wardrobe-intake-storage";
