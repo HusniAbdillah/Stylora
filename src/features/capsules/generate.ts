@@ -24,7 +24,11 @@ import {
 } from "@/features/operations/server";
 import { getCapsuleDraft } from "./drafts";
 import { getCapsule } from "./queries";
-import { capsuleBriefReady, capsuleBriefSchema, categorySchema } from "./schema";
+import {
+  capsuleBriefReady,
+  capsuleBriefSchema,
+  categorySchema,
+} from "./schema";
 import { CAPSULE_TEMPLATES } from "./capsule-types";
 import {
   capsuleGenerationSchema,
@@ -43,9 +47,20 @@ export async function prepareCapsule(input: unknown) {
     })
     .parse(input);
   const draft = await getCapsuleDraft(parsed.draftId);
-  const sameBrief = draft && (!parsed.brief || JSON.stringify(parsed.brief) === JSON.stringify(draft.brief));
-  const acknowledgedLink = draft && parsed.brief && draft.capsuleId && draft.revision === parsed.expectedRevision + 1;
-  if (!draft || !sameBrief || (draft.revision !== parsed.expectedRevision && !acknowledgedLink))
+  const sameBrief =
+    draft &&
+    (!parsed.brief ||
+      JSON.stringify(parsed.brief) === JSON.stringify(draft.brief));
+  const acknowledgedLink =
+    draft &&
+    parsed.brief &&
+    draft.capsuleId &&
+    draft.revision === parsed.expectedRevision + 1;
+  if (
+    !draft ||
+    !sameBrief ||
+    (draft.revision !== parsed.expectedRevision && !acknowledgedLink)
+  )
     throw new ApiError(
       "draft_conflict",
       "Your draft changed. Reopen it before building a capsule.",
@@ -77,7 +92,12 @@ export async function prepareCapsule(input: unknown) {
     JSON.stringify(capsuleBriefSchema.parse(existing.brief)) ===
       JSON.stringify(brief),
   );
-  if (existing && (draft.capsuleId ? existing.revision !== draft.capsuleRevision : !unchanged || existing.revision !== 1))
+  if (
+    existing &&
+    (draft.capsuleId
+      ? existing.revision !== draft.capsuleRevision
+      : !unchanged || existing.revision !== 1)
+  )
     throw new ApiError(
       "capsule_revision_conflict",
       "This capsule changed in another session. Your draft is kept.",
@@ -106,7 +126,10 @@ export async function prepareCapsule(input: unknown) {
       .object({ id: z.uuid(), revision: z.number().int().positive() })
       .parse(data).revision;
   }
-  if (draft.capsuleId === capsuleId && draft.capsuleRevision === capsuleRevision) {
+  if (
+    draft.capsuleId === capsuleId &&
+    draft.capsuleRevision === capsuleRevision
+  ) {
     return { capsuleId, capsuleRevision, draftRevision: draft.revision };
   }
   const { data: linked, error: linkError } = await context.client

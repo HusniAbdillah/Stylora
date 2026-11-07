@@ -78,5 +78,11 @@ export const preparedCapsuleSchema = z.strictObject({
 export type PreparedCapsule = z.infer<typeof preparedCapsuleSchema>;
 
 export function capsuleBriefReady(brief: CapsuleDraftState["brief"]) {
-  return Boolean(brief.weather && brief.palette && brief.dressCode && brief.activities.length && brief.includedItemIds.length);
+  return Boolean(
+    brief.weather &&
+    brief.palette &&
+    brief.dressCode &&
+    brief.activities.length &&
+    brief.includedItemIds.length,
+  );
 }

@@ -9,6 +9,7 @@ import {
 import { EMPTY_CAPSULE_DRAFT } from "@/features/capsules/capsule-types";
 import { CapsuleDraftStudio } from "@/features/capsules/studio-draft";
 import { getCapsule } from "@/features/capsules/queries";
+import type { CapsuleDraftState } from "@/features/capsules/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -31,24 +32,26 @@ export default async function NewCapsulePage({
       : getCapsuleDraft(draftId),
     getCapsuleInventory(),
   ]);
-  const capsule = capsuleId ? await getCapsule(capsuleId) : null;
+  const sourceId = capsuleId ?? draft?.capsuleId;
+  const capsule = sourceId ? await getCapsule(sourceId) : null;
   if (draftId && !draft) notFound();
+  const initial: CapsuleDraftState = draft ?? {
+    id: randomUUID(),
+    revision: 0,
+    brief: capsule?.brief ?? EMPTY_CAPSULE_DRAFT,
+    step: capsule ? 1 : 0,
+    visited: capsule ? 3 : 0,
+    capsuleId: capsule?.id,
+    capsuleRevision: capsule?.revision,
+  };
   return (
     <CapsuleDraftStudio
-      initial={
-        draft ?? {
-          id: randomUUID(),
-          revision: 0,
-          brief: capsule?.brief ?? EMPTY_CAPSULE_DRAFT,
-          step: capsule ? 1 : 0,
-          visited: capsule ? 3 : 0,
-          capsuleId: capsule?.id,
-          capsuleRevision: capsule?.revision,
-        }
-      }
+      key={initial.id}
+      initial={initial}
       ownedItems={items}
       writesEnabled={getWorkspaceDatabase().writesEnabled}
       recoverPrevious={!capsuleId && fresh !== "1"}
+      baseBrief={capsule?.brief}
     />
   );
 }
