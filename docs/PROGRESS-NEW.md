@@ -196,6 +196,23 @@ below the latest one.
 
 - Final checks on Windows passed with `pnpm check` (ESLint, TypeScript and 37 tests), `pnpm build` and `pnpm build:storybook --quiet`. Both Chrome scenarios passed against the production build on loopback.
 
+### Wardrobe backend · 7 November 2026 (Asia/Bangkok)
+
+- Scope: O1.1 and O1.3, PRD R33–R34. Branch `o1/wardrobe-backend`, started on main `4b4aa38` and rebased onto `d30eece` after GitHub reported conflicts. Only the two Wardrobe intake files conflicted; the backend bindings preserve the newly merged form groups. Preferences and Profile are explicitly Owner 2's responsibility. No other owner's implementation, shared UI, package, lockfile, prompt or model definition was changed.
+- Implemented canonical row validation and adapter, list/detail and active-owned exports, workspace-scoped CRUD actions, user correction precedence and clearing, server intake/edit drafts, signed upload reservation and decoded-byte verification, atomic confirmation and photo attachment, archive, restore and candidate ownership. Wardrobe routes now use these services; browser storage contains resume pointers and a pre-upload image buffer rather than the inventory.
+- Preserved the concurrently merged Category, Colors, Pattern, Fabric look, Silhouette and fit, Length, Neckline and sleeve, and Occasion form groups. Composite groups edit distinct canonical fields and retain additional analysis attributes. The focused schema and form mapping suite passed 4 cases.
+- Published the endpoints and consumer contract in `src/features/wardrobe/README.md`. Item detail reads real saved-snapshot references. Other features' inventory adapters and the shell/Profile summaries were not changed; no cross-feature integration completion is claimed.
+- AI integration consumes Owner 2's shared `requestFashion`, description projection, canonical schema and prompt loader. Operations use the shared persisted runner and workspace provider quota. Whole garments stream provisionally; final results publish with revision, attempt, fingerprint, lease and asset fences. Reopening an active draft reads operation status rather than starting another provider request. Manual entry remains available when analysis fails.
+- Hosted changes were authorized by the requested Wardrobe implementation plan. CLI-created migrations `20261107051146_wardrobe_backend.sql` and `20261107052449_wardrobe_conflict_responses.sql` were reviewed and applied through Supabase MCP. The second migration fixes deterministic conflicts from `40001` to `PT409`; the live PostgREST 14 server otherwise retried the stale-write smoke until timeout. A direct retry after correction returned HTTP 409 in 534 ms. Applied migrations were not edited. Hosted reset was not used.
+- `pnpm db:types` could not authenticate because the CLI lacks a management access token. Types were generated through the authenticated Supabase MCP tool instead. That generator differs from CLI 3's formatting and computed-field metadata. The hosted schema also contains Owner 4's separately applied `preview_bag_subcategories`; this task did not author or modify that migration.
+- Starter path repair: `node --experimental-strip-types --env-file=<existing env file> scripts/normalize-wardrobe-paths.mjs --expected-workspace=6d68ca94-8165-42a7-9ee3-c5d050371c4a --apply` verified all 45 hashes, copied and normalized 45 paths while preserving item/asset IDs and old objects. Rollback paths were written to ignored `supabase/.temp`. The subsequent hosted read smoke passed actual connection, 45 canonical items and 45 signed image hashes through `createWorkspaceSignedRead`.
+- Verification environment: Windows, Node 22, hosted Stylora project, explicit `dev-owner-1`; the existing env file still selects read-only demo and was not changed. `pnpm test src/features/wardrobe/schema.test.ts` passed 3 focused cases, including all 45 starter records. Hosted manual lifecycle passed upload, verify, confirmation replay, edit/correction, stale-write rejection, candidate exclusion and promotion, archive, restore, foreign-workspace rejection and disabled writes. Temporary items, drafts, assets and Storage objects were removed, including the interrupted first smoke fixture.
+- `supabase/tests/wardrobe.sql` passed through Supabase MCP: denied direct anon/authenticated privileges, RLS, service-only RPCs, foreign parents, idempotent confirmation, HTTP conflict codes, stale attempt and changed-draft completion. Synthetic SQL fixtures rolled back. Health advisories were empty; the informational no-policy notices match the intentional server-only deny-direct-access design. Unrelated index notices were not changed.
+- Real HTTP/provider evidence: `node --experimental-strip-types --env-file=<existing env file> scripts/test-wardrobe-http.mjs --with-ai`, with `STYLORA_TEST_BASE_URL=http://localhost:3011`, passed upload, streaming, final persistence, confirmation replay, canonical detail and private image access. Dataset photograph `10007.webp` produced one validated garment using `gpt-6-luna`, prompt `stylora-fashion-v1`, schema `fashion-item.v1`. Operation `774628ca-3192-4432-a777-7ffdd2553065` recorded one provider call, 10,595 input and 1,052 output tokens. The temporary item, draft and image were removed; paid operation and provisional events remain for accounting. No other provider or shopping calls were made.
+- Browser review on the local server showed all 45 owned starter pieces with their actual photos, category counts and sample-source badges; opening a piece displayed its real photo, canonical fields and field provenance. This was collection/detail inspection, not a claim that every UI control was tested in-browser.
+- PR [#34](https://github.com/HusniAbdillah/Stylora/pull/34) is open and mergeable, awaiting Lane B human review. GitHub Actions [Check 42343934187](https://github.com/HusniAbdillah/Stylora/actions/runs/42343934187) passed `pnpm check` and `pnpm build` on code commit `0c42df8`. No main merge or manual deployment was performed.
+- Final `pnpm lint` and `pnpm typecheck` passed after resolving the concurrent Wardrobe form changes. The focused schema and form-mapping suite passed 4 cases. Windows used equivalent commands and `node scripts/pr-check.mjs` because make is unavailable. Full local check/build and unrelated feature tests were not run; PR CI is the full check/build gate. No deployment or main merge is part of this delivery. Lane B requires human review because of storage, workspace scoping, migrations, generated types and diff size. Final scoped SQL showed 45 owned starter items, 45 ready assets, zero pending assets, zero Wardrobe drafts and zero path mismatches; demo retained zero items. Storage has 90 objects including the 45 intentionally retained rollback copies. Old retained starter objects remain for a separately reviewed cleanup.
+
 ### Component library checkpoint · 2026-11-07, Asia/Bangkok
 
 - Owner 1 coordinated shared presentation for all four owners on the working tree based on `82aa65b`. O1.3–O1.6 cover the Wardrobe, preference, profile, shell and ownership controls.
@@ -403,6 +420,20 @@ below the latest one.
   general Wardrobe intake and Profile frontend persistence were not exercised
   by this Owner 4 smoke.
 
+
+### Owner 4 saved-avatar regeneration intent, 7 November 2026
+
+- Branch `o4/saved-avatar-intent` validates the leased operation's optional
+  regeneration intent and UUID request ID. Legacy empty input and saved-look
+  metadata continue to reuse existing images. Explicit regeneration disables
+  reuse while preserving model metadata updates and fenced completion.
+- `pnpm exec vitest run src/features/operations/schema.test.ts` passed all eight
+  tests in the managed Windows worktree. `make fast` passed lint and typecheck.
+  Tests cover legacy input, explicit regeneration, unknown intent and missing or
+  invalid request identity. The owned model fixture uses `gpt-image-1.5`.
+- This patch ran no hosted operations or provider calls. The report-only merge
+  resolution preserves the coordinator's complete integration report; local
+  checks were not repeated because worker code is unchanged. CI remains the gate.
 
 ### Owner 4 image Storage retry classification, 7 November 2026
 
@@ -740,3 +771,22 @@ which data, code revision or provider behavior was verified.
 - `pnpm exec vitest run src/lib/supabase/storage.test.ts` passed all 51 tests
   using synthetic SDK errors and in-memory image bytes. No hosted fixtures,
   database changes or provider requests were made. CI is the full build gate.
+
+## Owner 1 saved-media regeneration, 7 November 2026
+
+- Branch `o1/saved-media-regeneration`, O4.7 database contract. Added
+  `regenerate_saved_look_media(uuid,uuid,uuid,uuid)`, returning the complete
+  saved media row. A request UUID replays its original command before checking
+  the latest-media revision. Different commands cannot allocate concurrent work.
+- The transaction uses the existing retry and delete advisory lock, creates a
+  distinct saved-avatar operation and media version, and preserves the immutable
+  snapshot, prior image and approved share media. Operation input is exactly
+  `intent: regenerate` and `requestId`; rendering inputs remain unchanged.
+- `psql -v ON_ERROR_STOP=1 -f /tmp/stylora_regeneration_test.sql` passed as
+  `service_role` in isolated local database `stylora_operation_contract_v4`.
+  Synthetic fixtures rolled back. Cases cover foreign workspaces, queued and
+  completed replay, busy rejection, stale media, immutable data and denied
+  anon/authenticated execution. No provider calls or hosted fixtures were used.
+- Types were generated from the combined local schema with pinned Supabase CLI
+  3 and formatted with Prettier. Local `make fast` passed lint and typecheck; CI and hosted
+  schema application remain pending. Caller execution belongs to Owner 4.
