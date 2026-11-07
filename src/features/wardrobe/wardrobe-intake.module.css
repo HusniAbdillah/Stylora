@@ -296,6 +296,32 @@
   padding: 12px 20px;
 }
 
+.footerLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.inlineError {
+  border-radius: 10px;
+  background: var(--color-missing-bg);
+  color: var(--color-missing);
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 10px 12px;
+}
+
+.photo > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
 .uploadPrompt,
 .progress,
 .error {
@@ -307,6 +333,31 @@
   gap: 12px;
   color: var(--color-ink);
   text-align: center;
+}
+
+.addedState {
+  display: flex;
+  min-height: 420px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.addedState h3 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 400;
+  margin: 0;
+}
+
+.addedState p {
+  max-width: 330px;
+  color: var(--color-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 8px;
 }
 
 .uploadPrompt p,
@@ -386,6 +437,42 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  gap: 8px;
+}
+
+.actionDialog {
+  width: min(440px, calc(100vw - 32px));
+  max-width: none;
+  border: 0;
+  border-radius: 20px;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-overlay);
+  padding: 24px;
+}
+
+.actionDialog::backdrop {
+  background: var(--color-scrim);
+}
+
+.actionDialog h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 400;
+  margin: 0 0 10px;
+}
+
+.actionDialog p {
+  color: var(--color-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+
+.actionDialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
 }
 

@@ -12,6 +12,7 @@ type Crumb = { label: string; href?: string };
 type TopBarProps = {
   breadcrumbs: readonly Crumb[];
   activity: readonly ActivityItem[];
+  contextLabel?: string;
   draftStatus?: "saving" | "saved" | "failed";
 };
 
@@ -25,6 +26,7 @@ export function WorkspaceTopBar({
   breadcrumbs,
   activity,
   draftStatus,
+  contextLabel,
 }: TopBarProps) {
   const feedback = draftStatus && draftFeedback[draftStatus];
   return (
@@ -52,6 +54,9 @@ export function WorkspaceTopBar({
         </ol>
       </nav>
       <div className="flex shrink-0 items-center gap-4">
+        {contextLabel && (
+          <span className="text-metadata text-muted">{contextLabel}</span>
+        )}
         {feedback && (
           <span role="status" className="flex items-center gap-1.5 text-muted">
             <Icon name={feedback.icon} size={14} /> {feedback.text}
@@ -67,20 +72,46 @@ export function WorkspaceShell({
   activeHref,
   displayName,
   resume,
+  availableHrefs,
+  destinationHrefs,
+  contextLabel,
+  collapsed,
+  onCollapsedChange,
   breadcrumbs,
   activity,
   draftStatus,
   children,
 }: TopBarProps & {
   activeHref: string;
+  availableHrefs?: readonly string[];
+  destinationHrefs?: Readonly<Record<string, string>>;
+  collapsed?: boolean;
+  onCollapsedChange?: (value: boolean) => void;
   displayName: string;
   resume?: { href: string; label: string };
   children: ReactNode;
 }) {
-  const navigation = { activeHref, displayName, resume };
+  const navigation = {
+    activeHref,
+    displayName,
+    resume,
+    contextLabel,
+    availableHrefs,
+    destinationHrefs,
+  };
   return (
     <div className="min-h-dvh bg-canvas md:flex">
-      <WorkspaceSidebar {...navigation} />
+      <a
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-field focus:bg-paper focus:p-3"
+        href="#workspace-content"
+      >
+        Skip to content
+      </a>
+      <WorkspaceSidebar
+        {...navigation}
+        collapsed={collapsed}
+        onCollapsedChange={onCollapsedChange}
+      />
       <MobileTopBar
         {...navigation}
         activity={<ActivityMenu items={activity} />}
@@ -91,8 +122,11 @@ export function WorkspaceShell({
             breadcrumbs={breadcrumbs}
             activity={activity}
             draftStatus={draftStatus}
+            contextLabel={contextLabel}
           />
-          <main className="min-w-0 md:pt-6">{children}</main>
+          <main id="workspace-content" tabIndex={-1} className="min-w-0">
+            {children}
+          </main>
         </div>
       </div>
     </div>

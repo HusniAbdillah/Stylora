@@ -4,11 +4,13 @@ import styles from "./wardrobe.module.css";
 export type WardrobeEmptyStateProps = {
   onAddItem: () => void;
   onUseSample?: () => void;
+  localPreview?: boolean;
 };
 
 export function WardrobeEmptyState({
   onAddItem,
   onUseSample,
+  localPreview = false,
 }: WardrobeEmptyStateProps) {
   return (
     <div className={styles.emptyCard}>
@@ -16,18 +18,25 @@ export function WardrobeEmptyState({
       <div className={styles.emptyContent}>
         <h2>Start with three to five pieces you wear often</h2>
         <p>
-          One photo per piece is enough. AI writes the description; you confirm
-          it. More pieces mean better matches and capsules.
+          {localPreview
+            ? "One photo per piece is enough. Add the details you know, then keep the piece in this sample workspace."
+            : "One photo per piece is enough. AI writes the description; you confirm it. More pieces mean better matches and capsules."}
         </p>
         <ul>
           <li>
             <Icon name="upload" /> Take a photo on a plain background
           </li>
           <li>
-            <Icon name="sparkle" /> Review the AI description and fix anything
+            <Icon name="sparkle" />{" "}
+            {localPreview
+              ? "Add a clear name and category"
+              : "Review the AI description and fix anything"}
           </li>
           <li>
-            <Icon name="layers" /> Use it in matches, capsules and previews
+            <Icon name="layers" />{" "}
+            {localPreview
+              ? "Edit, archive or restore pieces later"
+              : "Use it in matches, capsules and previews"}
           </li>
         </ul>
         <div className={styles.emptyActions}>

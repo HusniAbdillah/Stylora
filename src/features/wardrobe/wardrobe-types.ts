@@ -9,6 +9,8 @@ export type WardrobeItemSummary = {
   category: WardrobeCategory;
   subcategory?: string | null;
   imageUrl?: string | null;
+  imageKey?: string;
+  isSample?: boolean;
   inventoryStatus: InventoryStatus;
 };
 
