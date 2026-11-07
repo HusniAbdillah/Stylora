@@ -17,6 +17,81 @@ const values = {
   attributes: { colors: ["blue"] },
 };
 describe("Wardrobe contracts", () => {
+  it("reads legacy marketplace evidence without inventing confidence or catalog details", () => {
+    const row = {
+      id,
+      ...values,
+      workspace_id: id,
+      color: "blue",
+      import_idempotency_key: null,
+      updated_at: "2026-11-07T00:00:00Z",
+      inferred_attributes: {},
+      provenance: {
+        name: { source: "catalog", state: "reported" },
+        category: {
+          source: "derived",
+          state: "inferred",
+          evidence: "Category words in catalog title",
+        },
+      },
+      corrections: {},
+      uncertainty: [
+        "Garment details and functional suitability require review.",
+      ],
+      confidence: null,
+      revision: 1,
+      asset_id: null,
+      source_type: "live",
+      inventory_status: "saved_candidate",
+      notes: "",
+      archived_at: null,
+      created_at: "2026-11-07T00:00:00Z",
+      source_product_id: id,
+    } satisfies WardrobeRow;
+    const canonical = toCanonicalWardrobeItem(row);
+    expect(canonical.inventoryStatus).toBe("saved_candidate");
+    expect(canonical.provenance.name).toMatchObject({
+      source: "catalog",
+      state: "reported",
+      confidence: null,
+      evidence: "",
+      uncertainty: null,
+    });
+    expect(canonical.provenance.category.evidence).toBe(
+      "Category words in catalog title",
+    );
+    expect(canonical.inferredAttributes).toEqual({});
+    expect(() =>
+      toCanonicalWardrobeItem({ ...row, source_product_id: null }),
+    ).toThrow();
+    expect(() =>
+      toCanonicalWardrobeItem({
+        ...row,
+        provenance: {
+          name: { source: "catalog", state: "reported", confidence: 2 },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      toCanonicalWardrobeItem({ ...row, attributes: { colors: "blue" } }),
+    ).toThrow();
+    const edited = toCanonicalWardrobeItem({
+      ...row,
+      inventory_status: "owned",
+      provenance: {
+        ...row.provenance,
+        description: {
+          source: "user",
+          state: "reported",
+          confidence: null,
+          evidence: "User correction",
+          uncertainty: null,
+        },
+      },
+    });
+    expect(edited.inventoryStatus).toBe("owned");
+    expect(edited.provenance.description.source).toBe("user");
+  });
   it("adapts every starter item to the canonical envelope without inventing omitted attributes", () => {
     const manifest = JSON.parse(
       readFileSync("data/wardrobe/wardrobe.json", "utf8"),

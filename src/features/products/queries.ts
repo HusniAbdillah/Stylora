@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import type { observationSchema } from "@/lib/ai/fashion-schema";
 import { ApiError } from "@/lib/http";
 import {
   getWorkspaceDatabase,
@@ -497,13 +498,24 @@ export async function searchLookSlot(lookIdInput: string, input: unknown) {
             retrieved_at: retrievedAt,
             attributes: {},
             provenance: {
-              name: { source: "catalog", state: "reported" },
+              name: {
+                source: "catalog",
+                state: "reported",
+                confidence: null,
+                evidence: "Title reported by the marketplace catalog",
+                uncertainty: null,
+              },
               category: {
                 source: "derived",
                 state: "inferred",
+                confidence: null,
                 evidence: "Category words in catalog title",
+                uncertainty: null,
               },
-            },
+            } satisfies Record<
+              string,
+              Omit<z.infer<typeof observationSchema>, "path">
+            >,
             uncertainty: [
               "Garment details and functional suitability require review.",
             ],

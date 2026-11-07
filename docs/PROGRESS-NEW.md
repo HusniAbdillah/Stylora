@@ -1145,3 +1145,29 @@ which data, code revision or provider behavior was verified.
   The combined final focused command passed 64 cases across five files without
   accessing a provider. Its single `make pr-ready` is running; full CI is still
   required on the final follow-up commit before merge.
+
+## Marketplace candidate Wardrobe read fix, 7 November 2026
+
+- Branch `codex/marketplace-wardrobe-contract`. A persisted marketplace
+  candidate omitted name evidence text and name/category confidence metadata.
+  The canonical Wardrobe reader rejected the row, causing the entire collection
+  GET to return an invalid-request response.
+- New product evidence now satisfies the shared observation type at compile
+  time and includes explicit unknown confidence. Historical product-linked
+  catalog/derived evidence receives only missing confidence/evidence defaults
+  when read. Complete user edits remain intact; other invalid fields and
+  non-marketplace evidence remain rejected. Existing records are not deleted,
+  skipped or silently rewritten, and no garment details are invented.
+- The regression failed against the old reader with the reported missing
+  fields, then `corepack pnpm exec vitest run
+  src/features/wardrobe/schema.test.ts` passed all four tests. Coverage includes
+  unknown confidence, saved candidates becoming owned, user edits, and retained
+  rejection of invalid confidence, garment attributes and unrelated provenance.
+- A temporary read-only Vitest harness invoked the actual GET route against
+  the configured hosted workspace. It returned status 200 with the imported
+  candidate and existing inventory. The harness was removed after passing;
+  no fixtures, database writes, migrations or provider requests were used.
+- Local typecheck passed after regenerating current route types and setting
+  aside a stale generated dev validator from before main's route move. Local
+  lint passed. CI is the full build gate. No credentials, environment settings,
+  dependencies or database declarations were changed.
