@@ -250,6 +250,7 @@ export function WardrobeIntakeFlow({
       );
   }
   async function pick(file: File) {
+    setWatchingDraft(undefined);
     setBusy(true);
     setError(undefined);
     setStage("uploading");
@@ -354,6 +355,7 @@ export function WardrobeIntakeFlow({
     }
   }
   async function discard() {
+    setWatchingDraft(undefined);
     setBusy(true);
     try {
       await saveQueue.current.catch(() => undefined);
