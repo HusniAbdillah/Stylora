@@ -1831,6 +1831,47 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commit_capsule_generation: {
+        Args: {
+          p_attempt_count: number
+          p_capsule_id: string
+          p_expected_revision: number
+          p_input_fingerprint: string
+          p_missing_additions: Json
+          p_operation_id: string
+          p_outfits: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       complete_preview_operation: {
         Args: {
           p_attempt_count: number
@@ -1908,6 +1949,23 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      delete_capsule: {
+        Args: {
+          p_capsule_id: string
+          p_expected_revision: number
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      delete_capsule_outfit: {
+        Args: {
+          p_capsule_id: string
+          p_expected_revision: number
+          p_outfit_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       delete_saved_look: {
         Args: { p_saved_look_id: string; p_workspace_id: string }
@@ -2015,6 +2073,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      save_capsule_draft: {
+        Args: {
+          p_brief: Json
+          p_capsule_id: string
+          p_expected_revision: number
+          p_item_ids: string[]
+          p_title: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       save_look_selection: {
         Args: {
           p_choices: Json
@@ -2075,6 +2144,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      save_studio_look: {
+        Args: {
+          p_expected_revision: number
+          p_idempotency_key: string
+          p_parent_id: string
+          p_source_id: string
+          p_source_kind: string
+          p_title: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       start_workflow_operation: {
         Args: {
