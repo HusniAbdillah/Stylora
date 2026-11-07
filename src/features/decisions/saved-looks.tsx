@@ -19,7 +19,14 @@ export type SavedLook = {
   subtitle?: string;
   savedAt: string;
   avatarUrl?: string | null;
-  mediaStatus: "queued" | "running" | "succeeded" | "failed" | "unavailable";
+  mediaStatus:
+    | "queued"
+    | "running"
+    | "succeeded"
+    | "failed"
+    | "unavailable"
+    | "cancelled"
+    | "superseded";
   canRetry?: boolean;
   sample?: boolean;
   items: SavedLookItem[];
@@ -76,11 +83,7 @@ export function SavedLookAvatar({
 }) {
   const [failedSource, setFailedSource] = useState<string | null>(null);
   const geometry = detail ? "aspect-[3/4] md:aspect-[2/3]" : "aspect-[3/4]";
-  if (
-    look.mediaStatus === "succeeded" &&
-    look.avatarUrl &&
-    failedSource !== look.avatarUrl
-  ) {
+  if (look.avatarUrl && failedSource !== look.avatarUrl) {
     return (
       <div
         className={"relative overflow-hidden rounded-2xl bg-sand " + geometry}
@@ -102,6 +105,31 @@ export function SavedLookAvatar({
           <Icon name="sparkle" className="mr-1 inline size-3 text-crimson" />
           Illustrative avatar
         </span>
+        {look.mediaStatus !== "succeeded" && (
+          <div
+            role="status"
+            className="absolute inset-x-3 bottom-3 rounded-xl bg-paper p-3 text-sm"
+          >
+            <p>
+              {look.mediaStatus === "queued" || look.mediaStatus === "running"
+                ? "New image preparing. Showing the previous image."
+                : look.mediaStatus === "cancelled"
+                  ? "New image cancelled. Showing the previous image."
+                  : look.mediaStatus === "superseded"
+                    ? "New image out of date. Showing the previous image."
+                    : "New image unavailable. Showing the previous image."}
+            </p>
+            {look.canRetry && onRetry && (
+              <Button
+                variant="quiet"
+                disabled={busy}
+                onClick={() => onRetry(look.id)}
+              >
+                Retry image
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -134,7 +162,9 @@ export function SavedLookAvatar({
           ? "Avatar could not be made"
           : pending
             ? "Look saved, avatar preparing"
-            : "Avatar image unavailable"}
+            : look.mediaStatus === "cancelled"
+              ? "Image generation cancelled"
+              : "Avatar image unavailable"}
       </p>
       {failed ? (
         onRetry &&
@@ -365,6 +395,7 @@ export function SavedLookDetail({
   look,
   busy = false,
   onRetryImage,
+  onRegenerateImage,
   onPreview,
   onDelete,
   onShare,
@@ -378,6 +409,7 @@ export function SavedLookDetail({
   look: SavedLook;
   busy?: boolean;
   onRetryImage?: (id: string) => void;
+  onRegenerateImage?: (id: string) => void;
   onPreview?: (id: string) => void;
   onDelete?: (id: string) => void | Promise<void>;
   onShare?: (id: string) => void;
@@ -411,11 +443,16 @@ export function SavedLookDetail({
           detail
         />
         <div className="mt-3 flex flex-wrap gap-2">
-          {look.mediaStatus === "succeeded" && (
+          {look.avatarUrl && (
             <Button
               variant="secondary"
-              disabled
-              title="New avatar generation is not available here yet."
+              disabled={
+                !writesEnabled ||
+                busy ||
+                !onRegenerateImage ||
+                ["queued", "running"].includes(look.mediaStatus)
+              }
+              onClick={() => onRegenerateImage?.(look.id)}
             >
               Regenerate image
             </Button>
@@ -431,12 +468,6 @@ export function SavedLookDetail({
             </Button>
           )}
         </div>
-        {look.mediaStatus === "succeeded" && (
-          <p className="mt-2 text-xs leading-relaxed text-secondary">
-            New image generation is unavailable for this look. Your saved image
-            is unchanged.
-          </p>
-        )}
       </div>
       <div>
         <p className="text-xs text-crimson">
