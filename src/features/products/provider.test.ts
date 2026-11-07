@@ -4,7 +4,7 @@ import { normalizeOffer, supportedCategory } from "./provider";
 
 const catalog = {
   title: "Ivory relaxed shirt",
-  source: "Catalog retailer",
+  source: "Shopee",
   product_link: "https://www.google.com/shopping/product/123",
   product_id: "123",
 };
@@ -32,6 +32,30 @@ describe("catalog normalization", () => {
     expect(normalizeOffer(catalog, "shoes")).toBeNull();
     expect(supportedCategory("Sneaker cleaning kit")).toBeNull();
     expect(supportedCategory("Shirt dress")).toBe("dress");
+  });
+  it("accepts only Shopee sources and titles consistent with the selected body group", () => {
+    expect(
+      normalizeOffer({ ...catalog, source: "Not Shopee" }, "top"),
+    ).toBeNull();
+    expect(
+      normalizeOffer({ ...catalog, source: "Shopee.example" }, "top"),
+    ).toBeNull();
+    expect(
+      normalizeOffer({ ...catalog, title: "Kemeja wanita" }, "top", "men"),
+    ).toBeNull();
+    expect(
+      normalizeOffer({ ...catalog, title: "Kemeja pria" }, "top", "women"),
+    ).toBeNull();
+    expect(
+      normalizeOffer(
+        { ...catalog, title: "Kemeja unisex", source: "Shopee Indonesia" },
+        "top",
+        "women",
+      ),
+    ).toMatchObject({ sourceLabel: "Shopee Indonesia" });
+    expect(
+      normalizeOffer({ ...catalog, title: "Kemeja wanita" }, "top", null),
+    ).not.toBeNull();
   });
   it("stores IDR minor units independently of runtime display defaults", () => {
     const formatter = vi.spyOn(Intl, "NumberFormat").mockImplementation(() => {

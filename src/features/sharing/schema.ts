@@ -21,7 +21,7 @@ export const imageIndexSchema = z
 export const createShareSchema = z
   .strictObject({
     catchphrase: z.string().trim().max(240).default(""),
-    expiresInHours: z.number().int().min(1).max(720).default(168),
+    expiresInHours: z.number().int().min(1).max(720).optional(),
     approvedMediaIds: z.array(savedLookIdSchema).max(20).default([]),
   })
   .refine(
@@ -59,6 +59,31 @@ export const publicSnapshotSchema = z.strictObject({
     .min(1)
     .max(20),
 });
+
+export function isShareActive(
+  expiresAt: string | null,
+  revokedAt: string | null,
+  now = Date.now(),
+) {
+  return (
+    revokedAt === null && (expiresAt === null || Date.parse(expiresAt) > now)
+  );
+}
+
+export function initialLookDescription(
+  items: { name: unknown }[],
+  previous?: string | null,
+) {
+  const existing = z.string().trim().min(1).max(240).safeParse(previous);
+  if (existing.success) return existing.data;
+  const names = items
+    .flatMap((item) => {
+      const name = z.string().trim().min(1).max(160).safeParse(item.name);
+      return name.success ? [name.data] : [];
+    })
+    .join(", ");
+  return names.length <= 240 ? names : `${names.slice(0, 237).trimEnd()}…`;
+}
 
 export function projectPublicSnapshot(
   title: string,

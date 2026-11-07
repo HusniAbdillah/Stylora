@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { Badge, Button, Chip, ConfirmDialog, Icon } from "@/components/ui";
+import { SavedCardsSkeleton, SavedFilterSkeleton } from "./saved-skeletons";
 
 export type SavedLookItem = {
   id: string;
@@ -30,7 +31,7 @@ export type SavedLook = {
   canRetry?: boolean;
   sample?: boolean;
   items: SavedLookItem[];
-  share?: { active: boolean; expiresLabel?: string };
+  share?: { active: boolean; permanent?: boolean; expiresLabel?: string };
 };
 
 function ItemImage({
@@ -236,7 +237,7 @@ export function SavedLooksGallery({
             : look.mediaStatus === "queued" || look.mediaStatus === "running"),
       );
   return (
-    <section>
+    <section aria-busy={changingView}>
       <header>
         <p className="text-xs font-medium text-crimson">Your collection</p>
         <h1 className="mt-2 font-serif text-4xl md:text-5xl">
@@ -247,39 +248,42 @@ export function SavedLooksGallery({
           image.
         </p>
       </header>
-      <div
-        role="group"
-        aria-label="Filter saved looks"
-        className="mt-5 flex gap-2"
-      >
-        <Chip
-          selected={filter === "all"}
-          disabled={changingView}
-          onClick={() => setFilter("all")}
+      {changingView ? (
+        <SavedFilterSkeleton />
+      ) : (
+        <div
+          role="group"
+          aria-label="Filter saved looks"
+          className="mt-5 flex gap-2"
         >
-          All {totals.all}
-        </Chip>
-        <Chip
-          selected={filter === "shared"}
-          disabled={changingView}
-          onClick={() => setFilter("shared")}
-        >
-          Shared {totals.shared}
-        </Chip>
-        <Chip
-          selected={filter === "preparing"}
-          disabled={changingView}
-          onClick={() => setFilter("preparing")}
-        >
-          Preparing {totals.preparing}
-        </Chip>
-      </div>
-      {changingView && (
-        <p role="status" className="mt-3 text-sm text-secondary">
-          Loading saved looks…
-        </p>
+          <Chip
+            selected={filter === "all"}
+            disabled={changingView}
+            onClick={() => setFilter("all")}
+          >
+            All {totals.all}
+          </Chip>
+          <Chip
+            selected={filter === "shared"}
+            disabled={changingView}
+            onClick={() => setFilter("shared")}
+          >
+            Shared {totals.shared}
+          </Chip>
+          <Chip
+            selected={filter === "preparing"}
+            disabled={changingView}
+            onClick={() => setFilter("preparing")}
+          >
+            Preparing {totals.preparing}
+          </Chip>
+        </div>
       )}
-      {filtered.length ? (
+      {changingView ? (
+        <div role="status" aria-label="Updating collection">
+          <SavedCardsSkeleton />
+        </div>
+      ) : filtered.length ? (
         <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 xl:grid-cols-4">
           {filtered.map((look) => (
             <article key={look.id} className="min-w-0">
@@ -367,10 +371,12 @@ export function SavedLooksGallery({
               {look.share?.active && (
                 <p className="mt-1 text-xs text-crimson">
                   <Icon name="link" className="mr-1 inline size-3" />
-                  Shared
-                  {look.share.expiresLabel
-                    ? ", " + look.share.expiresLabel
-                    : ""}
+                  {look.share.permanent
+                    ? "Shared until turned off"
+                    : "Shared" +
+                      (look.share.expiresLabel
+                        ? ", " + look.share.expiresLabel
+                        : "")}
                 </p>
               )}
             </article>
@@ -444,18 +450,23 @@ export function SavedLookDetail({
         />
         <div className="mt-3 flex flex-wrap gap-2">
           {look.avatarUrl && (
-            <Button
-              variant="secondary"
-              disabled={
-                !writesEnabled ||
-                busy ||
-                !onRegenerateImage ||
-                ["queued", "running"].includes(look.mediaStatus)
-              }
-              onClick={() => onRegenerateImage?.(look.id)}
-            >
-              Regenerate image
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                disabled={
+                  !writesEnabled ||
+                  busy ||
+                  !onRegenerateImage ||
+                  ["queued", "running"].includes(look.mediaStatus)
+                }
+                onClick={() => onRegenerateImage?.(look.id)}
+              >
+                Regenerate image
+              </Button>
+              {!writesEnabled && (
+                <span className="text-xs text-secondary">Read-only</span>
+              )}
+            </div>
           )}
           {onPreview && (
             <Button variant="quiet" onClick={() => onPreview(look.id)}>
@@ -481,8 +492,12 @@ export function SavedLookDetail({
           <div className="mt-4 flex w-full min-h-11 flex-wrap items-center justify-between gap-2 rounded-xl bg-owned-bg px-4 py-2 text-sm text-owned">
             <span>
               <Icon name="link" className="mr-2 inline size-4" />
-              Shared link active
-              {look.share.expiresLabel ? ", " + look.share.expiresLabel : ""}
+              {look.share.permanent
+                ? "Shared until turned off"
+                : "Shared link active" +
+                  (look.share.expiresLabel
+                    ? ", " + look.share.expiresLabel
+                    : "")}
             </span>
             {manageShareAction ??
               (onManageShare ? (
@@ -536,14 +551,19 @@ export function SavedLookDetail({
         </p>
         <div className="mt-5 hidden flex-wrap items-center justify-between gap-3 md:flex">
           {onDelete && (
-            <Button
-              variant="quiet"
-              disabled={busy || !writesEnabled}
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Icon name="trash" className="mr-1 inline size-4" />
-              Delete look
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="quiet"
+                disabled={busy || !writesEnabled}
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Icon name="trash" className="mr-1 inline size-4" />
+                Delete look
+              </Button>
+              {!writesEnabled && (
+                <span className="text-xs text-secondary">Read-only</span>
+              )}
+            </div>
           )}
           <div className="flex gap-2">
             {onAddToCapsule && (
@@ -597,13 +617,18 @@ export function SavedLookDetail({
       </div>
       <div className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-stone bg-paper p-4 md:hidden">
         {onDelete ? (
-          <Button
-            variant="quiet"
-            disabled={busy || !writesEnabled}
-            onClick={() => setDeleteOpen(true)}
-          >
-            Delete look
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="quiet"
+              disabled={busy || !writesEnabled}
+              onClick={() => setDeleteOpen(true)}
+            >
+              Delete look
+            </Button>
+            {!writesEnabled && (
+              <span className="text-xs text-secondary">Read-only</span>
+            )}
+          </div>
         ) : (
           <span />
         )}
