@@ -1,4 +1,5 @@
 "use client";
+import { withFeedback } from "@/lib/feedback/store";
 
 import * as Dialog from "@radix-ui/react-dialog";
 import Image from "next/image";
@@ -256,7 +257,14 @@ export function ShareReviewDialog({
   async function copyLink() {
     if (!shareUrl) return;
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await withFeedback(
+        {
+          id: "copy-share-link",
+          label: "Copy share link",
+          success: "Link copied to the clipboard.",
+        },
+        () => navigator.clipboard.writeText(shareUrl),
+      );
       setCopied(true);
       setCopyFailed(false);
     } catch {

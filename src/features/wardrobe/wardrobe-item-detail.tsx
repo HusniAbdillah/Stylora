@@ -48,7 +48,7 @@ export type WardrobeItemDetailProps = {
 function sourceLabel(source?: WardrobeField["source"]) {
   switch (source) {
     case "visual_inference":
-      return "AI";
+      return null;
     case "catalog":
       return "Catalog";
     case "user":

@@ -1,5 +1,45 @@
 # Stylora shared progress reporting
 
+## PR 75 conflict resolution, 7 November 2026
+
+- Rebased `o1/progress-feedback` onto main `a2bf348`. Preserved both owners' progress records, the PWA installation provider and service worker, capsule saving skeleton and duplicate-submit guard, and studio save and image preparation indicators.
+- Upload notifications now confirm verified bytes without restoring the obsolete unconditional description and confidence starts. Current main retains ownership of the occasion readiness gate.
+- Focused operation and feedback tests passed 10 across three files after conflict resolution. No browser, provider, hosted mutation or deployment checks were run for this resolution. CI remains the complete check and build gate.
+
+## Owner 4 capsule bulk selection, 7 November 2026
+
+- O4.2, R38; branch `o4/capsule-select-all` from `47b1659`. Added Select all
+  above the Items category tabs, using the existing Button and draft callback.
+  Includes owned items across categories, preserves pins and removes exclusions
+  for selected items. Above 60 items, the action reads Select up to 60 and keeps
+  existing choices first. Manual selection and pinning also respect that bound.
+- `make pr-ready PNPM="corepack pnpm"` passed lint and typecheck; Lane A.
+  Storybook Items fixture on port 3129: a real browser click changed 8 selected
+  items to all 9, retained 1 required item, cleared the remaining exclusion and
+  disabled Select all. Desktop screenshot inspected. Storybook was stopped.
+- No new UI tests or local production build; CI runs the full check and build.
+  Browser reload persistence, mobile layout and the over-60 case were not
+  exercised. No provider call, hosted mutation, dependency or schema change.
+
+## Owner 1 sidebar edge toggle: 7 November 2026
+
+- The user requested a smooth sidebar toggle anchored to its divider. Moved
+  the existing accessible button out of the changing logo row and centered it
+  on the sidebar edge with a fixed vertical offset. The scrolling content sits
+  inside a separate container so it cannot clip the boundary control.
+- Removed the blank-surface pointer toggle. Expanded and collapsed headers use
+  the same height; icons keep the same left padding. Labels stay mounted and
+  fade while width and chevron rotation share a 220 ms transition. Reduced
+  motion sets the duration to zero. Existing persisted state, destination links,
+  profile access and the mobile drawer are preserved.
+- `pnpm exec vitest run src/components/shell/navigation.test.tsx` passed both
+  tests. `git diff --check` passed. Local `make fast` passed lint and is finishing
+  typecheck. CI remains the complete suite and build gate.
+- Browser verification was attempted against a separate local Next.js server
+  on port 3133. The browser bridge timed out before loading the page; visual
+  alignment, repeated interaction and viewport checks remain unverified.
+  No database, provider, deployment or environment changes were made.
+
 ## Owner 1 demo data enrichment: 7 November 2026
 
 - The user explicitly authorized richer seed data directly in hosted Supabase.
@@ -50,6 +90,18 @@
 - Reproduction: `OWNER2_EXPLICIT_ANALYSIS_SMOKE=GO` starts the gated full runner; continuations require `OWNER2_SMOKE_CONTINUE_BUDGET=true` and preserve its atomic counter. Final command used `OWNER2_FINISH_RETAINED_SMOKE=GO`, `OWNER2_SMOKE_WARDROBE_AI=true`, `STYLORA_TEST_APP_DIR=C:/Users/Pongo/Desktop/Stylora-owner2-smoke`, then `node scripts/finish-owner2-retained-smoke.mjs`. The separate detached checkout prevents the user's port 3000 dev server from sharing Next's cache/lock with the smoke runner. No further provider request is planned.
 - Final local checks before delivery synchronization: `pnpm lint`, `pnpm typecheck`, and targeted backend Vitest **43 tests across nine files** passed. Diagnostic test expectations now assert the explicit missing-operation code; integer-key schema tests assert bounds and reject invalid indices. No rule or guard was weakened.
 - User-reviewed UI: matching cards now order owned, alternatives, then missing; excluded candidate lists are hidden from presentation while backend evidence is retained. Missing uses a category icon and `To find`, with `No match yet`, one concise reason and vertically centered reference title. Actual desktop/mobile screenshots were inspected at 1440 and 390 px in a read-only isolated app using the real look, with zero frontend inference. Landing initial Scan and moving blue band were inspected too. Local artifacts: `.next/owner2-recovery-visual/`. No automated frontend interaction test or local production build was run.
+## Owner 1 workspace feedback, 7 November 2026
+
+- Task: O1.5 and the user's explicit request for consistent feedback across all features. Lane B; shared layout, shell, UI primitives and feature request boundaries. Contract and source audit: [FEEDBACK-AUDIT.md](FEEDBACK-AUDIT.md).
+- Branch: `o1/progress-feedback`, isolated under `.worktrees/o1-feedback`. Reconciled with `origin/main` at `1d0afb3`; preserved the newly connected Create, Profile, Preferences and preview behavior.
+- Implemented: one bottom-right viewport, retained Activity history, real operation states, stale snapshot rejection, quiet autosave success, actionable failures, explicit partial import outcomes, separate save and image results, safe retries, long-content handling, reduced motion, screen-reader status and 44 px controls. Reuses the shell's existing polling; no second observer or new dependency.
+- Design source: live Figma Activity frame `270:2437` (D17), existing Paper, Ink, Secondary, Crimson, semantic colors, shared SVG icons, radii and motion tokens.
+- Actual checks: focused tests passed 10; `make test` passed 268 with 2 existing skips. `git diff --check` passed at the implementation checkpoint. Initial older-base TypeScript errors were identified in unchanged wardrobe code; final fast gate follows the main reconciliation.
+- UI evidence: labeled Storybook notification fixtures. Failure and Retry were exercised in the integrated browser. Standard screenshot capture timed out; CDP capture succeeded and the desktop and mobile images were visually inspected. At a 390 px viewport, page width was 390 px, toast x was 16 px, toast width was 358.4 px, and both dismiss controls measured 44 by 44 px. Long text wrapped inside the card and the bounded stack remained scrollable. Fixture actions do not call the API.
+- Fixture and cleanup: synthetic HTTP responses and DTOs in unit tests, labeled UI-only sample tasks. No shared data or provider output created. Storybook caches and any local captures are ignored and unstaged.
+- Not run: local production build, hosted policy tests, hosted mutations, seeding, provider calls or deployment. Provider usage for this task: zero. End-to-end provider and Storage behavior is unverified.
+- Delivery: shared changes require a Lane B pull request and human merge review. Full-history pagination and durable background execution remain outside this UI feedback change.
+
 ## Owner 1 wardrobe visibility and navigation: 7 November 2026
 
 - User-authorized UI and navigation repair; branch `o1/navigation-wardrobe`
@@ -351,6 +403,7 @@ below the latest one.
 
 ### Owner 1 workspace frontend · 7 November 2026, Asia/Bangkok
 
+- Add Item review now uses direct editable controls, with per-field source badges and pencil toggles removed. Attribute projection matches Item details, including primary and secondary colors, populated category-specific observations, description and subcategory. Manual defaults follow category and accessory subtype. Three projection regressions passed, including retained independent edits and cleared fields. `pnpm check` passed with 295 tests and two opt-in hosted tests skipped. Isolated Chrome at 1440 and 390 px passed direct edit, blur formatting, reload, multi-proposal retention, jewelry field relevance, unchanged original readings and disabled controls during confirmation. Browser mutations were intercepted and no provider calls were made.
 - Item details visual refinement gives Item name and Category outlined surfaces through the shared SelectField variant. Desktop navigation uses a top-corner chevron, Preview uses the image icon, and Profile uses the user icon. Fixed collapsed rail intrinsic sizing and hidden profile text. Chrome passed sidebar checks at 1440, 850 and 390 px and live field checks at 1440, 390 and 360 px on port 3011, with mutations blocked. `pnpm check` passed 243 tests with two opt-in hosted tests skipped.
 - Wardrobe item details now edit name, category, description, attributes and notes inline, with Save changes and a browser draft that survives reload. Permanent deletion replaces archive and restore. The detail photo replacement control was removed. Fixed editor draft validation by projecting canonical items onto the editable fields before strict parsing.
 - Applied `20261107065738_wardrobe_permanent_delete.sql` to the hosted Stylora project. Four legacy archived items were permanently deleted under the user's explicit instruction. The command validates workspace/revision, invalidates live dependencies and capsule drafts, and preserves saved snapshots and their ready image assets. Rollback SQL passed scoping, stale-revision, dependency, snapshot and deleted-proposal replay assertions. Both hosted Wardrobe integration tests passed and cleaned their temporary fixtures.
@@ -1233,6 +1286,61 @@ which data, code revision or provider behavior was verified.
   aside a stale generated dev validator from before main's route move. Local
   lint passed. CI is the full build gate. No credentials, environment settings,
   dependencies or database declarations were changed.
+
+## Owner 1 PWA and app icons, 7 November 2026
+
+- Conflict follow-up: merged main `bfc40a6` into the PR #67 branch, retaining
+  both the PWA and sharing UI reports. Only this report file conflicted.
+  Focused PWA/navigation tests and `make fast` were started; results are
+  recorded on the pull request. No hosted or provider operations were run.
+- PR #67: https://github.com/HusniAbdillah/Stylora/pull/67. Rebased onto
+  `a924ac4` after GitHub reported a conflict in concurrent progress appends;
+  retained both reports. Shared-shell changes merged without conflicts.
+  The five focused tests passed again after integration. Temporary servers on
+  ports 3127 and 3128 were stopped; no shared fixtures were created.
+- Post-rebase `make fast PNPM="corepack pnpm"` passed lint, then encountered
+  eight obsolete `.next/types/app` route files from the earlier production
+  build. Confirmed each source route had moved under `(workspace)`, removed
+  only those generated files and reran `corepack pnpm typecheck`: passed.
+  GitHub Check on `18d7e23` passed its full check and build. Build and browser
+  evidence below was collected before rebase; CI supplies integration evidence.
+- Task O1.5, R01 and R10. Branch `o1/pwa-icons`, Lane B. Added root app
+  metadata, a standalone manifest with task shortcuts, public browser and
+  home-screen icons, a browser-supported workspace install action and Safari
+  instructions. Existing logo geometry and design colors are preserved.
+- Service-worker registration is production-only. Its cache contains only the
+  offline document, retry script and public icon. API, RSC, writes and private
+  media pass through. Updates do not force reloads or interrupt open drafts.
+  `docs/PWA.md` records the audit, cache boundary and device release checklist.
+- Windows worktree, Node 22.23.3, pnpm 10.26.2; no `.env.local` or hosted
+  configuration was copied. `corepack pnpm install --frozen-lockfile` completed.
+  `make pr-ready PNPM="corepack pnpm"` passed lint and typecheck and reported
+  Lane B. `corepack pnpm build` passed, including the static manifest route.
+- `corepack pnpm exec vitest run src/components/pwa/service-worker.test.mjs
+  src/components/shell/navigation.test.tsx` passed five tests. The new cache
+  boundary tests cover excluded requests, live navigation, network failure and
+  cache cleanup. No provider, online test or shared-data fixture ran.
+- `node scripts/generate-app-icons.mjs` generated the committed assets. A local
+  Sharp inspection confirmed exact dimensions, full opacity for the maskable
+  icon and every logo pixel inside the centered 40 percent radius safe zone.
+  The ICO directory contains 16, 32 and 48 px frames.
+- A local production server on `127.0.0.1:3127` returned the manifest and every
+  declared icon and recovery asset with HTTP 200. Node HTTP assertions passed
+  manifest identity, scope and display; worker no-store, CSP, MIME and nosniff
+  headers; and rendered favicon, Apple, theme and manifest metadata.
+- Edge visibly offered the native Install Stylora action without a simulated
+  installation event. After a controlled reload and shutdown of this task's
+  server, navigation to `/profile?offline-check=1` displayed the branded cached
+  fallback at the same address, including its icon and retry control.
+  Recovery layout was inspected at desktop and mobile widths; measured mobile
+  content width equaled its 355 CSS px viewport and the retry target was about
+  50 px tall. Temporary viewport overrides were reset.
+- Browser automation intermittently detached. The final retry-to-online click,
+  installation acceptance, iOS instructions on a device, Android launcher masks,
+  an installed-app relaunch and an existing-worker upgrade were not verified.
+  The local unconfigured Profile state is not database integration evidence.
+  CI remains the full test gate. No deployment, hosted write or provider call
+  was performed; human review is required before merging this Lane B change.
 
 ## Owner 3 sharing and saved-look UI cleanup, 7 November 2026
 

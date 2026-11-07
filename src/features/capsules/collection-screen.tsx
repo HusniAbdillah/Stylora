@@ -6,6 +6,7 @@ import { Button, StateNotice } from "@/components/ui";
 import { CapsuleCollection } from "./capsule-results";
 import type { CapsuleResult } from "./capsule-types";
 import type { CapsuleDraftState } from "./schema";
+import { feedbackRequest } from "@/lib/feedback/request";
 
 export function CapsuleCollectionScreen({
   capsules,
@@ -18,16 +19,22 @@ export function CapsuleCollectionScreen({
   const [message, setMessage] = useState("");
   async function remove(id: string) {
     const capsule = capsules.find((item) => item.id === id);
-    const response = await fetch(`/api/capsules/${id}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expectedRevision: capsule?.revision }),
-    });
-    if (response.ok) router.refresh();
-    else
+    try {
+      const response = await feedbackRequest(`/api/capsules/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedRevision: capsule?.revision }),
+      });
+      if (response.ok) router.refresh();
+      else
+        setMessage(
+          "This capsule could not be deleted. Reload the collection to check its current revision.",
+        );
+    } catch {
       setMessage(
-        "This capsule could not be deleted. Reload the collection to check its current revision.",
+        "Could not connect. Your capsule is kept. Try deleting it again.",
       );
+    }
   }
   return (
     <>

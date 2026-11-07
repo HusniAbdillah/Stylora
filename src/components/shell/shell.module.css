@@ -1,37 +1,35 @@
 .sidebar {
+  --sidebar-duration: 220ms;
+  --sidebar-easing: cubic-bezier(0.4, 0, 0.2, 1);
   width: 15.5rem;
   min-width: 0;
   flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
   position: sticky;
   top: 0;
   align-self: flex-start;
   height: 100dvh;
-  overflow-y: auto;
   background: var(--color-surface);
   color: var(--color-text);
   border-inline-end: 1px solid var(--color-border);
-  padding: 1rem;
+  transition: width var(--sidebar-duration) var(--sidebar-easing);
 }
 .sidebar[data-rail="true"] {
   width: 5rem;
-  align-items: center;
 }
-.sidebarSurfaceToggle {
-  position: absolute;
-  inset: 0;
-  background: transparent;
-  cursor: w-resize;
-}
-[data-rail="true"] .sidebarSurfaceToggle {
-  cursor: e-resize;
-}
-.sidebar > :not(.sidebarSurfaceToggle) {
-  position: relative;
+.sidebarContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: 100%;
+  padding: 1rem;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .sidebarToggle {
+  position: absolute;
+  inset-inline-end: -22px;
+  inset-block-start: 22px;
+  z-index: 2;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -39,11 +37,13 @@
   height: 44px;
   border-radius: var(--radius-pill);
   background: var(--color-porcelain);
+  border: 1px solid var(--color-border);
   color: var(--color-muted);
   cursor: pointer;
 }
 .sidebarChevron {
   transform: rotate(90deg);
+  transition: transform var(--sidebar-duration) var(--sidebar-easing);
 }
 [data-rail="true"] .sidebarChevron {
   transform: rotate(-90deg);
@@ -78,13 +78,13 @@
   width: 100%;
   gap: 0.5rem;
   min-height: 3.5rem;
+  flex-shrink: 0;
 }
-[data-rail="true"] .brandRow {
-  flex-direction: column-reverse;
-  gap: 0.75rem;
-}
-[data-rail="true"] .sidebarToggle {
-  align-self: flex-end;
+.brandRow > a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline-start: 10px;
 }
 .links {
   display: grid;
@@ -93,6 +93,34 @@
 }
 .links a {
   position: relative;
+}
+.sidebar .links a,
+.sidebar .unavailable,
+.sidebar .profile {
+  padding: 10px;
+  white-space: nowrap;
+}
+.sidebar .links a > :first-child,
+.sidebar .unavailable > :first-child,
+.sidebar .profile > :first-child {
+  flex-shrink: 0;
+}
+.linkLabel,
+.profileLabel {
+  min-width: 0;
+  overflow: hidden;
+  visibility: visible;
+  transition:
+    opacity var(--sidebar-duration) var(--sidebar-easing),
+    visibility 0s;
+}
+[data-rail="true"] .linkLabel,
+[data-rail="true"] .profileLabel {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--sidebar-duration) var(--sidebar-easing),
+    visibility 0s var(--sidebar-duration);
 }
 .navigationPending {
   margin-left: auto;
@@ -128,7 +156,7 @@
   background: var(--color-selected);
   font-weight: 600;
 }
-.links a[aria-current="page"] > span,
+.links a[aria-current="page"] > span:first-child,
 .resume > span,
 .profile > span:first-child {
   color: var(--color-action);
@@ -150,19 +178,14 @@
   min-width: 0;
 }
 [data-rail="true"] .links {
-  justify-items: center;
+  justify-items: stretch;
 }
 [data-rail="true"] .links a,
 [data-rail="true"] .unavailable,
 [data-rail="true"] .profile {
-  width: 44px;
+  width: 100%;
   max-width: 100%;
-  gap: 0;
-  padding: 10px;
-  justify-content: center;
-}
-[data-rail="true"] .profile > span[hidden] {
-  display: none;
+  justify-content: flex-start;
 }
 .profile small,
 .activityPanel small {
@@ -262,7 +285,15 @@
   margin-left: auto;
 }
 .activityPanel li small {
+  overflow-wrap: anywhere;
   font-size: 12px;
+}
+.activityPanel li > div {
+  min-width: 0;
+  flex: 1;
+}
+.activityPanel li > span {
+  flex-shrink: 0;
 }
 .shellNotice {
   display: flex;
@@ -355,4 +386,10 @@
 }
 .profile[aria-current="page"] {
   background: var(--color-selected);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    --sidebar-duration: 0ms;
+  }
 }

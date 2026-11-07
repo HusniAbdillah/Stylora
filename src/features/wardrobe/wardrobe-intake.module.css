@@ -57,8 +57,7 @@
   margin: 0;
 }
 
-.close,
-.editField {
+.close {
   display: grid;
   place-items: center;
   flex: none;
@@ -71,13 +70,11 @@
   cursor: pointer;
 }
 
-.close:hover,
-.editField:hover {
+.close:hover {
   background: var(--color-blush);
 }
 
-.close svg,
-.editField svg {
+.close svg {
   width: 20px;
   height: 20px;
 }
@@ -186,7 +183,7 @@
 
 .fieldValue {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   align-self: stretch;
   gap: 2px 8px;
@@ -219,8 +216,8 @@
   flex-direction: column;
 }
 
-.fieldText strong,
-.fieldText input {
+.fieldText input,
+.fieldText textarea {
   color: var(--color-ink);
   font-size: 14px;
   font-weight: 500;
@@ -228,28 +225,13 @@
   overflow-wrap: anywhere;
 }
 
-.fieldText input {
+.fieldText input,
+.fieldText textarea {
   width: 100%;
   border: 0;
   min-width: 0;
   background: transparent;
   font: inherit;
-}
-
-.sourceBadge {
-  background: var(--color-blush);
-  color: var(--color-crimson);
-  font-size: 11px;
-}
-
-.editField {
-  width: 44px;
-  height: 44px;
-}
-
-.editField svg {
-  width: 16px;
-  height: 16px;
 }
 
 .limitation,
@@ -533,4 +515,10 @@
   .footer {
     margin-top: 16px;
   }
+}
+
+.fieldText textarea {
+  resize: vertical;
+  min-height: 82px;
+  line-height: 1.5;
 }

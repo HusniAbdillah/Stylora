@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icon } from "@/components/ui";
+import { InstallApp } from "@/components/pwa/install-app";
 import {
   ActivityMenu,
   MobileTopBar,
@@ -131,6 +132,7 @@ export function WorkspaceShell({
           <main id="workspace-content" tabIndex={-1} className="min-w-0">
             {children}
           </main>
+          <InstallApp />
         </div>
       </div>
     </div>

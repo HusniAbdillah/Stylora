@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { operationStatusSchema } from "./schema";
+import { reportOperationResponse } from "@/lib/feedback/request";
+import { publishFeedback } from "@/lib/feedback/store";
 
 const pendingRequests = new Map<string, Promise<Response>>();
 const statusSchema = z
@@ -144,9 +146,22 @@ export async function startOperationRequest(
 ): Promise<Response> {
   let pending = pendingRequests.get(operationId);
   if (!pending) {
-    pending = executeRequest(operationId, url, init).finally(() =>
-      pendingRequests.delete(operationId),
-    );
+    pending = executeRequest(operationId, url, init)
+      .then(async (response) => {
+        await reportOperationResponse(response, operationId);
+        return response;
+      })
+      .catch((error) => {
+        publishFeedback({
+          id: `operation-request:${operationId}`,
+          label: "Task connection interrupted",
+          state: "failed",
+          detail:
+            "The task may still be running. Open it to check its current status before retrying.",
+        });
+        throw error;
+      })
+      .finally(() => pendingRequests.delete(operationId));
     pendingRequests.set(operationId, pending);
   }
   return (await pending).clone();
@@ -173,6 +188,9 @@ export async function retryOperationRequest(
     `/api/workflow-operations/${operationId}/retry`,
     { method: "POST", cache: "no-store" },
   );
-  if (!response.ok) return response;
+  if (!response.ok) {
+    await reportOperationResponse(response, operationId);
+    return response;
+  }
   return requestOperation(operationId, executeUrl, body);
 }

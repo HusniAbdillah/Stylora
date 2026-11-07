@@ -29,6 +29,7 @@ import { getWardrobeCollectionHref } from "@/features/wardrobe/wardrobe-navigati
 import { WorkspaceShell } from "./workspace-shell";
 import type { ActivityItem } from "./workspace-navigation";
 import styles from "./shell.module.css";
+import { acceptOperationActivity } from "@/features/operations/notifications";
 
 const sections = {
   "/create": "Create",
@@ -187,63 +188,69 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
     }
   }, [pathname, searchParams, scopeKey, state.draft, recoveredDraft]);
 
-  const refreshActivity = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const operations = await settingsRequest(
-        "/api/workflow-operations",
-        activitySchema,
-        { signal },
-      );
-      if (signal?.aborted) return;
-      setActivity(
-        operations.map((operation): WorkspaceActivityItem => {
-          const hasCreateExecutor = createOperationKinds.has(operation.kind);
-          const destination = activityDestinations[operation.kind];
-          const step =
-            operation.kind === "wardrobe_match"
-              ? "matches"
-              : ["outfit_options", "option_regeneration"].includes(
-                    operation.kind,
-                  )
-                ? "ideas"
-                : "review";
-          return {
-            id: operation.id,
-            kind: operation.kind,
-            label: operationLabels[operation.kind],
-            state:
-              operation.status === "succeeded" ? "complete" : operation.status,
-            detail:
-              operation.status === "failed"
-                ? hasCreateExecutor
-                  ? "Could not finish. Retry or reopen the look."
-                  : destination
-                    ? "Could not finish. Open this feature to retry."
-                    : "Could not finish."
-                : operation.status === "succeeded"
-                  ? "Ready"
-                  : operation.status === "partial"
-                    ? "Partial results available"
-                    : operation.status === "superseded"
-                      ? "Replaced by newer inputs"
-                      : operation.status === "running"
-                        ? "In progress"
-                        : operation.status === "queued"
-                          ? "Waiting to start"
-                          : "Cancelled",
-            href:
-              hasCreateExecutor && operation.subjectType === "look"
-                ? `/create/${operation.subjectId}?step=${step}`
-                : destination,
-          };
-        }),
-      );
-      setActivityError(false);
-    } catch (error) {
-      if (!(error instanceof Error && error.name === "AbortError"))
-        setActivityError(true);
-    }
-  }, []);
+  const refreshActivity = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const operations = await settingsRequest(
+          "/api/workflow-operations?limit=50",
+          activitySchema,
+          { signal },
+        );
+        if (signal?.aborted) return;
+        acceptOperationActivity(operations, writesEnabled);
+        setActivity(
+          operations.map((operation): WorkspaceActivityItem => {
+            const hasCreateExecutor = createOperationKinds.has(operation.kind);
+            const destination = activityDestinations[operation.kind];
+            const step =
+              operation.kind === "wardrobe_match"
+                ? "matches"
+                : ["outfit_options", "option_regeneration"].includes(
+                      operation.kind,
+                    )
+                  ? "ideas"
+                  : "review";
+            return {
+              id: operation.id,
+              kind: operation.kind,
+              label: operationLabels[operation.kind],
+              state:
+                operation.status === "succeeded"
+                  ? "complete"
+                  : operation.status,
+              detail:
+                operation.status === "failed"
+                  ? hasCreateExecutor
+                    ? "Could not finish. Retry or reopen the look."
+                    : destination
+                      ? "Could not finish. Open this feature to retry."
+                      : "Could not finish."
+                  : operation.status === "succeeded"
+                    ? "Ready"
+                    : operation.status === "partial"
+                      ? "Partial results available"
+                      : operation.status === "superseded"
+                        ? "Replaced by newer inputs"
+                        : operation.status === "running"
+                          ? "In progress"
+                          : operation.status === "queued"
+                            ? "Waiting to start"
+                            : "Cancelled",
+              href:
+                hasCreateExecutor && operation.subjectType === "look"
+                  ? `/create/${operation.subjectId}?step=${step}`
+                  : destination,
+            };
+          }),
+        );
+        setActivityError(false);
+      } catch (error) {
+        if (!(error instanceof Error && error.name === "AbortError"))
+          setActivityError(true);
+      }
+    },
+    [writesEnabled],
+  );
 
   useEffect(() => {
     let profileController: AbortController | null = null;
