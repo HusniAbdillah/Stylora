@@ -142,4 +142,3 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.attach_product_candidate(uuid,uuid,uuid,uuid,uuid,uuid,integer) FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.attach_product_candidate(uuid,uuid,uuid,uuid,uuid,uuid,integer) TO service_role;
-

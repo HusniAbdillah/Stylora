@@ -41,5 +41,3 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
-

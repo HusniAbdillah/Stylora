@@ -154,7 +154,7 @@ below the latest one.
 - Consumer integration: Owner 1 inventory and preferences; Owner 3 selected
   detail; Owner 4 worker; not assessed.
 - Verification evidence: Not run.
-- Real Muse evidence and input provenance: Not verified.
+- Real OpenAI evidence and input provenance: Not verified.
 - Unresolved work and next concrete action: Not reported.
 
 ## 6. Owner 3 report
@@ -299,3 +299,49 @@ which data, code revision or provider behavior was verified.
 - Delivery: Lane B (schema, generated types, storage and shared server code).
   The user explicitly authorized PR creation and merge after green checks,
   including resolving conflicts. No branch-protection bypass or deployment.
+
+## Owner 3 backend checkpoint: 7 November 2026, Asia/Jakarta
+
+- Branch: `codex/owner3-backend`, based on merged foundation `f78c002`.
+- Delivered: product search/cache/score/import and attach; per-option selection;
+  immutable save, saved filters/counts/detail/delete/media retry; reviewed public
+  shares, revocation and token-checked avatar/item bytes. Thin HTTP routes use
+  server workspace scope, Zod, the write gate and safe no-store responses.
+- Media generation belongs to Owner 4. Saved responses carry truthful queued,
+  running, failed and succeeded states and nullable image URLs for the Figma
+  placeholder. No generated image or autonomous worker is claimed.
+- Two additive MCP migrations applied to the authorized hosted project:
+  `20261107034005_owner3_backend_commands` and
+  `20261107034035_share_revocation_guard`. The original baseline is unchanged.
+  Types were regenerated from the applied schema.
+- Passed: shared HTTP 3 tests, sharing 2, decisions 3, product score 3 and
+  provider/import-boundary 15. Initial products tests required a Vitest alias
+  configuration; the affected 15 tests passed after that fix. Lint and integrated
+  typecheck passed. Local build not repeated; CI supplies the full build gate.
+- Hosted command smoke passed retry identity, list filters, irreversible revoke
+  after an image becomes unavailable, and atomic deletion. Fixtures rolled back.
+- Live HTTP smoke passed real scoped detail, one SerpAPI search, cached restore,
+  attach, selection, idempotent save with queued image operation, saved filters,
+  public projection, revoke returning 404, and saved deletion. Provider calls: 1.
+- Cleanup confirmed: synthetic look/saved records and Storage objects remaining: 0. Only the generated fixture and its unreferenced search products were removed.
+  Runtime configuration file remains ignored; credential scan found no values.
+- Not run: live candidate-image import, image generation, UI/browser comparison,
+  deployment and local Supabase. Pure image import boundary tests passed.
+- Handoff: `docs/OWNER-3-BACKEND.md` maps API data to D06, D14, D27, D15 and D16
+  and identifies the Owner 1/2/4 integration points. No shared executor is implied.
+- User authorized PR creation, conflict resolution and merge after green CI.
+- Integration update: merged `origin/main` at `4fd5aba` (shared UI and Storybook)
+  without conflicts. Frozen dependency install, lint and typecheck passed again.
+  These UI components remain presentation contracts; application wiring is not
+  claimed by the backend smoke.
+- Latest user instruction supersedes the earlier merge authorization: open the
+  PR and check CI, but leave the PR unmerged until explicitly requested.
+- A second main update, `532a463` (profile, preferences and workflow drafts),
+  also merged without conflicts. Its API routes use separate feature modules;
+  the combined revision is submitted to the PR CI gate.
+- PR #7 CI first passed lint/typecheck, then reported 67 passing tests and one
+  failing IDR normalization test on Linux. ICU currency display defaults differ
+  from Windows. Persisted IDR conversion now explicitly uses two minor digits,
+  verified against the SIX ISO 4217 currency list. The focused provider suite
+  passed all three tests, including a runtime-independent regression. CI rerun
+  remains the final build gate; merge is held at the user's request.
