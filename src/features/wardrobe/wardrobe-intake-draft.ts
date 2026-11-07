@@ -41,12 +41,22 @@ export const emptyDraft: IntakeDraft = {
   isSample: false,
 };
 
-export const manualFields: WardrobeField[] = [
-  { key: "color", label: "Color", value: "", source: "user" },
-  { key: "silhouette", label: "Shape or fit", value: "", source: "user" },
-  { key: "texture", label: "Visible texture", value: "", source: "user" },
-  { key: "notes", label: "Other details", value: "", source: "user" },
-];
+const intakeFieldLabels = [
+  ["color", "Colors"],
+  ["pattern", "Pattern"],
+  ["texture", "Fabric look"],
+  ["silhouette", "Silhouette and fit"],
+  ["length", "Length"],
+  ["necklineSleeve", "Neckline and sleeve"],
+  ["occasion", "Occasion"],
+] as const;
+
+export function getIntakeFields(fields: WardrobeField[] = []): WardrobeField[] {
+  return intakeFieldLabels.map(([key, label]) => {
+    const field = fields.find((candidate) => candidate.key === key);
+    return { value: "", ...field, key, label };
+  });
+}
 
 export function sampleDraft(): IntakeDraft {
   return {
@@ -55,15 +65,15 @@ export function sampleDraft(): IntakeDraft {
     imageUrl: "/design/images/wardrobe-ivory-shirt.webp",
     name: "Ivory relaxed shirt",
     category: "top",
-    fields: [
-      { key: "color", label: "Color", value: "Ivory", source: "sample" },
+    fields: getIntakeFields([
+      { key: "color", label: "Colors", value: "Ivory", source: "sample" },
       {
         key: "silhouette",
-        label: "Shape or fit",
+        label: "Silhouette and fit",
         value: "Relaxed button-front shirt",
         source: "sample",
       },
-    ],
+    ]),
     isSample: true,
   };
 }

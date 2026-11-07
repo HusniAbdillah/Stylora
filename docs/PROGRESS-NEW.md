@@ -171,6 +171,7 @@ below the latest one.
 
 ### Owner 1 workspace frontend · 7 November 2026, Asia/Bangkok
 
+- Wardrobe Add Item (D08, M15) uses the eight desktop fields on both screen sizes. Existing drafts keep their color, fabric and fit values under the updated labels. Extra notes from earlier drafts are retained in the saved item. `pnpm check` passed with 112 tests.
 - Work branch `o1/workspace-frontend`, base `4fd5aba`. Requirements R33–R36 and work packages O1.3–O1.6. The four application routes under `src/app/(workspace)` compose the shared shell, Wardrobe, Preferences and Profile.
 - Wardrobe supports searching, filtering, returning to the collection, reading and editing details, marking a candidate owned, and archiving and restoring pieces. Each seeded example uses the same existing `/design/images/wardrobe-ivory-shirt.webp` thumbnail. The intake keeps selected files in IndexedDB. Users can save one or more manually described pieces from a photo, or try the labeled sample item.
 - Preferences preserves optional selections and drafts across navigation and reload. Profile saves the workspace name shown in the sidebar and reads the active wardrobe count. The sample workspace keeps local navigation, item records, preferences and profile data in browser storage. Database persistence, automated descriptions and other owners’ routes remain separate integration work.
