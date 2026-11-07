@@ -26,6 +26,12 @@ database configuration is missing or invalid. HTTP 200 confirms valid
 configuration shape and reports whether provider keys are present. Use an
 approved scoped query to verify actual connectivity.
 
+## Component catalog
+
+Run `pnpm storybook` and open [the catalog](http://localhost:6006). Foundations contains the tokens, icons, brand assets and shared controls. Shell contains responsive navigation. Features contains interactive component examples for all four owners. Use `pnpm build:storybook` for a static catalog in `storybook-static/`.
+
+Follow the [UI library guide](src/components/ui/README.md) for semantic color tokens, fonts, assets and component imports. Shared controls live in `src/components/ui/`, navigation in `src/components/shell/`, and feature components in `src/features/<feature>/`.
+
 ## Checks
 
 ```sh

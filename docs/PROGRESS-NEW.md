@@ -109,6 +109,15 @@ below the latest one.
   live provider, storage, Figma screen or Vercel verification was performed
   for this foundation.
 
+### Component library checkpoint · 2026-11-07, Asia/Bangkok
+
+- Owner 1 coordinated shared presentation for all four owners on the working tree based on `82aa65b`. O1.3–O1.6 cover the Wardrobe, preference, profile, shell and ownership controls.
+- Current Figma sources are pages 01 through 03, identified by stable node IDs 250:394, 250:395 and 250:396. The [library guide](../src/components/ui/README.md) maps desktop frame IDs to each feature entry point. The mobile variants share the same presentation contracts.
+- UI delivered in `src/components/ui`, `src/components/shell` and `src/features` with locally bundled fonts and `public/design` assets. Brand colors and semantic roles are defined in `src/app/globals.css`. Storybook examples use labeled sample media and fixture data. Five alternate men's silhouettes were drawn locally to fill the documented gap in the Figma illustrations.
+- Local checks on Windows: `pnpm check` passed lint, TypeScript and 3 existing tests. ESLint reported one warning in the existing PostCSS configuration. `pnpm build` completed using Next's Webpack builder. The default Turbopack builder exited while starting its PostCSS worker on this workstation. `pnpm build:storybook --quiet` generated the static component catalog.
+- Browser verification: served the static catalog on loopback and loaded all 76 story iframes in Chrome at 390 and 1440 px. There were no failed image decodes or document-level horizontal scrollbars. Seven representative examples also passed at 360, 768 and 1280 px. Keyboard and pointer checks covered confirm-dialog dismissal and focus restoration, chip selection, desktop rail collapse, mobile navigation, candidate versus owned filtering and the empty-search result. The catalog and QA screenshots were generated locally in ignored output directories.
+- Integration pending: feature routes, persisted selections, signed uploads, provider calls and the server-side Supabase backend. These checks exercised presentation callbacks and sample states. The local checks made no hosted data changes.
+
 - Reporter and timestamp: Not reported.
 - Source revision and task IDs: Not reported.
 - Contract published: canonical items, preference mapping, candidate ownership,
