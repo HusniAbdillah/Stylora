@@ -12,24 +12,24 @@ PNPM ?= pnpm
 
 help:
 	@echo Stylora make targets
-	@echo.
-	@echo Setup
+	@echo -
+	@echo [Setup]
 	@echo   make install       Install dependencies with the frozen lockfile
 	@echo   make env           Create .env.local from .env.example when missing
-	@echo Develop
+	@echo [Develop]
 	@echo   make dev           Start the Next.js dev server on port 3000
 	@echo   make build         Production build
 	@echo   make start         Serve the production build
-	@echo Quality
+	@echo [Quality]
 	@echo   make lint          ESLint
 	@echo   make typecheck     next typegen and tsc
 	@echo   make test          Vitest, single run
-	@echo   make check         lint, typecheck and test (same as pnpm check)
+	@echo   make check         lint, typecheck and test, same as pnpm check
 	@echo   make format        Prettier check
 	@echo   make format-write  Prettier write
 	@echo   make ci            Same steps as .github/workflows/check.yml
-	@echo   make pre-pr        check then build; run after rebasing on origin/main
-	@echo Database, Owner 1 only
+	@echo   make pre-pr        check then build, run after rebasing on origin/main
+	@echo [Database, Owner 1 only]
 	@echo   make db-new name=add_operations   Create a new migration with the CLI
 	@echo   make db-types                     Regenerate src/types/database.ts
 	@echo   make db-push CONFIRM=yes          Push reviewed migrations to hosted Supabase
