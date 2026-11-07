@@ -13,7 +13,7 @@ import {
   assertWorkflowRpc,
 } from "@/features/operations/server";
 import {
-  FASHION_PROMPT_VERSION,
+  AVATAR_PROMPT_VERSION as FASHION_PROMPT_VERSION,
   FASHION_SCHEMA_VERSION,
   FASHION_KNOWLEDGE_VERSION,
   IMAGE_MODEL,

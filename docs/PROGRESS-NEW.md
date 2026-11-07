@@ -1004,3 +1004,24 @@ which data, code revision or provider behavior was verified.
   locally). CI remains the full build gate. PR #49 contains the integrated work.
   No additional paid provider calls were made for this implementation. Browser
   verification has not passed; prior local browser attempts timed out.
+
+## Owner 4 visual personalization integration, 7 November 2026
+
+- PRs #51, #52, #53 and #54 merged after their complete GitHub Check workflows
+  passed. They add validated render settings, draft-preserving preference
+  navigation, a guarded comparison harness and the visual-direction contract.
+  The contract suite passed 23 focused cases; return navigation passed nine.
+- Image requests now validate one explicit visual-direction manifest, use five
+  deterministic outfit-aware poses and preserve supplied garment references.
+  The image-only prompt version changes independently of Capsule text prompts.
+  Render fingerprints include the canonical manifest and all render settings,
+  with preference database revisions excluded from visual identity.
+- Saved-avatar operation inputs capture the validated manifest and render
+  settings under the existing workspace and attempt fence. Retries retain
+  captured settings. No migration or dependency was added.
+- The integration `make pr-ready` is running; CI remains the complete check and
+  build gate. An earlier overlapping local check saw the temporarily absent
+  dependent module and was not recorded as passed. No provider calls or hosted
+  fixture writes have been made for this comparison yet. Three controlled image
+  calls and visual review will follow only after the coordinated status contract
+  is integrated; the journal reserves every call before submission.
