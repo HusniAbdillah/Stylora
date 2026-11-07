@@ -782,3 +782,20 @@ which data, code revision or provider behavior was verified.
 - Types were generated from the combined local schema with pinned Supabase CLI
   3 and formatted with Prettier. Local `make fast` passed lint and typecheck; CI and hosted
   schema application remain pending. Caller execution belongs to Owner 4.
+
+### Hosted regeneration rollout and type parity
+
+- PR #41 merged as `f634525` after GitHub check and build passed. Local
+  `make fast` passed. Vercel preview was rate-limited for 24 hours; it did not
+  produce a deployment result. No protection was bypassed.
+- Applied exact committed migration `20261107055411` under the existing hosted
+  migration approval. Recorded SQL MD5 `c87c3b7cab28810290b849aafa700862`
+  matches the merged source. The return type is `saved_look_media`; service-role
+  execution is allowed and anon/authenticated execution is denied. All 25
+  public tables retain RLS and deny direct anon/authenticated CRUD.
+- The post-rollout generator exposed six Wardrobe RPCs added concurrently to
+  hosted persistence. Replaced the local generator output with complete hosted
+  MCP output containing all 36 RPCs, including regeneration and Wardrobe commands.
+  No generated declarations were edited manually. Follow-up `make fast` is
+  running; CI remains the full gate. No provider calls, shared fixtures or
+  production environment settings were changed.
