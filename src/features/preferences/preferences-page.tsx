@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { z } from "zod";
 import { Button, ConfirmDialog, Skeleton } from "@/components/ui";
 import {
@@ -65,45 +65,43 @@ export function PreferencesLoading() {
   );
 }
 
-export function PreferencesPage() {
+function createReturnHref(destination?: string) {
+  if (
+    !destination ||
+    !destination.startsWith("/") ||
+    destination.startsWith("//") ||
+    destination.includes("\\")
+  )
+    return null;
+  const base = "https://stylora.invalid";
+  const url = new URL(destination, base);
+  if (url.origin !== base) return null;
+  const lookId = /^\/(?:looks|create)\/([^/]+)$/.exec(url.pathname)?.[1];
+  if (
+    url.pathname !== "/create" &&
+    (!lookId || !z.uuid().safeParse(lookId).success)
+  )
+    return null;
+  const params = new URLSearchParams();
+  const draft = url.searchParams.get("draft");
+  if (draft && z.uuid().safeParse(draft).success) params.set("draft", draft);
+  const step = url.searchParams.get("step");
+  if (lookId && step && ["upload", "review", "matches", "ideas"].includes(step))
+    params.set("step", step);
+  const query = params.toString();
+  return `${url.pathname}${query ? `?${query}` : ""}`;
+}
+
+export function PreferencesPage({
+  returnTo: destination,
+}: {
+  returnTo?: string;
+}) {
   const settings = useLiveSettingsDraft<PreferencesDraft>(
     preferencesConfiguration,
   );
   const [discardOpen, setDiscardOpen] = useState(false);
-  const [returnTo, setReturnTo] = useState<string | null>(null);
-
-  useEffect(() => {
-    const destination = new URLSearchParams(window.location.search).get(
-      "returnTo",
-    );
-    if (
-      !destination ||
-      !destination.startsWith("/") ||
-      destination.startsWith("//") ||
-      destination.includes("\\")
-    )
-      return;
-    const url = new URL(destination, window.location.origin);
-    if (url.origin !== window.location.origin) return;
-    const lookId = /^\/(?:looks|create)\/([^/]+)$/.exec(url.pathname)?.[1];
-    if (
-      url.pathname !== "/create" &&
-      (!lookId || !z.uuid().safeParse(lookId).success)
-    )
-      return;
-    const params = new URLSearchParams();
-    const draft = url.searchParams.get("draft");
-    if (draft && z.uuid().safeParse(draft).success) params.set("draft", draft);
-    const step = url.searchParams.get("step");
-    if (
-      lookId &&
-      step &&
-      ["upload", "review", "matches", "ideas"].includes(step)
-    )
-      params.set("step", step);
-    const query = params.toString();
-    setReturnTo(`${url.pathname}${query ? `?${query}` : ""}`);
-  }, []);
+  const returnTo = createReturnHref(destination);
 
   if (settings.loading) return <PreferencesLoading />;
 

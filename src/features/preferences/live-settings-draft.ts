@@ -99,75 +99,89 @@ export function useLiveSettingsDraft<T>(
     [configuration, scopeKey, writesEnabled],
   );
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     const version = ++loadVersion.current;
-    setLoading(true);
-    try {
-      const snapshot = await configuration.read();
-      let next = snapshot.value;
-      let baseRevision = snapshot.revision;
-      let restored = false;
-      let recoveryNotice = "";
-      try {
-        const recovery = readSettingsRecovery(scopeKey, configuration.feature);
-        if (recovery) {
-          next = configuration.parse(recovery.payload, snapshot.value);
-          baseRevision = recovery.savedRevision;
-          restored = true;
-          if (recovery.draftId) {
-            try {
-              const serverDraft = await readSettingsDraft(
-                configuration.feature,
-                recovery.draftId,
-              );
-              if (serverDraft.status !== "active") {
-                restored = false;
-                next = snapshot.value;
-                baseRevision = snapshot.revision;
-                clearSettingsRecovery(scopeKey, configuration.feature);
+    return configuration
+      .read()
+      .then(async (snapshot) => {
+        let next = snapshot.value;
+        let baseRevision = snapshot.revision;
+        let restored = false;
+        let recoveryNotice = "";
+        try {
+          const recovery = readSettingsRecovery(
+            scopeKey,
+            configuration.feature,
+          );
+          if (recovery) {
+            next = configuration.parse(recovery.payload, snapshot.value);
+            baseRevision = recovery.savedRevision;
+            restored = true;
+            if (recovery.draftId) {
+              try {
+                const serverDraft = await readSettingsDraft(
+                  configuration.feature,
+                  recovery.draftId,
+                );
+                if (serverDraft.status !== "active") {
+                  restored = false;
+                  next = snapshot.value;
+                  baseRevision = snapshot.revision;
+                  clearSettingsRecovery(scopeKey, configuration.feature);
+                }
+                if (
+                  serverDraft.status === "active" &&
+                  Date.parse(serverDraft.updatedAt) >
+                    Date.parse(recovery.updatedAt)
+                ) {
+                  next = configuration.parse(
+                    serverDraft.payload,
+                    snapshot.value,
+                  );
+                }
+              } catch {
+                recoveryNotice =
+                  "Your local draft was restored. Its server copy could not be loaded.";
               }
-              if (
-                serverDraft.status === "active" &&
-                Date.parse(serverDraft.updatedAt) >
-                  Date.parse(recovery.updatedAt)
-              ) {
-                next = configuration.parse(serverDraft.payload, snapshot.value);
-              }
-            } catch {
-              recoveryNotice =
-                "Your local draft was restored. Its server copy could not be loaded.";
             }
           }
+        } catch {
+          recoveryNotice =
+            "Browser recovery is unavailable. Saved workspace values are shown.";
         }
-      } catch {
-        recoveryNotice =
-          "Browser recovery is unavailable. Saved workspace values are shown.";
-      }
-      if (!mounted.current || version !== loadVersion.current) return;
-      saved.current = { value: snapshot.value, revision: baseRevision };
-      latest.current = next;
-      unsaved.current = restored;
-      setValue(next);
-      setDirty(restored);
-      setConflict(baseRevision !== snapshot.revision);
-      setStatus("idle");
-      setMessage(
-        baseRevision !== snapshot.revision
-          ? "The shared settings changed while this draft was open. Reload the latest revision before saving."
-          : recoveryNotice || (restored ? "Draft restored" : ""),
-      );
-    } catch (error) {
-      if (!mounted.current || version !== loadVersion.current) return;
-      setStatus("error");
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Settings could not be loaded. Try again.",
-      );
-    } finally {
-      if (mounted.current && version === loadVersion.current) setLoading(false);
-    }
+        if (!mounted.current || version !== loadVersion.current) return;
+        saved.current = { value: snapshot.value, revision: baseRevision };
+        latest.current = next;
+        unsaved.current = restored;
+        setValue(next);
+        setDirty(restored);
+        setConflict(baseRevision !== snapshot.revision);
+        setStatus("idle");
+        setMessage(
+          baseRevision !== snapshot.revision
+            ? "The shared settings changed while this draft was open. Reload the latest revision before saving."
+            : recoveryNotice || (restored ? "Draft restored" : ""),
+        );
+      })
+      .catch((error: unknown) => {
+        if (!mounted.current || version !== loadVersion.current) return;
+        setStatus("error");
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Settings could not be loaded. Try again.",
+        );
+      })
+      .finally(() => {
+        if (mounted.current && version === loadVersion.current)
+          setLoading(false);
+      });
   }, [configuration, scopeKey]);
+
+  async function reload() {
+    setLoading(true);
+    await load();
+  }
 
   useEffect(() => {
     mounted.current = true;
@@ -306,7 +320,7 @@ export function useLiveSettingsDraft<T>(
     change,
     save,
     discard,
-    reload: load,
+    reload,
     reloadRevision,
   };
 }

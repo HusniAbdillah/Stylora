@@ -164,7 +164,6 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
     if (!draft?.lookId || pathname !== `/looks/${draft.lookId}`) return;
     const selected = z.uuid().safeParse(searchParams.get("option_id"));
     if (!selected.success) return;
-    setRecoveredOptionId(selected.data);
     // Detail rendering has already checked option membership server-side.
     try {
       for (const key of [
@@ -385,13 +384,18 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
   const currentStep = queryStep.success
     ? queryStep.data
     : (draft?.currentStep ?? "upload");
+  const detailOption = z.uuid().safeParse(searchParams.get("option_id"));
   const selectedOptionId =
-    state.look && state.look.id === draft?.lookId
-      ? (state.look.outfitOptions.find(
-          (option) =>
-            option.optionType === state.selectedDirection && !option.stale,
-        )?.id ?? null)
-      : recoveredOptionId;
+    draft?.lookId &&
+    pathname === `/looks/${draft.lookId}` &&
+    detailOption.success
+      ? detailOption.data
+      : state.look && state.look.id === draft?.lookId
+        ? (state.look.outfitOptions.find(
+            (option) =>
+              option.optionType === state.selectedDirection && !option.stale,
+          )?.id ?? null)
+        : recoveredOptionId;
   const breadcrumbs =
     (section === "/create" && pathname !== "/create") || section === "/looks"
       ? [
