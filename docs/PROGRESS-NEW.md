@@ -43,6 +43,10 @@
   transition took 7,728 ms in this dev run; this is not evidence of a production
   speed improvement or a before/after benchmark. API mutations were blocked in
   browser checks, and no provider-backed path was exercised.
+- Final copy screenshots were inspected at 1440 px and 390 px. Wardrobe rendered
+  loaded sample photos, one visible collection title, no root breadcrumb and no
+  mobile horizontal overflow. Capsules rendered one empty-state message. QA
+  captures stay local and unstaged; the production deployment is unchanged.
 - Runtime uses an isolated dev server at `http://127.0.0.1:3027`; root env values
   are passed through process environment without copying credential files into
   the worktree. No production deployment or provider-backed feature execution.
