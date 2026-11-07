@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Button, Chip, ConfirmDialog, Icon } from "@/components/ui";
+import { Button, Chip, ConfirmDialog, Icon, Stepper } from "@/components/ui";
 import {
   CAPSULE_TEMPLATES,
   EMPTY_CAPSULE_DRAFT,
@@ -55,11 +55,13 @@ export function CapsuleTemplateCard({
       onClick={() => onSelect?.(template.id)}
       aria-pressed={selected}
       className={
-        "min-w-0 rounded-2xl border bg-paper p-2 text-left hover:border-crimson focus-visible:outline-2 focus-visible:outline-crimson " +
-        (selected ? "border-crimson bg-blush" : "border-stone")
+        "grid min-w-0 grid-cols-[88px_minmax(0,1fr)] items-center gap-3 rounded-2xl border bg-paper p-2 text-left hover:border-crimson focus-visible:outline-2 focus-visible:outline-crimson sm:block " +
+        (selected
+          ? "order-first border-crimson bg-blush sm:order-none"
+          : "border-stone")
       }
     >
-      <span className="relative block aspect-[4/5] overflow-hidden rounded-xl bg-sand">
+      <span className="relative block h-[100px] overflow-hidden rounded-xl bg-sand sm:aspect-[4/5] sm:h-auto">
         <Image
           src={template.imageUrl}
           alt=""
@@ -68,19 +70,21 @@ export function CapsuleTemplateCard({
           className="object-cover"
         />
       </span>
-      <span className="mt-2 block font-serif text-lg leading-tight">
-        {template.name}
-      </span>
-      <span className="mt-1 block text-xs text-secondary">
-        {template.tagline}
-      </span>
-      <span className="mt-2 hidden space-y-1 text-xs lg:block">
-        {template.cues.map((cue) => (
-          <span key={cue} className="block">
-            <Icon name="check" className="mr-1 inline size-3 text-crimson" />
-            {cue}
-          </span>
-        ))}
+      <span>
+        <span className="mt-2 block font-serif text-xl leading-tight lg:text-2xl">
+          {template.name}
+        </span>
+        <span className="mt-1 block text-xs text-secondary">
+          {template.tagline}
+        </span>
+        <span className="mt-2 hidden space-y-1 text-xs lg:block">
+          {template.cues.map((cue) => (
+            <span key={cue} className="block">
+              <Icon name="check" className="mr-1 inline size-3 text-crimson" />
+              {cue}
+            </span>
+          ))}
+        </span>
       </span>
     </button>
   );
@@ -153,25 +157,29 @@ function StepHeading({
 export function CapsuleWizard({
   initialDraft = EMPTY_CAPSULE_DRAFT,
   initialStep = 0,
+  initialVisited = initialStep,
   ownedItems,
   profileSummary,
   busy = false,
   onDraftChange,
+  onStepChange,
   onBuild,
   onBackToCollection,
 }: {
   initialDraft?: CapsuleDraft;
   initialStep?: 0 | 1 | 2 | 3;
+  initialVisited?: number;
   ownedItems: CapsuleItem[];
   profileSummary?: string[];
   busy?: boolean;
   onDraftChange?: (draft: CapsuleDraft) => void;
+  onStepChange?: (step: 0 | 1 | 2 | 3, visited: number) => void;
   onBuild?: (draft: CapsuleDraft) => void;
   onBackToCollection?: () => void;
 }) {
   const [draft, setDraft] = useState<CapsuleDraft>(initialDraft);
   const [step, setStep] = useState<number>(initialStep);
-  const [visited, setVisited] = useState<number>(initialStep);
+  const [visited, setVisited] = useState<number>(initialVisited);
   const [touched, setTouched] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<
     CapsuleTemplateId | null | undefined
@@ -252,6 +260,11 @@ export function CapsuleWizard({
     const next = Math.min(step + 1, 3);
     setStep(next);
     setVisited(Math.max(visited, next));
+    onStepChange?.(next as 0 | 1 | 2 | 3, Math.max(visited, next));
+  }
+  function goToStep(next: number) {
+    setStep(next);
+    onStepChange?.(next as 0 | 1 | 2 | 3, visited);
   }
   const canContinue =
     step === 0 || step === 1
@@ -263,42 +276,15 @@ export function CapsuleWizard({
 
   return (
     <div className="pb-20 md:pb-4">
-      <nav
-        aria-label="Capsule steps"
-        className="mb-5 flex max-w-3xl gap-1 overflow-x-auto rounded-2xl border border-stone bg-paper p-1"
-      >
-        {STEPS.map((label, index) => (
-          <button
-            key={label}
-            type="button"
-            disabled={index > visited}
-            aria-current={step === index ? "step" : undefined}
-            onClick={() => setStep(index)}
-            className={
-              "flex min-h-11 min-w-max items-center gap-2 rounded-xl px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50 md:text-sm " +
-              (step === index ? "bg-blush font-semibold" : "hover:bg-porcelain")
-            }
-          >
-            <span
-              className={
-                "flex size-6 items-center justify-center rounded-full border " +
-                (index <= step
-                  ? "border-crimson bg-crimson text-paper"
-                  : "border-stone")
-              }
-            >
-              {index < step ? (
-                <Icon name="check" className="size-3" />
-              ) : (
-                index + 1
-              )}
-            </span>
-            <span className={index === step ? "" : "hidden sm:inline"}>
-              {label}
-            </span>
-          </button>
-        ))}
-      </nav>
+      <div className="mb-5">
+        <Stepper
+          steps={STEPS}
+          current={step}
+          visited={Array.from({ length: visited + 1 }, (_, index) => index)}
+          onSelect={goToStep}
+          label="Capsule progress"
+        />
+      </div>
       <header className="flex flex-wrap items-end justify-between gap-5">
         <StepHeading step={step} templateName={template?.name} />
         <div className="hidden md:block">
@@ -758,7 +744,7 @@ export function CapsuleWizard({
       <footer className="mt-6 hidden items-center justify-between md:flex">
         <Button
           variant="quiet"
-          onClick={() => (step ? setStep(step - 1) : onBackToCollection?.())}
+          onClick={() => (step ? goToStep(step - 1) : onBackToCollection?.())}
         >
           ←{" "}
           {step
@@ -776,7 +762,7 @@ export function CapsuleWizard({
       <div className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-2 border-t border-stone bg-paper p-4 md:hidden">
         <Button
           variant="quiet"
-          onClick={() => (step ? setStep(step - 1) : onBackToCollection?.())}
+          onClick={() => (step ? goToStep(step - 1) : onBackToCollection?.())}
         >
           Back
         </Button>
