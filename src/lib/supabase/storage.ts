@@ -230,6 +230,61 @@ export async function createWorkspaceSignedRead(assetId: string) {
   };
 }
 
+/**
+ * Signs many ready assets with two round trips per bucket instead of two per
+ * asset. Assets that are missing, foreign, not ready or fail to sign are simply
+ * absent from the result, so callers show no image rather than failing a page.
+ */
+export async function createWorkspaceSignedReads(assetIds: readonly string[]) {
+  const context = getWorkspaceDatabase();
+  const ids = [
+    ...new Set(assetIds.filter((id) => z.uuid().safeParse(id).success)),
+  ];
+  const urls = new Map<string, string>();
+  for (let start = 0; start < ids.length; start += 100) {
+    const { data, error } = await context.client
+      .from("assets")
+      .select("id,workspace_id,bucket,storage_path,status")
+      .eq("workspace_id", context.workspaceId)
+      .eq("status", "ready")
+      .in("id", ids.slice(start, start + 100));
+    if (error) {
+      throw new StorageAssetError(
+        "STORAGE_ASSET_READ_FAILED",
+        "The images could not be loaded.",
+        storageUpstreamStatus(error),
+      );
+    }
+    const byBucket = new Map<string, { id: string; path: string }[]>();
+    for (const row of data) {
+      if (row.workspace_id !== context.workspaceId) continue;
+      const group = byBucket.get(row.bucket) ?? [];
+      group.push({ id: row.id, path: row.storage_path });
+      byBucket.set(row.bucket, group);
+    }
+    await Promise.all(
+      [...byBucket].map(async ([bucket, group]) => {
+        const { data: signed, error: signError } = await context.client.storage
+          .from(bucket)
+          .createSignedUrls(
+            group.map((entry) => entry.path),
+            STORAGE_READ_TTL_SECONDS,
+          );
+        if (signError || !signed) return;
+        for (const entry of signed) {
+          const match = group.find(
+            (candidate) => candidate.path === entry.path,
+          );
+          if (match && entry.signedUrl && !entry.error) {
+            urls.set(match.id, entry.signedUrl);
+          }
+        }
+      }),
+    );
+  }
+  return urls;
+}
+
 export async function verifyWorkspaceStorageAsset(assetId: string) {
   const context = getWorkspaceDatabase();
   const asset = await readAsset(context, assetId, ["pending", "ready"]);
