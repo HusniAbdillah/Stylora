@@ -235,7 +235,7 @@ export async function previewImageStatus(draftId: string) {
     }
   }
   if (outdated) {
-    job = { status: "idle", superseded: true, imageUrl: job.imageUrl };
+    job = { status: "idle", superseded: !!inputs, imageUrl: job.imageUrl };
     operationId = null;
   }
   if (!job.imageUrl && ready.data) {

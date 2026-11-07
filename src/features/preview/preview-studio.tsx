@@ -87,6 +87,8 @@ export function PreviewStudio({
   saving = false,
   readOnly = false,
   initialCategory = "top",
+  category: controlledCategory,
+  imageOutdated = false,
   onCategoryChange,
   primarySave,
   onSelectionChange,
@@ -106,6 +108,8 @@ export function PreviewStudio({
   saving?: boolean;
   readOnly?: boolean;
   initialCategory?: PreviewCategory;
+  category?: PreviewCategory;
+  imageOutdated?: boolean;
   onCategoryChange?: (category: PreviewCategory) => void;
   primarySave?: ReactNode;
   onSelectionChange?: (selection: PreviewSelection) => void;
@@ -113,7 +117,9 @@ export function PreviewStudio({
   onSaveLook?: (selection: PreviewSelection) => void;
   onEditPreferences?: () => void;
 }) {
-  const [category, setCategory] = useState<PreviewCategory>(initialCategory);
+  const [localCategory, setCategory] =
+    useState<PreviewCategory>(initialCategory);
+  const category = controlledCategory ?? localCategory;
   const tabId = useId();
   const [selection, setSelection] =
     useState<PreviewSelection>(initialSelection);
@@ -137,7 +143,9 @@ export function PreviewStudio({
   }
   const statusLabel =
     job.status === "succeeded"
-      ? "Ready, illustrative"
+      ? imageOutdated
+        ? "Previous image"
+        : "Ready, illustrative"
       : job.status === "queued"
         ? "Queued"
         : job.status === "running"
@@ -148,7 +156,9 @@ export function PreviewStudio({
               ? "Image generation stopped"
               : job.status === "unavailable"
                 ? "Image provider unavailable"
-                : "Ready to create";
+                : imageOutdated && job.imageUrl
+                  ? "Previous image"
+                  : "Ready to create";
   return (
     <section className="pb-24 md:pb-0">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -345,10 +355,14 @@ export function PreviewStudio({
             </button>
           </div>
           <div className="relative mt-3 aspect-[2/3] overflow-hidden rounded-2xl bg-porcelain">
-            {job.status === "succeeded" && job.imageUrl ? (
+            {job.imageUrl ? (
               <Image
                 src={job.imageUrl}
-                alt="Illustrative avatar wearing the selected outfit"
+                alt={
+                  imageOutdated
+                    ? "Previous illustrative avatar"
+                    : "Illustrative avatar wearing the selected outfit"
+                }
                 loading="eager"
                 fill
                 sizes="(max-width: 768px) 90vw, 500px"
@@ -377,6 +391,16 @@ export function PreviewStudio({
               </div>
             )}
           </div>
+          {job.imageUrl && imageOutdated && (
+            <p role="status" className="mt-3 text-sm text-secondary">
+              {job.status === "queued" || job.status === "running"
+                ? "Preparing a new image. The previous image stays visible."
+                : job.status === "failed"
+                  ? (job.errorMessage ??
+                    "The new image failed. Retry image to continue.")
+                  : "Previous image. Review your choices and generate an updated preview."}
+            </p>
+          )}
           <p className="mt-3 rounded-xl bg-paper p-3 text-xs leading-relaxed text-secondary">
             <Icon name="info" className="mr-1 inline size-4" />
             Illustrative avatar. Colors and fit are approximate and do not show
