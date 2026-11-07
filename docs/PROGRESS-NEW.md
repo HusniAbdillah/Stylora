@@ -1,5 +1,20 @@
 # Stylora shared progress reporting
 
+## Owner 4 capsule bulk selection, 7 November 2026
+
+- O4.2, R38; branch `o4/capsule-select-all` from `47b1659`. Added Select all
+  above the Items category tabs, using the existing Button and draft callback.
+  Includes owned items across categories, preserves pins and removes exclusions
+  for selected items. Above 60 items, the action reads Select up to 60 and keeps
+  existing choices first. Manual selection and pinning also respect that bound.
+- `make pr-ready PNPM="corepack pnpm"` passed lint and typecheck; Lane A.
+  Storybook Items fixture on port 3129: a real browser click changed 8 selected
+  items to all 9, retained 1 required item, cleared the remaining exclusion and
+  disabled Select all. Desktop screenshot inspected. Storybook was stopped.
+- No new UI tests or local production build; CI runs the full check and build.
+  Browser reload persistence, mobile layout and the over-60 case were not
+  exercised. No provider call, hosted mutation, dependency or schema change.
+
 ## Owner 1 demo data enrichment: 7 November 2026
 
 - The user explicitly authorized richer seed data directly in hosted Supabase.
