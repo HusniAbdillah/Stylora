@@ -65,6 +65,11 @@ export function PreviewClient({
   const seeded = useRef(false);
   const [activeDraftId, setActiveDraftId] = useState(initial.draftId);
   const latestSelection = useRef(initial.selection);
+  const persistedSelection = useRef(initial.draftId ? initial.selection : null);
+  const activeCategory = useRef(category);
+  const openingPreferences = useRef(false);
+  const [preferencesPending, setPreferencesPending] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [status, setStatus] = useState(
     initial.draftId ? "Selections saved" : "Choose pieces to start",
   );
@@ -264,6 +269,7 @@ export function PreviewClient({
                 ? "This preview changed elsewhere. Reload to review the current selection."
                 : "Selection could not be saved. Try selecting the piece again.",
             );
+            setSaveFailed(true);
             return;
           }
           draft.current = {
@@ -272,6 +278,8 @@ export function PreviewClient({
           };
           setDraftRevision(result.revision);
           setActiveDraftId(result.draftId);
+          persistedSelection.current = selection;
+          setSaveFailed(false);
           const url = new URL(window.location.href);
           url.searchParams.set("draftId", result.draftId);
           url.searchParams.delete("capsuleId");
@@ -282,6 +290,7 @@ export function PreviewClient({
           setStatus("Selections saved");
           if (
             selection === latestSelection.current &&
+            !openingPreferences.current &&
             Object.keys(selection).length &&
             initial.job.status !== "unavailable"
           )
@@ -289,6 +298,7 @@ export function PreviewClient({
               void launch("resume");
             }, 600);
         } catch {
+          setSaveFailed(true);
           setStatus(
             "Selection could not be saved. Try selecting the piece again.",
           );
@@ -297,6 +307,32 @@ export function PreviewClient({
     },
     [launch, initial.job.status],
   );
+
+  async function editPreferences() {
+    if (openingPreferences.current) return;
+    openingPreferences.current = true;
+    setPreferencesPending(true);
+    clearTimeout(launchTimer.current);
+    await queue.current;
+    if (
+      initial.writesEnabled &&
+      latestSelection.current !== persistedSelection.current &&
+      (draft.current.draftId || Object.keys(latestSelection.current).length)
+    ) {
+      openingPreferences.current = false;
+      setPreferencesPending(false);
+      setSaveFailed(true);
+      setStatus(
+        "Save your selection before editing preferences. Retry save to continue.",
+      );
+      return;
+    }
+    const params = new URLSearchParams({ category: activeCategory.current });
+    if (draft.current.draftId) params.set("draftId", draft.current.draftId);
+    router.push(
+      `/preferences?returnTo=${encodeURIComponent(`/preview?${params}`)}`,
+    );
+  }
 
   useEffect(() => {
     if (
@@ -317,6 +353,15 @@ export function PreviewClient({
           ? status
           : "Workspace changes are currently disabled."}
       </p>
+      {saveFailed && !conflict && (
+        <Button
+          variant="quiet"
+          disabled={preferencesPending}
+          onClick={() => persist(latestSelection.current)}
+        >
+          Retry save
+        </Button>
+      )}
       {conflict && (
         <Button variant="quiet" onClick={() => setReviewing(true)}>
           Review saved selection
@@ -362,7 +407,7 @@ export function PreviewClient({
         initialSelection={initial.selection}
         profileSummary={initial.profileSummary}
         job={job}
-        readOnly={!initial.writesEnabled}
+        readOnly={!initial.writesEnabled || preferencesPending}
         initialCategory={category}
         primarySave={
           activeDraftId ? (
@@ -378,6 +423,7 @@ export function PreviewClient({
           ) : undefined
         }
         onCategoryChange={(next) => {
+          activeCategory.current = next;
           const url = new URL(window.location.href);
           url.searchParams.set("category", next);
           window.history.replaceState(null, "", url);
@@ -396,7 +442,9 @@ export function PreviewClient({
               }
             : undefined
         }
-        onEditPreferences={() => router.push("/preferences")}
+        onEditPreferences={() => {
+          void editPreferences();
+        }}
       />
     </>
   );
