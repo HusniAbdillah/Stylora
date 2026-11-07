@@ -14,6 +14,7 @@ import {
 
 export { OperationError } from "./errors";
 export { fingerprintOperationInput } from "./fingerprint";
+export { assertWorkflowRpc } from "./readiness";
 export {
   operationStatus,
   type Operation,
