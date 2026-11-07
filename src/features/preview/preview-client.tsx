@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { useWorkspaceChrome } from "@/components/shell";
 import { Button, ConfirmDialog } from "@/components/ui";
 import {
   requestOperation,
@@ -75,6 +76,10 @@ export function PreviewClient({
   const pendingLaunches = useRef(new Set<string>());
   const seeded = useRef(false);
   const [activeDraftId, setActiveDraftId] = useState(initial.draftId);
+  useWorkspaceChrome({
+    breadcrumbs: [{ label: "Preview" }],
+    draftStatus: activeDraftId ? "saved" : undefined,
+  });
   const latestSelection = useRef(initial.selection);
   const persistedSelection = useRef(initial.draftId ? initial.selection : null);
   const activeCategory = useRef(category);

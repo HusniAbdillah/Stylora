@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { WorkspaceShell } from "@/components/shell";
+import { useWorkspaceChrome } from "@/components/shell";
 import { Button, LoadingLayout, StateNotice } from "@/components/ui";
 import {
   requestOperation,
@@ -26,6 +26,16 @@ export function CapsuleResultScreen({
   generationNeeded = false,
 }: Props) {
   const router = useRouter();
+  const selectedTitle = result.outfits.find(
+    (outfit) => outfit.id === outfitId,
+  )?.title;
+  useWorkspaceChrome({
+    breadcrumbs: [
+      { label: "Capsules", href: "/capsules" },
+      { label: result.title, href: `/capsules/${result.id}` },
+      ...(selectedTitle ? [{ label: selectedTitle }] : []),
+    ],
+  });
   const [message, setMessage] = useState("");
   const [operationId, setOperationId] = useState<string>();
   const [running, setRunning] = useState(
@@ -132,16 +142,7 @@ export function CapsuleResultScreen({
   const index = result.outfits.findIndex((outfit) => outfit.id === outfitId);
   const selected = result.outfits[index];
   return (
-    <WorkspaceShell
-      activeHref="/capsules"
-      displayName="Studio guest"
-      activity={[]}
-      breadcrumbs={[
-        { label: "Capsules", href: "/capsules" },
-        { label: result.title, href: `/capsules/${result.id}` },
-        ...(selected ? [{ label: selected.title }] : []),
-      ]}
-    >
+    <>
       {running && result.outfits.length > 0 && (
         <div className="mb-4">
           <StateNotice title="Checking your capsule">
@@ -215,6 +216,6 @@ export function CapsuleResultScreen({
           }
         />
       )}
-    </WorkspaceShell>
+    </>
   );
 }

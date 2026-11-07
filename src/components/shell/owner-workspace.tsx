@@ -27,6 +27,10 @@ import {
 } from "@/features/operations/schema";
 import { getWardrobeCollectionHref } from "@/features/wardrobe/wardrobe-navigation";
 import { WorkspaceShell } from "./workspace-shell";
+import {
+  WorkspaceChromeProvider,
+  useWorkspaceChromeValue,
+} from "./workspace-chrome";
 import type { ActivityItem } from "./workspace-navigation";
 import styles from "./shell.module.css";
 
@@ -125,6 +129,7 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const { scopeKey, writesEnabled } = useCreateWorkspace();
   const { session, state } = useCreateSession(scopeKey);
+  const pageChrome = useWorkspaceChromeValue();
   const [displayName, setDisplayName] = useState("Workspace profile");
   const [profileError, setProfileError] = useState(false);
   const [activity, setActivity] = useState<WorkspaceActivityItem[]>([]);
@@ -394,7 +399,7 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
               option.optionType === state.selectedDirection && !option.stale,
           )?.id ?? null)
         : recoveredOptionId;
-  const breadcrumbs =
+  const defaultBreadcrumbs =
     (section === "/create" && pathname !== "/create") || section === "/looks"
       ? [
           {
@@ -415,6 +420,7 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
             { label, href: section === "/wardrobe" ? wardrobeHref : section },
             { label: section === "/wardrobe" ? "Item details" : "Details" },
           ];
+  const breadcrumbs = pageChrome.breadcrumbs ?? defaultBreadcrumbs;
   const resume = draft
     ? {
         href: draftDestination(draft, selectedOptionId),
@@ -452,7 +458,9 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
       resume={resume}
       contextLabel="Shared workspace"
       draftStatus={
-        section === "/create" && state.draft ? state.draftStatus : undefined
+        section === "/create" && state.draft
+          ? state.draftStatus
+          : pageChrome.draftStatus
       }
     >
       {profileError && (
@@ -481,21 +489,23 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
 
 export function OwnerWorkspace({ children }: { children: ReactNode }) {
   return (
-    <Suspense
-      fallback={
-        <WorkspaceShell
-          activeHref=""
-          availableHrefs={availableHrefs}
-          breadcrumbs={[]}
-          displayName="Workspace profile"
-          activity={[]}
-          contextLabel="Shared workspace"
-        >
-          {children}
-        </WorkspaceShell>
-      }
-    >
-      <WorkspaceContents>{children}</WorkspaceContents>
-    </Suspense>
+    <WorkspaceChromeProvider>
+      <Suspense
+        fallback={
+          <WorkspaceShell
+            activeHref=""
+            availableHrefs={availableHrefs}
+            breadcrumbs={[]}
+            displayName="Workspace profile"
+            activity={[]}
+            contextLabel="Shared workspace"
+          >
+            {children}
+          </WorkspaceShell>
+        }
+      >
+        <WorkspaceContents>{children}</WorkspaceContents>
+      </Suspense>
+    </WorkspaceChromeProvider>
   );
 }

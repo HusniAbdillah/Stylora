@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { WorkspaceShell } from "@/components/shell";
+import { useWorkspaceChrome } from "@/components/shell";
 import { Button, ConfirmDialog, StateNotice } from "@/components/ui";
 import { requestOperation } from "@/features/operations/client";
 import { CapsuleWizard } from "./capsule-wizard";
@@ -93,6 +93,13 @@ export function CapsuleDraftStudio({
     () => initial,
   );
   const [status, setStatus] = useState<"saving" | "saved" | "failed">();
+  useWorkspaceChrome({
+    breadcrumbs: [
+      { label: "Capsules", href: "/capsules" },
+      { label: "New capsule" },
+    ],
+    draftStatus: status,
+  });
   const [message, setMessage] = useState("");
   const [applyOpen, setApplyOpen] = useState(false);
   const [building, setBuilding] = useState(false);
@@ -397,16 +404,7 @@ export function CapsuleDraftStudio({
   }
 
   return (
-    <WorkspaceShell
-      activeHref="/capsules"
-      displayName="Studio guest"
-      activity={[]}
-      breadcrumbs={[
-        { label: "Capsules", href: "/capsules" },
-        { label: "New capsule" },
-      ]}
-      draftStatus={status}
-    >
+    <>
       {!writesEnabled && (
         <StateNotice title="Changes are disabled">
           You can review this draft. Saving and generation are unavailable while
@@ -459,6 +457,6 @@ export function CapsuleDraftStudio({
         confirmLabel="Apply brief"
         busy={building}
       />
-    </WorkspaceShell>
+    </>
   );
 }
