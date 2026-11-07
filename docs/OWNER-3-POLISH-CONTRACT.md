@@ -6,11 +6,10 @@ The user authorized frontend and backend changes for the reviewed revision list.
   Google catalog links from direct seller links. Search identity includes used
   shopping target, preference revision, marketplace policy and canonical query;
   changing score weights does not start a provider request.
-- Add explicit optional `shoppingGender` to Preferences: `men`, `women`, `unisex`
-  or null. Legacy records default to null. This field is a shopping preference,
-  not identity inferred from body illustrations. The product agent owns only the
-  necessary Preferences schema, persistence mapping and UI additions for this
-  agreed field; existing fields retain their behavior.
+- The user's subsequent clarification selects the existing body illustration
+  group as the shopping-query signal: `men` maps to pria, `women` to wanita,
+  and absent/unknown values remain neutral. Do not add a separate preference
+  field or infer identity from photographs. Preference persistence is unchanged.
 - New shares store nullable `share_links.expires_at = NULL`; existing finite
   links retain their expiry. Active means unrevoked and either null or future
   expiry. Revocation and immutable publication remain enforced.
