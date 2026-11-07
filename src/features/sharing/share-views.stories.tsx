@@ -13,7 +13,6 @@ const look: PublicLook = {
   title: "Ivory and charcoal",
   catchphrase: "Soft tailoring for an easy Friday.",
   avatarUrl: photo("avatar-aivory-charcoal"),
-  expiresLabel: "14 November 2026",
   items: [
     {
       id: "shirt",
@@ -41,6 +40,7 @@ const look: PublicLook = {
 function ReviewDemo() {
   const [open, setOpen] = useState(true);
   const [revokeOpen, setRevokeOpen] = useState(false);
+  const [description, setDescription] = useState(look.catchphrase ?? "");
   const [url, setUrl] = useState<string | null>(
     "https://stylora.example/shared/sample",
   );
@@ -57,7 +57,8 @@ function ReviewDemo() {
         open={open}
         look={look}
         shareUrl={url}
-        initialCatchphrase={look.catchphrase ?? ""}
+        catchphrase={description}
+        onCatchphraseChange={setDescription}
         onClose={() => setOpen(false)}
         onPublish={() => setUrl("https://stylora.example/shared/sample")}
         onTurnOff={() => {
@@ -101,5 +102,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const PublicPage: Story = {};
+export const LegacyExpiringLink: Story = {
+  args: { look: { ...look, expiresLabel: "14 November 2026" } },
+};
 export const ReviewAndRevoke: Story = { render: () => <ReviewDemo /> };
 export const LinkUnavailable: Story = { render: () => <ShareUnavailable /> };

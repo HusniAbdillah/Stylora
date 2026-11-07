@@ -15,9 +15,7 @@ export const workspaceLinks = [
   { href: "/preferences", label: "Preferences", icon: "sliders" },
 ] as const;
 
-const availableDestinations = workspaceLinks
-  .filter(({ href }) => href !== "/create")
-  .map(({ href }) => href);
+const availableDestinations = workspaceLinks.map(({ href }) => href);
 const railPreference = createPreviewStore<boolean | null>(
   "navigation.rail",
   null,
@@ -71,7 +69,9 @@ function Destinations({
             title={rail ? link.label : undefined}
             aria-label={rail ? link.label : undefined}
             aria-current={
-              activeHref === link.href || activeHref.startsWith(link.href + "/")
+              activeHref === link.href ||
+              activeHref.startsWith(link.href + "/") ||
+              (link.href === "/create" && activeHref.startsWith("/looks/"))
                 ? "page"
                 : undefined
             }
@@ -124,21 +124,21 @@ export function WorkspaceSidebar({
   const toggleLabel = rail ? "Expand navigation" : "Collapse navigation";
   return (
     <aside className={styles.sidebar} data-rail={rail}>
-      <button
-        type="button"
-        className={styles.sidebarToggle}
-        title={toggleLabel}
-        aria-label={toggleLabel}
-        aria-controls={navId}
-        aria-expanded={!rail}
-        onClick={toggle}
-      >
-        <span>{toggleLabel}</span>
-      </button>
       <div className={styles.brandRow}>
         <Link href="/" aria-label="Stylora home">
           <Logo markOnly={rail} />
         </Link>
+        <button
+          type="button"
+          className={styles.sidebarToggle}
+          title={toggleLabel}
+          aria-label={toggleLabel}
+          aria-controls={navId}
+          aria-expanded={!rail}
+          onClick={toggle}
+        >
+          <Icon name="menu" size={18} />
+        </button>
       </div>
       <div id={navId}>
         <Destinations

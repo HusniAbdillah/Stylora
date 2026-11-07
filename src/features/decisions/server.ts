@@ -209,8 +209,8 @@ async function savedDto(
       .eq("workspace_id", context.workspaceId)
       .eq("saved_look_id", saved.id)
       .is("revoked_at", null)
-      .gt("expires_at", new Date().toISOString())
-      .order("expires_at", { ascending: false })
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+      .order("expires_at", { ascending: false, nullsFirst: true })
       .limit(1)
       .maybeSingle(),
   ]);
@@ -277,7 +277,10 @@ async function savedDto(
     spendCurrency: saved.spend_currency,
     media,
     activeShare: share.data
-      ? { id: share.data.id, expiresAt: share.data.expires_at }
+      ? {
+          id: share.data.id,
+          expiresAt: z.string().nullable().parse(share.data.expires_at),
+        }
       : null,
   };
 }

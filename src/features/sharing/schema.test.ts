@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   createShareSchema,
+  initialLookDescription,
+  isShareActive,
   projectPublicSnapshot,
   publicSnapshotSchema,
 } from "./schema";
@@ -33,7 +35,8 @@ describe("public share contracts", () => {
     ).toBe(false);
   });
 
-  it("bounds expiry and rejects client-supplied public snapshots or workspace IDs", () => {
+  it("accepts new requests without expiry and validates legacy expiry input", () => {
+    expect(createShareSchema.parse({}).expiresInHours).toBeUndefined();
     for (const expiresInHours of [0, 721, 1.5])
       expect(createShareSchema.safeParse({ expiresInHours }).success).toBe(
         false,
@@ -48,5 +51,30 @@ describe("public share contracts", () => {
         workspaceId: "foreign",
       }).success,
     ).toBe(false);
+  });
+
+  it("keeps permanent links active while respecting revocation and legacy expiry", () => {
+    const now = Date.parse("2026-11-07T12:00:00Z");
+    expect(isShareActive(null, null, now)).toBe(true);
+    expect(isShareActive(null, "2026-11-07T11:00:00Z", now)).toBe(false);
+    expect(isShareActive("2026-11-07T13:00:00Z", null, now)).toBe(true);
+    expect(isShareActive("2026-11-07T12:00:00Z", null, now)).toBe(false);
+    expect(isShareActive("invalid", null, now)).toBe(false);
+  });
+
+  it("prefills a reviewed description or saved item names only", () => {
+    const items = [
+      { name: "Ivory shirt", notes: "private note" },
+      { name: "Charcoal trousers", rationale: "private preference" },
+    ];
+    expect(initialLookDescription(items, " Existing public description ")).toBe(
+      "Existing public description",
+    );
+    expect(initialLookDescription(items)).toBe(
+      "Ivory shirt, Charcoal trousers",
+    );
+    expect(
+      initialLookDescription(Array.from({ length: 20 }, () => items[0])).length,
+    ).toBeLessThanOrEqual(240);
   });
 });

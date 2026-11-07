@@ -17,7 +17,7 @@ export type PublicLook = {
   avatarUrl?: string | null;
   avatarNotice?: string;
   items: PublicShareItem[];
-  expiresLabel?: string;
+  expiresLabel?: string | null;
 };
 
 function Brand({ logo }: { logo?: ReactNode }) {
@@ -166,7 +166,7 @@ export function PublicShare({
             {look.title}
           </h1>
           {look.catchphrase && (
-            <p className="mt-4 break-words font-serif text-xl italic text-crimson lg:text-3xl">
+            <p className="mt-4 whitespace-pre-wrap break-words font-serif text-xl italic text-crimson lg:text-3xl">
               {look.catchphrase}
             </p>
           )}
@@ -176,12 +176,11 @@ export function PublicShare({
           <div className="mt-6 [&>*]:w-full sm:[&>*]:w-auto">
             <MakeLook onMakeLook={onMakeLook} />
           </div>
-          {look.expiresLabel && (
-            <p className="mt-4 text-xs leading-relaxed text-secondary">
-              Shared until {look.expiresLabel}. This link can be turned off at
-              any time.
-            </p>
-          )}
+          <p className="mt-4 text-xs leading-relaxed text-secondary">
+            {look.expiresLabel
+              ? `Shared until ${look.expiresLabel}. This link can be turned off at any time.`
+              : "Shared until the owner turns off this link."}
+          </p>
         </div>
       </div>
     </main>
@@ -220,8 +219,8 @@ export function ShareReviewDialog({
   open,
   look,
   shareUrl,
-  initialCatchphrase = "",
-  initialExpiryHours = 168,
+  catchphrase,
+  onCatchphraseChange,
   busy = false,
   loading = false,
   canPublish = true,
@@ -234,21 +233,19 @@ export function ShareReviewDialog({
   open: boolean;
   look: PublicLook | null;
   shareUrl?: string | null;
-  initialCatchphrase?: string;
-  initialExpiryHours?: number;
+  catchphrase: string;
+  onCatchphraseChange: (value: string) => void;
   busy?: boolean;
   loading?: boolean;
   canPublish?: boolean;
   error?: string | null;
   children?: ReactNode;
   onClose: () => void;
-  onPublish: (values: { catchphrase: string; expiryHours: number }) => void;
+  onPublish: (values: { catchphrase: string }) => void;
   onTurnOff?: () => void;
 }) {
   const safe = useRef<HTMLButtonElement>(null);
   const opener = useRef<HTMLElement | null>(null);
-  const [catchphrase, setCatchphrase] = useState(initialCatchphrase);
-  const [expiryHours, setExpiryHours] = useState(initialExpiryHours);
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const locked = busy || loading || !!shareUrl || !canPublish;
@@ -326,7 +323,7 @@ export function ShareReviewDialog({
                     {look.title}
                   </h2>
                   {catchphrase && (
-                    <p className="mt-1 break-words font-serif italic text-crimson">
+                    <p className="mt-1 whitespace-pre-wrap break-words font-serif italic text-crimson">
                       {catchphrase}
                     </p>
                   )}
@@ -357,56 +354,20 @@ export function ShareReviewDialog({
                 </p>
               )}
               <label className="mt-4 block text-sm">
-                Catchphrase
-                <input
+                Look description
+                <textarea
                   value={catchphrase}
                   maxLength={240}
+                  rows={3}
                   disabled={locked}
-                  onChange={(event) => setCatchphrase(event.target.value)}
-                  className="mt-2 min-h-11 w-full rounded-lg border border-secondary bg-paper px-3 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crimson disabled:opacity-70"
+                  onChange={(event) => onCatchphraseChange(event.target.value)}
+                  className="mt-2 min-h-24 w-full resize-y rounded-lg border border-secondary bg-paper px-3 py-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crimson disabled:opacity-70"
                 />
               </label>
-              <fieldset className="mt-4" disabled={locked}>
-                <legend className="mb-2 text-sm">Link expires after</legend>
-                <div className="flex flex-wrap gap-2">
-                  {[24, 168, 720].map((hours) => (
-                    <label
-                      key={hours}
-                      className={`relative flex min-h-11 cursor-pointer items-center rounded-full border px-3 py-2 text-sm focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-crimson ${expiryHours === hours ? "border-crimson bg-blush" : "border-stone"}`}
-                    >
-                      <input
-                        type="radio"
-                        name="share-expiry"
-                        value={hours}
-                        checked={expiryHours === hours}
-                        onChange={() => setExpiryHours(hours)}
-                        className="sr-only"
-                      />
-                      {hours === 24
-                        ? "1 day"
-                        : hours === 168
-                          ? "7 days"
-                          : "30 days"}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
+              <p className="mt-3 text-xs leading-relaxed text-secondary">
+                This link stays active until you turn it off.
+              </p>
               {children}
-              <div className="mt-5 rounded-xl bg-porcelain p-4 text-xs leading-relaxed">
-                <p>
-                  <Icon
-                    name="check"
-                    className="mr-1 inline size-3 text-crimson"
-                  />
-                  Shared: title, catchphrase, item names and available item
-                  photos. Only an avatar you approve is included.
-                </p>
-                <p className="mt-2">
-                  <Icon name="x" className="mr-1 inline size-3 text-crimson" />
-                  Not included in this link: preferences, notes or other
-                  wardrobe items.
-                </p>
-              </div>
               {error && (
                 <p role="alert" className="mt-3 text-sm text-crimson">
                   {error}
@@ -461,7 +422,6 @@ export function ShareReviewDialog({
                       setCopied(false);
                       onPublish({
                         catchphrase: catchphrase.trim(),
-                        expiryHours,
                       });
                     }
                   }}
