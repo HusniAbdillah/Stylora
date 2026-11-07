@@ -19,6 +19,7 @@ import {
   itemValuesSchema,
   listQuerySchema,
   mutationSchema,
+  deleteItemSchema,
   revisionSchema,
   saveDraftSchema,
   toCanonicalWardrobeItem,
@@ -29,6 +30,13 @@ import {
 
 const asJson = (value: unknown) => z.record(z.string(), z.json()).parse(value);
 export function wardrobeDatabaseError(error: { code?: string }): never {
+  if (error.code === "40P01")
+    throw new ApiError(
+      "wardrobe_busy",
+      "Another wardrobe change is in progress. Try saving again.",
+      503,
+      true,
+    );
   if (
     error.code === "40001" ||
     error.code === "PT409" ||
@@ -115,10 +123,8 @@ export async function listWardrobeItems(input: unknown = {}) {
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false })
     .order("id");
-  if (filter.status === "archived")
-    query = query.not("archived_at", "is", null);
-  else if (filter.status !== "all")
-    query = query.is("archived_at", null).eq("inventory_status", filter.status);
+  if (filter.status !== "all")
+    query = query.eq("inventory_status", filter.status);
   if (filter.category !== "all") query = query.eq("category", filter.category);
   // Fetch in bounded pages; the API never silently truncates the shared inventory.
   const items = [];
@@ -196,7 +202,13 @@ export async function createWardrobeDraft(input: unknown = {}) {
     payload.editor = {
       itemId,
       baseRevision: item.revision,
-      values: itemValuesSchema.parse(item),
+      values: itemValuesSchema.parse({
+        name: item.name,
+        category: item.category,
+        subcategory: item.subcategory,
+        description: item.description,
+        attributes: item.attributes,
+      }),
       notes: item.notes,
     };
   }
@@ -456,6 +468,21 @@ export async function mutateWardrobeItem(id: string, input: unknown) {
   });
   if (error) wardrobeDatabaseError(error);
   return toCanonicalWardrobeItem(data);
+}
+
+export async function deleteWardrobeItem(id: string, input: unknown) {
+  const { expectedRevision } = deleteItemSchema.parse(input);
+  const context = getWorkspaceDatabase();
+  requireWorkspaceWrites(context);
+  const itemId = z.uuid().parse(id);
+  const { error } = await context.client.rpc("wardrobe_item_command", {
+    p_workspace_id: context.workspaceId,
+    p_item_id: itemId,
+    p_expected_revision: expectedRevision,
+    p_action: "delete",
+  });
+  if (error && error.code !== "P0002") wardrobeDatabaseError(error);
+  return { deleted: true as const, itemId };
 }
 
 export async function saveWardrobeEditor(id: string, input: unknown) {

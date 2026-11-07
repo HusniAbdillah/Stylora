@@ -20,10 +20,10 @@ export {
 } from "./wardrobe-intake";
 export {
   WardrobeItemDetail,
-  WardrobeArchiveDialog,
+  WardrobeDeleteDialog,
   type WardrobeItemDetailData,
   type WardrobeItemDetailProps,
-  type WardrobeArchiveDialogProps,
+  type WardrobeDeleteDialogProps,
 } from "./wardrobe-item-detail";
 export {
   wardrobeCategories,

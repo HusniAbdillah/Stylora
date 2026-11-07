@@ -10,7 +10,7 @@ export const workspaceLinks = [
   { href: "/create", label: "Create", icon: "plus" },
   { href: "/wardrobe", label: "Wardrobe", icon: "shirt" },
   { href: "/capsules", label: "Capsules", icon: "layers" },
-  { href: "/preview", label: "Preview", icon: "avatar" },
+  { href: "/preview", label: "Preview", icon: "image" },
   { href: "/saved-looks", label: "Saved looks", icon: "bookmark" },
   { href: "/preferences", label: "Preferences", icon: "sliders" },
 ] as const;
@@ -168,6 +168,13 @@ export function WorkspaceSidebar({
   const toggleLabel = rail ? "Expand navigation" : "Collapse navigation";
   return (
     <aside className={styles.sidebar} data-rail={rail}>
+      <div
+        className={styles.sidebarSurfaceToggle}
+        aria-hidden="true"
+        onPointerUp={(event) => {
+          if (event.button === 0) toggle();
+        }}
+      />
       <div className={styles.brandRow}>
         <Link href="/" aria-label="Stylora home">
           <Logo markOnly={rail} />
@@ -181,10 +188,14 @@ export function WorkspaceSidebar({
           aria-expanded={!rail}
           onClick={toggle}
         >
-          <Icon name="menu" size={18} />
+          <Icon
+            name="chevronDown"
+            size={18}
+            className={styles.sidebarChevron}
+          />
         </button>
       </div>
-      <div id={navId}>
+      <div id={navId} className={styles.destinations}>
         <Destinations
           activeHref={activeHref}
           rail={rail}

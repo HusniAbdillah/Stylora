@@ -90,7 +90,7 @@ boundary with retry, and restores its draft. Frame IDs refer to the Figma pages
 | `/looks/[lookId]?step=ideas`               | Step 4 Outfit ideas: three fixed directions, regeneration, empty and missing-preference cards          | D05, D19, M05                       |
 | `/looks/[lookId]?option_id=…`              | Step 5 Outfit details with integrated marketplace, Save this look                                      | D06, M06                            |
 | `/wardrobe`                                | Category tabs, search, owned and candidate filter, image grid, upload-only add drawer, empty state     | D07, D08, D21, M07, M15, M17        |
-| `/wardrobe/[itemId]`                       | Item detail, field provenance, Mark as owned, replace photo, edit, archive with confirmation           | D20, D22                            |
+| `/wardrobe/[itemId]`                       | Inline item detail editing, field provenance, Mark as owned, save changes, delete with confirmation           | D20, D22                            |
 | `/preferences`                             | Visual preference sections with explanations and examples                                              | D09, M08                            |
 | `/profile`                                 | Shared display name and workspace scope notice                                                         | D29                                 |
 | `/capsules`                                | Capsule collection with drafts                                                                         | D25                                 |
@@ -152,7 +152,7 @@ explicit adapter.
 | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
 | POST `/api/wardrobe/uploads`                                       | Signed upload for a new item draft                                            |
 | POST `/api/wardrobe/drafts/[draftId]/analyze`                      | Wardrobe description task; returns proposed items, one per garment            |
-| Server Actions                                                     | Confirm item, edit, replace photo, archive, restore, Mark as owned            |
+| Server Actions                                                     | Confirm item, save edits, delete item, Mark as owned            |
 | Server Actions                                                     | Save preferences and profile name with revision checks                        |
 | GET, POST `/api/capsules`; GET, PATCH, DELETE `/api/capsules/[id]` | Capsule CRUD with revision                                                    |
 | POST `/api/capsules/[id]/generate`                                 | Starts capsule generation from text and IDs once brief and items are complete |
@@ -380,7 +380,7 @@ redirects, size and MIME, deduplicates and creates a saved candidate.
 
 Upload-only intake with a description task; multiple garments return separate
 proposals. Item detail shows provenance per field, candidate status with Mark as
-owned, replace photo and archive with confirmation. Preferences save stable
+owned, save inline edits and delete with confirmation. Preferences save stable
 swatch IDs and hex, undertone, contrast, body illustration ID and proportions,
 fit, style, climate, coverage, footwear and care; skipped fields stay absent.
 

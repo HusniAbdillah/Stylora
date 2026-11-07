@@ -29,7 +29,7 @@ import { Badge, Button, Icon } from "@/components/ui";
 
 Use `Button asChild` to style a link. Use `Chip` with `selected` and a change callback. `ConfirmDialog` accepts `open`, `onClose`, `onConfirm`, `title`, `description` and `confirmLabel`. The trigger owns the state. `Stepper` uses a zero-based current step and an explicit array of visited indices.
 
-`SelectField` takes native select props and `<option>` children. Pass `label` to place the label inside the field. For a text input with a padded wrapper, put `data-field-surface` on the wrapper and associate its label with the input so clicking the padding focuses it.
+`SelectField` takes native select props and `<option>` children. Pass `label` to place the label inside the field and `variant="outlined"` for a bordered surface. For a text input with a padded wrapper, put `data-field-surface` on the wrapper and associate its label with the input so clicking the padding focuses it.
 
 The icon mask inherits the text color. Use `iconNames` for the full list. Provide an accessible name on an icon-only control. Use `Logo` for the full lockup or `Logo markOnly` for the rail. The `paper` tone is intended for dark backgrounds.
 

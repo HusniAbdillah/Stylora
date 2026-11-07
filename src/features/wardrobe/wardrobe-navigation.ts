@@ -9,6 +9,8 @@ export function rememberWardrobeCollectionHref() {
   try {
     const url = new URL(window.location.href);
     url.searchParams.delete("add");
+    if (url.searchParams.get("status") === "archived")
+      url.searchParams.delete("status");
     window.sessionStorage.setItem(
       WARDROBE_LIST_URL_KEY,
       url.pathname + url.search,
@@ -27,6 +29,8 @@ export function getWardrobeCollectionHref() {
     if (url.origin !== window.location.origin || url.pathname !== "/wardrobe")
       return "/wardrobe";
     url.searchParams.delete("add");
+    if (url.searchParams.get("status") === "archived")
+      url.searchParams.delete("status");
     return url.pathname + url.search;
   } catch {
     return "/wardrobe";
