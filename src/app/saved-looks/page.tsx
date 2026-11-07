@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { WorkspaceShell } from "@/components/shell";
 import { StateNotice } from "@/components/ui";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
 import { listSavedLooks } from "@/features/decisions/server";
@@ -17,41 +16,27 @@ export default async function SavedLooksPage({
   const query = savedListSchema.safeParse(await searchParams);
   if (!query.success)
     return (
-      <WorkspaceShell
-        activeHref="/saved-looks"
-        displayName="Studio guest"
-        activity={[]}
-        breadcrumbs={[{ label: "Saved looks" }]}
-      >
-        <StateNotice title="This saved-look view is unavailable">
-          Check the address or{" "}
-          <Link href="/saved-looks" className="text-crimson underline">
-            open your collection
-          </Link>
-          .
-        </StateNotice>
-      </WorkspaceShell>
+      <StateNotice title="This saved-look view is unavailable">
+        Check the address or{" "}
+        <Link href="/saved-looks" className="text-crimson underline">
+          open your collection
+        </Link>
+        .
+      </StateNotice>
     );
   const collection = await listSavedLooks(query.data);
   return (
-    <WorkspaceShell
-      activeHref="/saved-looks"
-      displayName="Studio guest"
-      activity={[]}
-      breadcrumbs={[{ label: "Saved looks" }]}
-    >
-      <SavedCollectionWorkspace
-        key={savedCollectionHref(
-          query.data.filter,
-          query.data.limit,
-          query.data.cursor,
-        )}
-        initial={collection}
-        filter={query.data.filter}
-        limit={query.data.limit}
-        cursor={query.data.cursor}
-        writesEnabled={getWorkspaceDatabase().writesEnabled}
-      />
-    </WorkspaceShell>
+    <SavedCollectionWorkspace
+      key={savedCollectionHref(
+        query.data.filter,
+        query.data.limit,
+        query.data.cursor,
+      )}
+      initial={collection}
+      filter={query.data.filter}
+      limit={query.data.limit}
+      cursor={query.data.cursor}
+      writesEnabled={getWorkspaceDatabase().writesEnabled}
+    />
   );
 }

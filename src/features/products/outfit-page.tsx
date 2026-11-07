@@ -40,7 +40,11 @@ function mergeShopping(
   previous: Shopping | undefined,
   incoming: Shopping,
 ): Shopping {
-  if (!previous || previous.optionRevision !== incoming.optionRevision)
+  if (
+    !previous ||
+    previous.optionRevision !== incoming.optionRevision ||
+    previous.contextKey !== incoming.contextKey
+  )
     return incoming;
   const searches = new Map<string, Search>(
     previous.searches.map((search) => [search.slotId, search]),
@@ -228,6 +232,8 @@ export function OutfitPage({
               lookId: data.lookId,
               optionId: data.activeOptionId,
               optionRevision: data.detail.option.revision,
+              contextKey: "",
+              preferenceRevision: 0,
               searches: [],
             },
           },
@@ -301,6 +307,8 @@ export function OutfitPage({
           (previous &&
             (detail.look.revision < previous.detail.look.revision ||
               detail.option.revision < previous.detail.option.revision ||
+              shopping.preferenceRevision <
+                previous.shopping.preferenceRevision ||
               (detail.option.revision === previous.detail.option.revision &&
                 (detail.selection?.revision ?? 0) <
                   (previous.detail.selection?.revision ?? 0))))
@@ -373,8 +381,36 @@ export function OutfitPage({
     return () => window.removeEventListener("popstate", restore);
   }, [data.options, loadOption]);
 
+  useEffect(() => {
+    const refresh = () => {
+      const id = activeIdRef.current;
+      if (!id || document.visibilityState !== "visible" || mutationLock.current)
+        return;
+      const epoch = optionEpochs.current.get(id) ?? 0;
+      requestData<Shopping>(`/api/looks/${data.lookId}/products?optionId=${id}`)
+        .then((shopping) => {
+          if ((optionEpochs.current.get(id) ?? 0) !== epoch) return;
+          updateOption(id, (current) =>
+            shopping.optionRevision !== current.detail.option.revision ||
+            shopping.preferenceRevision < current.shopping.preferenceRevision
+              ? current
+              : {
+                  ...current,
+                  shopping: mergeShopping(current.shopping, shopping),
+                },
+          );
+        })
+        .catch(() =>
+          setMessage("Shopping preferences could not be refreshed. Try again."),
+        );
+    };
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [data.lookId, updateOption]);
+
   const active = activeId ? cache[activeId] : undefined;
   const revision = active?.detail.option.revision;
+  const shoppingContext = active?.shopping.contextKey;
   useEffect(() => {
     if (!writesEnabled || !activeId || !revision) return;
     const state = cacheRef.current[activeId];
@@ -402,7 +438,7 @@ export function OutfitPage({
         const candidate = slot.candidates.find(
           (item) => item.kind === "missing",
         );
-        const key = `${data.lookId}:${activeId}:${revision}:${slot.slotId}`;
+        const key = `${data.lookId}:${activeId}:${revision}:${shoppingContext}:${slot.slotId}`;
         const slotKey = `${activeId}:${slot.slotId}`;
         const slotVersion = advanceVersion(searchVersions.current, slotKey);
         let pending = inFlightSearches.get(key);
@@ -431,12 +467,15 @@ export function OutfitPage({
           )
             updateOption(activeId, (current) =>
               current.detail.option.revision !== revision ||
-              search.optionRevision !== revision
+              search.optionRevision !== revision ||
+              search.preferenceRevision < current.shopping.preferenceRevision
                 ? current
                 : {
                     ...current,
                     shopping: mergeShopping(current.shopping, {
                       ...current.shopping,
+                      contextKey: search.contextKey,
+                      preferenceRevision: search.preferenceRevision,
                       searches: [search],
                     }),
                   },
@@ -471,7 +510,14 @@ export function OutfitPage({
     return () => {
       mounted = false;
     };
-  }, [activeId, revision, writesEnabled, data.lookId, updateOption]);
+  }, [
+    activeId,
+    revision,
+    shoppingContext,
+    writesEnabled,
+    data.lookId,
+    updateOption,
+  ]);
 
   const hasRunningSearch = Boolean(
     active?.shopping.searches.some((search) => search.status === "running"),
@@ -494,12 +540,17 @@ export function OutfitPage({
           updateOption(activeId, (current) => {
             if (
               current.detail.option.revision !== expectedRevision ||
-              shopping.optionRevision !== expectedRevision
+              shopping.optionRevision !== expectedRevision ||
+              shopping.preferenceRevision < current.shopping.preferenceRevision
             )
               return current;
             const merged = new Map(
               current.shopping.searches
-                .filter((search) => search.optionRevision === expectedRevision)
+                .filter(
+                  (search) =>
+                    search.optionRevision === expectedRevision &&
+                    search.contextKey === shopping.contextKey,
+                )
                 .map((search) => [search.slotId, search]),
             );
             for (const search of shopping.searches) {
@@ -725,12 +776,15 @@ export function OutfitPage({
         return;
       updateOption(id, (current) =>
         current.detail.option.revision !== expectedRevision ||
-        search.optionRevision !== expectedRevision
+        search.optionRevision !== expectedRevision ||
+        search.preferenceRevision < current.shopping.preferenceRevision
           ? current
           : {
               ...current,
               shopping: mergeShopping(current.shopping, {
                 ...current.shopping,
+                contextKey: search.contextKey,
+                preferenceRevision: search.preferenceRevision,
                 searches: [search],
               }),
             },

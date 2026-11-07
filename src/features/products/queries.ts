@@ -8,17 +8,70 @@ import {
   type WorkspaceDatabase,
 } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
+import { getPreferences } from "@/features/preferences/server";
 import {
   categorySchema,
   defaultWeights,
   searchInputSchema,
   weightsSchema,
+  type ScoreWeights,
 } from "./schema";
 import { normalizeOffer, searchSerpApi } from "./provider";
 import { relevanceScore, scoreOffer, SCORE_VERSION } from "./score";
+import {
+  buildShoppingQuery,
+  shoppingContextKey,
+  shoppingPreferences,
+  shoppingSearchFingerprint,
+  type ShoppingPreferences,
+} from "./search-context";
 
 type Product = Database["public"]["Tables"]["products"]["Row"];
 type Search = Database["public"]["Tables"]["shopping_searches"]["Row"];
+type Slot = Database["public"]["Tables"]["outfit_option_items"]["Row"];
+
+async function readShoppingPreferences() {
+  try {
+    const saved = await getPreferences();
+    return shoppingPreferences(saved.preferences, saved.revision);
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "preferences_not_found"
+    )
+      return shoppingPreferences({}, 0);
+    throw new ApiError(
+      "SHOPPING_PREFERENCES_UNAVAILABLE",
+      "Shopping preferences could not be loaded. Retry later.",
+      503,
+      true,
+    );
+  }
+}
+
+function searchFingerprint(
+  context: WorkspaceDatabase,
+  lookId: string,
+  option: { id: string; revision: number },
+  slot: Slot,
+  query: string,
+  preferences: ShoppingPreferences,
+) {
+  return shoppingSearchFingerprint({
+    workspace: context.workspaceId,
+    lookId,
+    option: option.id,
+    revision: option.revision,
+    slot: slot.slot_id,
+    item: slot.id,
+    itemRevision: slot.revision,
+    brief: slot.missing_brief,
+    query,
+    preferences,
+  });
+}
 
 function validId(value: unknown) {
   const result = z.uuid().safeParse(value);
@@ -111,9 +164,16 @@ export function productDto(product: Product) {
   };
 }
 
-async function searchDto(context: WorkspaceDatabase, search: Search) {
+async function searchDto(
+  context: WorkspaceDatabase,
+  search: Search,
+  preferences: ShoppingPreferences,
+  requestedWeights?: ScoreWeights,
+) {
   const base = {
     id: search.id,
+    contextKey: shoppingContextKey(preferences),
+    preferenceRevision: preferences.revision,
     optionId: search.option_id,
     optionItemId: search.option_item_id,
     slotId: search.slot_id,
@@ -164,7 +224,9 @@ async function searchDto(context: WorkspaceDatabase, search: Search) {
     )
     .map((product) => product.price_minor!);
   const parsedWeights = weightsSchema.safeParse(search.score_weights);
-  const weights = parsedWeights.success ? parsedWeights.data : defaultWeights;
+  const weights =
+    requestedWeights ??
+    (parsedWeights.success ? parsedWeights.data : defaultWeights);
   return {
     ...base,
     weights,
@@ -208,6 +270,17 @@ export async function listLookProducts(
   const optionId = validId(optionIdInput);
   const context = getWorkspaceDatabase();
   const option = await readOption(context, lookId, optionId);
+  const preferences = await readShoppingPreferences();
+  const contextKey = shoppingContextKey(preferences);
+  const { data: slots, error: slotError } = await context.client
+    .from("outfit_option_items")
+    .select("*")
+    .eq("workspace_id", context.workspaceId)
+    .eq("look_id", lookId)
+    .eq("option_id", option.id)
+    .eq("item_kind", "missing")
+    .limit(20);
+  if (slotError) throw databaseFailure();
   const { data: searches, error } = await context.client
     .from("shopping_searches")
     .select("*")
@@ -219,14 +292,27 @@ export async function listLookProducts(
     .limit(100);
   if (error) throw databaseFailure();
   const latest = new Map<string, Search>();
-  for (const search of searches ?? [])
-    if (!latest.has(search.slot_id)) latest.set(search.slot_id, search);
+  for (const search of searches ?? []) {
+    const slot = slots?.find((item) => item.id === search.option_item_id);
+    const category = categorySchema.safeParse(slot?.category);
+    if (!slot || !category.success || latest.has(search.slot_id)) continue;
+    const query = buildShoppingQuery(search.query, category.data, preferences);
+    if (
+      search.input_fingerprint ===
+      searchFingerprint(context, lookId, option, slot, query, preferences)
+    )
+      latest.set(search.slot_id, search);
+  }
   return {
     lookId,
     optionId,
     optionRevision: option.revision,
+    contextKey,
+    preferenceRevision: preferences.revision,
     searches: await Promise.all(
-      [...latest.values()].map((search) => searchDto(context, search)),
+      [...latest.values()].map((search) =>
+        searchDto(context, search, preferences),
+      ),
     ),
   };
 }
@@ -281,7 +367,7 @@ export async function searchLookSlot(lookIdInput: string, input: unknown) {
       description: z.string().max(600).optional(),
     })
     .safeParse(slot.missing_brief);
-  const query = (
+  const briefQuery = (
     request.query ??
     slot.requested_brief ??
     (brief.success ? (brief.data.description ?? brief.data.name) : undefined) ??
@@ -290,31 +376,24 @@ export async function searchLookSlot(lookIdInput: string, input: unknown) {
     .trim()
     .replace(/\s+/g, " ")
     .slice(0, 240);
-  if (query.length < 2)
+  if (briefQuery.length < 2)
     throw new ApiError(
       "SEARCH_BRIEF_MISSING",
       "Add a description for this missing piece.",
       409,
     );
   const weights = request.weights ?? defaultWeights;
-  const fingerprint = createHash("sha256")
-    .update(
-      JSON.stringify({
-        workspace: context.workspaceId,
-        lookId,
-        option: option.id,
-        revision: option.revision,
-        slot: slot.slot_id,
-        item: slot.id,
-        itemRevision: slot.revision,
-        brief: slot.missing_brief,
-        query,
-        weights,
-        version: SCORE_VERSION,
-        country: "id",
-      }),
-    )
-    .digest("hex");
+  const preferences = await readShoppingPreferences();
+  const contextKey = shoppingContextKey(preferences);
+  const query = buildShoppingQuery(briefQuery, category.data, preferences);
+  const fingerprint = searchFingerprint(
+    context,
+    lookId,
+    option,
+    slot,
+    query,
+    preferences,
+  );
   const searchId = fingerprintId(
     `${fingerprint}:${request.retryKey ?? "initial"}`,
   );
@@ -331,7 +410,7 @@ export async function searchLookSlot(lookIdInput: string, input: unknown) {
     .limit(1)
     .maybeSingle();
   if (cacheError) throw databaseFailure();
-  if (cached) return searchDto(context, cached);
+  if (cached) return searchDto(context, cached, preferences, weights);
   const apiKey = process.env.SERPAPI_API_KEY?.trim();
   const { data: search, error: insertError } = await context.client
     .from("shopping_searches")
@@ -364,22 +443,30 @@ export async function searchLookSlot(lookIdInput: string, input: unknown) {
       .eq("id", searchId)
       .maybeSingle();
     if (error || !existing) throw databaseFailure();
-    return searchDto(context, existing);
+    return searchDto(context, existing, preferences, weights);
   }
   if (insertError || !search) throw databaseFailure();
-  if (!apiKey) return searchDto(context, search);
+  if (!apiKey) return searchDto(context, search, preferences, weights);
   try {
     const { results: raw, retrievedAt: providerRetrievedAt } =
-      await searchSerpApi(context.workspaceId, query, apiKey);
+      await searchSerpApi(context.workspaceId, query, apiKey, contextKey);
     const offers = [
       ...new Map(
         raw
-          .map((entry) => normalizeOffer(entry, category.data))
+          .map((entry) =>
+            normalizeOffer(entry, category.data, preferences.target),
+          )
           .filter((entry) => entry !== null)
           .map((entry) => [entry.providerProductId, entry]),
       ).values(),
     ].slice(0, 20);
     const current = await readOption(context, lookId, option.id);
+    if (shoppingContextKey(await readShoppingPreferences()) !== contextKey)
+      throw new ApiError(
+        "SHOPPING_PREFERENCES_CHANGED",
+        "Shopping preferences changed. Refresh the results before choosing.",
+        409,
+      );
     if (current.revision !== option.revision)
       throw new ApiError(
         "OUTFIT_STALE",
@@ -488,7 +575,7 @@ export async function searchLookSlot(lookIdInput: string, input: unknown) {
       .select("*")
       .single();
     if (error || !completed) throw databaseFailure();
-    return searchDto(context, completed);
+    return searchDto(context, completed, preferences, weights);
   } catch (error) {
     const errorCode =
       error instanceof ApiError ? error.code : "SHOPPING_PROVIDER_FAILED";
@@ -503,7 +590,7 @@ export async function searchLookSlot(lookIdInput: string, input: unknown) {
       .select("*")
       .single();
     if (updateError || !failed) throw databaseFailure();
-    return searchDto(context, failed);
+    return searchDto(context, failed, preferences, weights);
   }
 }
 
@@ -594,6 +681,19 @@ export async function attachProductCandidate(
       "Choose a valid product and current outfit revision.",
     );
   const request = parsed.data;
+  const shopping = await listLookProducts(lookId, request.optionId);
+  if (
+    !shopping.searches.some(
+      (search) =>
+        search.id === request.searchId && search.status === "succeeded",
+    )
+  )
+    throw new ApiError(
+      "SHOPPING_CONTEXT_STALE",
+      "Shopping preferences or results changed. Refresh before choosing this product.",
+      409,
+      true,
+    );
   const { data, error } = await context.client.rpc("attach_product_candidate", {
     p_workspace_id: context.workspaceId,
     p_look_id: lookId,

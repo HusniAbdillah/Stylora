@@ -42,7 +42,11 @@ export function toSavedLookView(saved: SavedLookResponse): SavedLook {
     share: saved.activeShare
       ? {
           active: true,
-          expiresLabel: `expires ${savedDate.format(new Date(saved.activeShare.expiresAt))}`,
+          permanent: saved.activeShare.expiresAt === null,
+          expiresLabel:
+            saved.activeShare.expiresAt === null
+              ? "until turned off"
+              : `expires ${savedDate.format(new Date(saved.activeShare.expiresAt))}`,
         }
       : { active: false },
   };
