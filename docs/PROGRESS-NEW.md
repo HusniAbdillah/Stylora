@@ -2,6 +2,7 @@
 
 ## Owner 2 occasion and recovery follow-up: 7 November 2026
 
+- Delivery synchronization: pushed the feature first, pulled main `830dd70`, and merged it. The only conflict was concurrent progress reporting; both owners' reports were retained. Source changes merged without conflicts.
 - Branch: `o2/occasion-analysis-recovery`. Started from updated main `0e2cb91`; merged `9387d79` as `eb88f1c` without conflicts. The user's later clarification supersedes the explicit-button plan: AI starts automatically only after a verified photo and a nonempty persisted occasion. Analyze opens Review. Landing sample and personal uploads follow the same live pipeline.
 - Implemented: Landing sample photo prefill with a fresh retained draft, initial blue animated Scan, clickable upload well, occasion readiness gates in Create and Wardrobe intake, persisted Wardrobe occasion context, runtime-aware retry/restart and single-operation provisional replay/adoption. A provisional edit explicitly confirms saving the complete valid partial set; the server verifies its original events and retains visual provenance.
 - Combined inventory: the user explicitly requested all sources/statuses, including archived and saved candidates. Removed the Create mode selector. All scoped rows participate in comparison; candidates remain alternatives and never owned slots. Archived owned rows can appear in combined Create options. Source, archive and ownership labels remain visible. Capsules, previews and saved-look eligibility retain the teammate's existing contracts; broader archived-item save/preview integration is not claimed.
@@ -13,6 +14,56 @@
 - Reproduction: `OWNER2_EXPLICIT_ANALYSIS_SMOKE=GO` starts the gated full runner; continuations require `OWNER2_SMOKE_CONTINUE_BUDGET=true` and preserve its atomic counter. Final command used `OWNER2_FINISH_RETAINED_SMOKE=GO`, `OWNER2_SMOKE_WARDROBE_AI=true`, `STYLORA_TEST_APP_DIR=C:/Users/Pongo/Desktop/Stylora-owner2-smoke`, then `node scripts/finish-owner2-retained-smoke.mjs`. The separate detached checkout prevents the user's port 3000 dev server from sharing Next's cache/lock with the smoke runner. No further provider request is planned.
 - Final local checks before delivery synchronization: `pnpm lint`, `pnpm typecheck`, and targeted backend Vitest **43 tests across nine files** passed. Diagnostic test expectations now assert the explicit missing-operation code; integer-key schema tests assert bounds and reject invalid indices. No rule or guard was weakened.
 - User-reviewed UI: matching cards now order owned, alternatives, then missing; excluded candidate lists are hidden from presentation while backend evidence is retained. Missing uses a category icon and `To find`, with `No match yet`, one concise reason and vertically centered reference title. Actual desktop/mobile screenshots were inspected at 1440 and 390 px in a read-only isolated app using the real look, with zero frontend inference. Landing initial Scan and moving blue band were inspected too. Local artifacts: `.next/owner2-recovery-visual/`. No automated frontend interaction test or local production build was run.
+## Owner 1 wardrobe visibility and navigation: 7 November 2026
+
+- User-authorized UI and navigation repair; branch `o1/navigation-wardrobe`
+  from `9387d79`. Scope covers the shared shell and thin routes plus the
+  Wardrobe and Capsule collection headings. Lane B; human merge required.
+- Read-only hosted diagnosis using the root local environment: workspace `demo`
+  initially had zero wardrobe rows, including owned, candidate, archived and
+  sample queries. A later read found 45 active owned sample rows. A guarded
+  `node --env-file=.env.local scripts/seed-wardrobe.mjs --dry-run
+  --expected-workspace demo` validated 45 images and preserved all 45 existing
+  rows. No seed apply, provider call or hosted mutation was performed here;
+  the concurrent data change is not attributed to this task.
+- Removed redundant collection eyebrow labels supplied in the user's
+  screenshots. Retained the page title, supporting copy and navigation context.
+  Compared the existing tokens and D07 frame `265:1061` in Figma; removing the
+  repeated label is the user's requested adjustment to that reference.
+- Moved Capsules, Preview, Saved looks and outfit detail routes into the common
+  workspace route group without changing URLs. Removed their page-owned shells
+  and duplicate saved collection layout. Draft feedback remains in capsule and
+  preview content. Shell state, profile, activity and Create recovery now share
+  one layout across workspace navigation.
+- Sidebar links retain automatic partial prefetch and request full prefetch
+  on hover or keyboard focus. Pending feedback reserves its space. Wardrobe
+  has a manual refresh action and renders one error message per current view.
+- Windows, Node.js 22.23.3, pnpm 10.26.2: frozen install passed. Focused
+  `pnpm exec vitest run src/components/shell/navigation.test.tsx
+  src/features/wardrobe/client.test.ts` passed 3 tests across 2 files. Editor
+  diagnostics reported no errors in navigation, wardrobe collection and capsule
+  draft components. `make pr-ready` passed ESLint, Next route type generation
+  and TypeScript, then reported Lane B (270 changed lines at that checkpoint).
+- Live local checks: `/api/wardrobe` returned HTTP 200 with 45 items; one sample
+  image returned HTTP 200, image/webp, 83,718 bytes. Wardrobe, Capsules, Preview
+  and Saved looks returned HTTP 200. Initial HTML includes streamed fallback
+  markup, so raw HTML element counts are not treated as visible duplicate shells.
+- Following the user's copy correction, collection titles are `Wardrobe` and
+  `Capsules`, with short functional descriptions. Root breadcrumb labels are
+  omitted; nested breadcrumbs remain. Removed the second Capsule empty notice.
+- Headless Chromium rendered the updated Wardrobe with one visible h1 and no
+  root breadcrumb. A Wardrobe-to-Capsules transition kept the exact sidebar DOM
+  node mounted. Capsule layout at 390 px had no horizontal overflow. The observed
+  transition took 7,728 ms in this dev run; this is not evidence of a production
+  speed improvement or a before/after benchmark. API mutations were blocked in
+  browser checks, and no provider-backed path was exercised.
+- Final copy screenshots were inspected at 1440 px and 390 px. Wardrobe rendered
+  loaded sample photos, one visible collection title, no root breadcrumb and no
+  mobile horizontal overflow. Capsules rendered one empty-state message. QA
+  captures stay local and unstaged; the production deployment is unchanged.
+- Runtime uses an isolated dev server at `http://127.0.0.1:3027`; root env values
+  are passed through process environment without copying credential files into
+  the worktree. No production deployment or provider-backed feature execution.
 
 
 ## Owner 1 deployment quota policy: 7 November 2026
@@ -973,6 +1024,22 @@ which data, code revision or provider behavior was verified.
   running; CI remains the full gate. No provider calls, shared fixtures or
   production environment settings were changed.
 
+## Owner 4 Preview personalization validation harness, 7 November 2026
+
+- Added `scripts/verify-preview-personalization.mjs` for root-operated A, B and
+  high-quality comparisons on port 3114 and the `dev-owner-4` sample fixture.
+  Two sample garment references remain constant. Preferences use the real API
+  with revision checks, and each single image POST is reserved in the external
+  smoke journal before execution. Reserved cases cannot submit again.
+- The script requires server `avatar-render.v2` settings before paid work,
+  verifies operation inputs and ready private PNG bytes, and saves external
+  images with metadata marked pending visual review. Preference restoration
+  checks the last written values and revision before using the API.
+- Local syntax check, dry-run, scoped ESLint and guards rejecting port 3104
+  and paths inside a Git checkout passed. No application HTTP request, hosted
+  data change or provider call ran in this task. Full checks and visual review
+  remain with CI and the coordinating root session, respectively.
+
 ## Owner 3 marketplace and sharing polish, 7 November 2026
 
 - Branch `codex/owner3-marketplace-polish`. Integrated Owner 2 Create navigation
@@ -1003,3 +1070,24 @@ which data, code revision or provider behavior was verified.
   locally). CI remains the full build gate. PR #49 contains the integrated work.
   No additional paid provider calls were made for this implementation. Browser
   verification has not passed; prior local browser attempts timed out.
+
+## Owner 4 visual personalization integration, 7 November 2026
+
+- PRs #51, #52, #53 and #54 merged after their complete GitHub Check workflows
+  passed. They add validated render settings, draft-preserving preference
+  navigation, a guarded comparison harness and the visual-direction contract.
+  The contract suite passed 23 focused cases; return navigation passed nine.
+- Image requests now validate one explicit visual-direction manifest, use five
+  deterministic outfit-aware poses and preserve supplied garment references.
+  The image-only prompt version changes independently of Capsule text prompts.
+  Render fingerprints include the canonical manifest and all render settings,
+  with preference database revisions excluded from visual identity.
+- Saved-avatar operation inputs capture the validated manifest and render
+  settings under the existing workspace and attempt fence. Retries retain
+  captured settings. No migration or dependency was added.
+- The integration `make pr-ready` is running; CI remains the complete check and
+  build gate. An earlier overlapping local check saw the temporarily absent
+  dependent module and was not recorded as passed. No provider calls or hosted
+  fixture writes have been made for this comparison yet. Three controlled image
+  calls and visual review will follow only after the coordinated status contract
+  is integrated; the journal reserves every call before submission.

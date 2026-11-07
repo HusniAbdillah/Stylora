@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
 import {
   IMAGE_MODEL,
-  FASHION_PROMPT_VERSION,
+  AVATAR_PROMPT_VERSION as FASHION_PROMPT_VERSION,
   FASHION_SCHEMA_VERSION,
 } from "@/features/ai/openai";
 import {
@@ -15,7 +15,11 @@ import {
 import {
   renderAndStoreAvatar,
   discardPendingAvatar,
+  getAvatarRenderSettings,
+  normalizeAvatarItems,
 } from "@/features/preview/image";
+import { imageRenderSettingsSchema } from "@/features/ai/image-settings";
+import { buildAvatarVisualDirection } from "@/features/preview/visual-direction";
 
 const avatarInputSchema = z
   .object({
@@ -56,20 +60,31 @@ export async function runSavedAvatar(operationId: string) {
       "This saved look is unavailable.",
       404,
     );
-  const items = z
-    .array(z.record(z.string(), z.unknown()))
-    .min(1)
-    .parse(snapshot.items);
+  const items = normalizeAvatarItems(
+    z.array(z.record(z.string(), z.unknown())).min(1).parse(snapshot.items),
+  );
   await assertWorkflowRpc("complete_saved_avatar");
   return runOperation(operation.id, {
     execute: async (claim) => {
       const reuse = shouldReuseSavedAvatar(claim.input);
+      const renderSettings = imageRenderSettingsSchema.parse(
+        claim.input.renderSettings ?? getAvatarRenderSettings(),
+      );
+      const visualDirection = buildAvatarVisualDirection(
+        snapshot.preference_snapshot,
+        items,
+      );
       const { data, error } = await context.client
         .from("workflow_operations")
         .update({
           model: IMAGE_MODEL,
           prompt_version: FASHION_PROMPT_VERSION,
           schema_version: FASHION_SCHEMA_VERSION,
+          input: z.record(z.string(), z.json()).parse({
+            ...claim.input,
+            visualDirection,
+            renderSettings,
+          }),
         })
         .eq("workspace_id", context.workspaceId)
         .eq("id", claim.operationId)
@@ -89,6 +104,7 @@ export async function runSavedAvatar(operationId: string) {
         allowIllustrativeItems: true,
         reuse,
         signal: claim.signal,
+        renderSettings,
       });
     },
     async commit(claim, output) {

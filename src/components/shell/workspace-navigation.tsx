@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, useSyncExternalStore, type ReactNode } from "react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { Button, Drawer, Icon, Logo } from "@/components/ui";
 import { createPreviewStore } from "@/lib/preview/store";
 import styles from "./shell.module.css";
@@ -16,6 +16,54 @@ export const workspaceLinks = [
 ] as const;
 
 const availableDestinations = workspaceLinks.map(({ href }) => href);
+
+function NavigationFeedback({ label }: { label: string }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span className={styles.navigationPending} data-pending={pending}>
+      <span aria-hidden="true">
+        <Icon name="refresh" size={14} />
+      </span>
+      <span className="sr-only" role="status">
+        {pending ? `Opening ${label}` : ""}
+      </span>
+    </span>
+  );
+}
+
+function DestinationLink({
+  href,
+  label,
+  icon,
+  active,
+  rail,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  icon: (typeof workspaceLinks)[number]["icon"];
+  active: boolean;
+  rail: boolean;
+  onNavigate?: () => void;
+}) {
+  const [prefetch, setPrefetch] = useState(false);
+  return (
+    <Link
+      href={href}
+      prefetch={prefetch ? true : null}
+      onMouseEnter={() => setPrefetch(true)}
+      onFocus={() => setPrefetch(true)}
+      onClick={onNavigate}
+      title={rail ? label : undefined}
+      aria-label={rail ? label : undefined}
+      aria-current={active ? "page" : undefined}
+    >
+      <Icon name={icon} />
+      {!rail && label}
+      <NavigationFeedback label={label} />
+    </Link>
+  );
+}
 const railPreference = createPreviewStore<boolean | null>(
   "navigation.rail",
   null,
@@ -62,23 +110,19 @@ function Destinations({
             {!rail && link.label}
           </span>
         ) : (
-          <Link
+          <DestinationLink
             key={link.href}
             href={destinationHrefs?.[link.href] ?? link.href}
-            onClick={onNavigate}
-            title={rail ? link.label : undefined}
-            aria-label={rail ? link.label : undefined}
-            aria-current={
+            label={link.label}
+            icon={link.icon}
+            rail={rail}
+            onNavigate={onNavigate}
+            active={
               activeHref === link.href ||
               activeHref.startsWith(link.href + "/") ||
               (link.href === "/create" && activeHref.startsWith("/looks/"))
-                ? "page"
-                : undefined
             }
-          >
-            <Icon name={link.icon} />
-            {!rail && link.label}
-          </Link>
+          />
         ),
       )}
     </nav>
