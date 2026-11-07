@@ -12,7 +12,15 @@
   The delivery gate now classifies `vercel.json` as Lane B.
 - Local environment: Windows PowerShell, isolated worktree. Initial
   `pnpm install --frozen-lockfile` failed with registry EACCES under the sandbox;
-  retried with approved network access. Validation results follow before delivery.
+  the approved retry passed with pnpm 10.26.2. Node.js is 22.13.1.
+- Passed: `pnpm exec prettier --check vercel.json scripts/pr-check.mjs`,
+  `git diff --check`, and editor diagnostics for both configuration and gate.
+  An inline Node assertion using ESLint's installed minimatch checked `main`
+  enabled and seven disabled branches, including all four owner prefixes and
+  a nested feature branch. The initial inline command had a PowerShell quoting
+  error; the corrected stdin invocation passed. `make pr-ready` passed lint and
+  typecheck, then reported Lane B for the workflow, gate and Vercel configuration.
+  No checks were disabled. GitHub CI remains the full test and build gate.
 - Not run: hosted deployment, live Preview, provider calls, database changes,
   unit tests and local production build. This configuration does not restore
   the exhausted allowance; live Git-trigger behavior remains unverified until
