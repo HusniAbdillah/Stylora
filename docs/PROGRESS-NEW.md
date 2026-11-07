@@ -907,7 +907,8 @@ which data, code revision or provider behavior was verified.
 ## Owner 3 marketplace and sharing polish, 7 November 2026
 
 - Branch `codex/owner3-marketplace-polish`. Integrated Owner 2 Create navigation
-  from `origin/main` at `10f0dd6` without conflicts. Saved Looks uses the same
+  from `origin/main` at `10f0dd6`, then navigation fix `a78c9ac`, without
+  conflicts. Saved Looks uses the same
   live workspace layout during collection, detail, loading and recovery states.
 - Saved Looks uses skeletons without temporary zero counts. Read-only hints sit
   beside unavailable actions; server and client write gates remain enforced.
@@ -928,6 +929,7 @@ which data, code revision or provider behavior was verified.
   denied direct anon access. Synthetic fixtures were rolled back.
 - Root `corepack pnpm exec vitest run src/features/products/provider.test.ts
   src/features/products/search-context.test.ts` passed seven tests. Sharing
-  schema tests, lint and typecheck are in progress; CI remains the full gate.
+  schema tests passed four tests. `corepack pnpm typecheck` passed. Lint is
+  in progress; CI remains the full gate.
   No additional paid provider calls were made for this implementation. Browser
   verification has not passed; prior local browser attempts timed out.
