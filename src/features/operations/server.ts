@@ -180,6 +180,7 @@ export async function runOperation<T>(
     p_input_revision: existing.input_revision,
     p_lease_seconds: 280,
   });
+  if (error?.code === "55P03") return readOperation(existing.id);
   if (error) databaseError(error.code);
   const operation = operationRowSchema.parse(data);
   if (operation.status !== "running") return operation;
@@ -193,7 +194,6 @@ export async function runOperation<T>(
   };
   try {
     const output = await handler.execute(claim);
-    claim.signal.throwIfAborted();
     await handler.commit(claim, output);
     const committed = await readOperation(operation.id);
     if (!["succeeded", "cancelled", "superseded"].includes(committed.status)) {
