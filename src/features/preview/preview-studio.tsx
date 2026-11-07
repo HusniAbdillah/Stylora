@@ -47,9 +47,10 @@ export function PreviewItemPhoto({
   item?: PreviewItem;
   sizes: string;
 }) {
+  const [failedUrl, setFailedUrl] = useState<string>();
   return (
     <div className="relative aspect-square overflow-hidden rounded-xl bg-sand">
-      {item?.imageUrl ? (
+      {item?.imageUrl && failedUrl !== item.imageUrl ? (
         <Image
           src={item.imageUrl}
           alt={item.name}
@@ -57,6 +58,7 @@ export function PreviewItemPhoto({
           sizes={sizes}
           unoptimized
           className="object-contain"
+          onError={() => setFailedUrl(item.imageUrl ?? undefined)}
         />
       ) : (
         <div className="flex size-full flex-col items-center justify-center gap-1 text-xs text-secondary">
@@ -74,6 +76,9 @@ export function PreviewStudio({
   job,
   profileSummary,
   saving = false,
+  readOnly = false,
+  initialCategory = "top",
+  onCategoryChange,
   onSelectionChange,
   onGenerate,
   onSaveLook,
@@ -89,12 +94,15 @@ export function PreviewStudio({
     pose?: string;
   };
   saving?: boolean;
+  readOnly?: boolean;
+  initialCategory?: PreviewCategory;
+  onCategoryChange?: (category: PreviewCategory) => void;
   onSelectionChange?: (selection: PreviewSelection) => void;
   onGenerate?: (selection: PreviewSelection) => void;
   onSaveLook?: (selection: PreviewSelection) => void;
   onEditPreferences?: () => void;
 }) {
-  const [category, setCategory] = useState<PreviewCategory>("top");
+  const [category, setCategory] = useState<PreviewCategory>(initialCategory);
   const [selection, setSelection] =
     useState<PreviewSelection>(initialSelection);
   const ownedItems = items.filter((item) => item.inventoryStatus === "owned");
@@ -103,6 +111,8 @@ export function PreviewStudio({
     ownedItems.find((item) => item.id === selection[key]),
   ).filter((item): item is PreviewItem => !!item);
   const canGenerate =
+    !!onGenerate &&
+    !readOnly &&
     chosenItems.length > 0 &&
     job.status !== "queued" &&
     job.status !== "running";
@@ -140,7 +150,7 @@ export function PreviewStudio({
         <div className="hidden md:block">
           <Button
             variant="primary"
-            disabled={chosenItems.length === 0 || saving}
+            disabled={chosenItems.length === 0 || saving || !onSaveLook || readOnly}
             onClick={() => onSaveLook?.(selection)}
           >
             {saving ? "Saving…" : "Save this look"}
@@ -163,7 +173,18 @@ export function PreviewStudio({
                 type="button"
                 role="tab"
                 aria-selected={category === key}
-                onClick={() => setCategory(key)}
+                tabIndex={category === key ? 0 : -1}
+                onKeyDown={(event) => {
+                  const offset = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+                  if (!offset && event.key !== "Home" && event.key !== "End") return;
+                  event.preventDefault();
+                  const index = event.key === "Home" ? 0 : event.key === "End" ? CATEGORIES.length - 1 : (CATEGORIES.findIndex((item) => item.key === category) + offset + CATEGORIES.length) % CATEGORIES.length;
+                  const next = CATEGORIES[index].key;
+                  setCategory(next);
+                  onCategoryChange?.(next);
+                  (event.currentTarget.parentElement?.children[index] as HTMLButtonElement | undefined)?.focus();
+                }}
+                onClick={() => { setCategory(key); onCategoryChange?.(key); }}
                 className={
                   "min-h-10 shrink-0 rounded-lg px-3 text-xs " +
                   (category === key ? "bg-paper font-medium" : "")
@@ -181,6 +202,7 @@ export function PreviewStudio({
                   key={item.id}
                   type="button"
                   onClick={() => pick(item.id)}
+                  disabled={readOnly}
                   aria-pressed={selection[category] === item.id}
                   className={
                     "min-w-0 rounded-xl border p-1 text-left " +
@@ -193,7 +215,7 @@ export function PreviewStudio({
                     item={item}
                     sizes="(max-width: 640px) 30vw, 130px"
                   />
-                  <span className="mt-1 block truncate text-xs">
+                  <span className="mt-1 block break-words text-xs">
                     {item.name}
                   </span>
                 </button>
@@ -201,6 +223,7 @@ export function PreviewStudio({
               <button
                 type="button"
                 onClick={() => pick()}
+                disabled={readOnly}
                 aria-pressed={!selection[category]}
                 className="min-w-0 rounded-xl border border-dashed border-stone p-1 text-center"
               >
@@ -395,7 +418,7 @@ export function PreviewStudio({
         </button>
         <Button
           variant="primary"
-          disabled={!chosenItems.length || saving}
+          disabled={!chosenItems.length || saving || !onSaveLook || readOnly}
           onClick={() => onSaveLook?.(selection)}
         >
           {saving ? "Saving…" : "Save this look"}
