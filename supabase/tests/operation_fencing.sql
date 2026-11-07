@@ -7,7 +7,7 @@ DECLARE
   op public.workflow_operations; second_op public.workflow_operations; finished public.workflow_operations;
   avatar_op public.workflow_operations; snapshot uuid := gen_random_uuid(); image uuid := gen_random_uuid();
   capsule uuid := gen_random_uuid();
-  item uuid := gen_random_uuid(); preview_draft uuid := gen_random_uuid();
+  item uuid := gen_random_uuid(); preview_draft uuid := gen_random_uuid(); pending_image uuid := gen_random_uuid();
 BEGIN
   INSERT INTO public.workspaces(id, name) VALUES (ws, 'operation_test_' || ws), (foreign_ws, 'operation_test_' || foreign_ws);
   INSERT INTO public.workflow_drafts(id, workspace_id, feature_kind)
@@ -95,15 +95,20 @@ BEGIN
   INSERT INTO public.assets(id, workspace_id, bucket, storage_path, mime_type, byte_size, source_type)
     VALUES (image, ws, 'previews', ws::text || '/' || image || '.png', 'image/png', 1, 'sample');
   BEGIN
-    PERFORM public.complete_saved_avatar(ws, avatar_op.id, 1, repeat('e',64), image, repeat('f',64));
-    RAISE EXCEPTION 'Unverified image accepted';
-  EXCEPTION WHEN check_violation THEN NULL;
+    PERFORM public.complete_saved_avatar(ws, avatar_op.id, 0, repeat('e',64), image, repeat('f',64));
+    RAISE EXCEPTION 'Stale image attempt accepted';
+  EXCEPTION WHEN serialization_failure THEN NULL;
   END;
-  UPDATE public.assets SET status = 'ready' WHERE workspace_id = ws AND id = image;
+  IF NOT EXISTS (SELECT 1 FROM public.assets WHERE workspace_id = ws AND id = image AND status = 'pending') THEN
+    RAISE EXCEPTION 'Stale image was promoted';
+  END IF;
   finished := public.complete_saved_avatar(ws, avatar_op.id, 1, repeat('e',64), image, repeat('f',64));
   IF finished.status <> 'succeeded' OR NOT EXISTS (SELECT 1 FROM public.saved_look_media
     WHERE workspace_id = ws AND operation_id = avatar_op.id AND output_asset_id = image AND status = 'succeeded') THEN
     RAISE EXCEPTION 'Avatar and operation were not committed together';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.assets WHERE workspace_id = ws AND id = image AND status = 'ready') THEN
+    RAISE EXCEPTION 'Verified pending avatar was not promoted';
   END IF;
   UPDATE public.workflow_drafts SET status = 'discarded' WHERE id = second_draft AND workspace_id = ws;
   finished := public.cancel_workflow_operation(ws, second_op.id);
@@ -132,8 +137,38 @@ BEGIN
       'preferences', jsonb_build_object('revision', 0), 'renderFingerprint', repeat('f',64)));
   op := public.claim_workflow_operation(ws, op.id, 1);
   UPDATE public.wardrobe_items SET revision = 2 WHERE workspace_id = ws AND id = item;
-  finished := public.complete_preview_operation(ws, op.id, 1, repeat('b',64), image, repeat('f',64));
+  INSERT INTO public.assets(id, workspace_id, bucket, storage_path, mime_type, byte_size, source_type)
+    VALUES (pending_image, ws, 'previews', ws::text || '/' || pending_image || '.png', 'image/png', 1, 'sample');
+  finished := public.complete_preview_operation(ws, op.id, 1, repeat('b',64), pending_image, repeat('f',64));
   IF finished.status <> 'superseded' THEN RAISE EXCEPTION 'Edited wardrobe image completion accepted'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.assets WHERE workspace_id = ws AND id = pending_image AND status = 'pending') THEN
+    RAISE EXCEPTION 'Superseded image was promoted';
+  END IF;
+  op := public.start_workflow_operation(ws, 'preview_image', 'draft', preview_draft, 1, repeat('c',64),
+    jsonb_build_object('items', jsonb_build_array(jsonb_build_object('id', item, 'revision', 2)),
+      'preferences', jsonb_build_object('revision', 0), 'renderFingerprint', repeat('f',64)));
+  op := public.claim_workflow_operation(ws, op.id, 1);
+  finished := public.cancel_workflow_operation(ws, op.id);
+  IF finished.status <> 'running' OR finished.cancel_requested_at IS NULL OR finished.lease_until IS NULL THEN
+    RAISE EXCEPTION 'Cancellation released an active provider lease';
+  END IF;
+  BEGIN
+    PERFORM public.claim_workflow_operation(ws, op.id, 1);
+    RAISE EXCEPTION 'Cancelled provider lease was reclaimed early';
+  EXCEPTION WHEN lock_not_available THEN NULL;
+  END;
+  avatar_op := public.start_workflow_operation(ws, 'saved_avatar', 'saved_look', snapshot, 1, repeat('a',64));
+  BEGIN
+    PERFORM public.claim_workflow_operation(ws, avatar_op.id, 1);
+    RAISE EXCEPTION 'Pending cancellation released image quota';
+  EXCEPTION WHEN lock_not_available THEN NULL;
+  END;
+  finished := public.complete_preview_operation(ws, op.id, 1, repeat('c',64), pending_image, repeat('f',64));
+  IF finished.status <> 'cancelled' OR finished.lease_until IS NOT NULL THEN RAISE EXCEPTION 'Provider completion did not acknowledge cancellation'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.assets WHERE workspace_id = ws AND id = pending_image AND status = 'pending') THEN
+    RAISE EXCEPTION 'Cancelled image was promoted';
+  END IF;
+  PERFORM public.claim_workflow_operation(ws, avatar_op.id, 1);
 END;
 $$;
 ROLLBACK;
