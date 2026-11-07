@@ -229,6 +229,8 @@ export function ShareReviewDialog({
   onClose,
   onPublish,
   onTurnOff,
+  managing = false,
+  onCreateNew,
 }: {
   open: boolean;
   look: PublicLook | null;
@@ -243,6 +245,8 @@ export function ShareReviewDialog({
   onClose: () => void;
   onPublish: (values: { catchphrase: string }) => void;
   onTurnOff?: () => void;
+  managing?: boolean;
+  onCreateNew?: () => void;
 }) {
   const safe = useRef<HTMLButtonElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -274,7 +278,7 @@ export function ShareReviewDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-night/45" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 max-h-[92dvh] w-[min(94vw,780px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-stone bg-paper text-ink shadow-xl"
+          className={`fixed left-1/2 top-1/2 z-50 max-h-[92dvh] ${managing ? "w-[min(94vw,560px)]" : "w-[min(94vw,780px)]"} -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-stone bg-paper text-ink shadow-xl`}
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             opener.current = document.activeElement as HTMLElement | null;
@@ -286,57 +290,64 @@ export function ShareReviewDialog({
           }}
         >
           <Dialog.Description className="sr-only">
-            Review exactly what this link will show before creating it. Closing
-            the dialog hides the full link.
+            {managing
+              ? "Manage published links. Their contents cannot be edited."
+              : "Review exactly what this link will show before creating it. Closing the dialog hides the full link."}
           </Dialog.Description>
           <div
-            className="grid gap-5 p-5 sm:grid-cols-[0.85fr_1.15fr] sm:p-7"
+            className={`grid gap-5 p-5 ${managing ? "" : "sm:grid-cols-[0.85fr_1.15fr]"} sm:p-7`}
             aria-busy={loading}
           >
-            <section
-              className="min-w-0 rounded-2xl bg-porcelain p-4"
-              aria-label="Exactly what people will see"
-            >
-              <p className="mb-3 text-xs text-secondary">
-                Exactly what people will see
-              </p>
-              {loading || !look ? (
-                <>
-                  <Skeleton className="block aspect-[3/4] w-full rounded-xl" />
-                  <Skeleton className="mt-3 block h-7 w-3/4" />
-                </>
-              ) : (
-                <>
-                  <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-sand">
-                    <SharedImage
-                      src={look.avatarUrl}
-                      alt={
-                        look.avatarUrl
-                          ? `Illustrative avatar for ${look.title}`
-                          : (look.avatarNotice ??
-                            "No avatar is selected for this link.")
-                      }
-                      avatar
-                    />
-                  </div>
-                  <h2 className="mt-3 break-words font-serif text-2xl">
-                    {look.title}
-                  </h2>
-                  {catchphrase && (
-                    <p className="mt-1 whitespace-pre-wrap break-words font-serif italic text-crimson">
-                      {catchphrase}
-                    </p>
-                  )}
-                  <div className="mt-3">
-                    <ItemGrid items={look.items} compact />
-                  </div>
-                </>
-              )}
-            </section>
+            {!managing && (
+              <section
+                className="min-w-0 rounded-2xl bg-porcelain p-4"
+                aria-label="Exactly what people will see"
+              >
+                <p className="mb-3 text-xs text-secondary">
+                  Exactly what people will see
+                </p>
+                {loading || !look ? (
+                  <>
+                    <Skeleton className="block aspect-[3/4] w-full rounded-xl" />
+                    <Skeleton className="mt-3 block h-7 w-3/4" />
+                  </>
+                ) : (
+                  <>
+                    <div className="relative mx-auto aspect-[3/4] w-full max-w-44 overflow-hidden rounded-xl bg-sand sm:max-w-none">
+                      <SharedImage
+                        src={look.avatarUrl}
+                        alt={
+                          look.avatarUrl
+                            ? `Illustrative avatar for ${look.title}`
+                            : (look.avatarNotice ??
+                              "No avatar is selected for this link.")
+                        }
+                        avatar
+                      />
+                    </div>
+                    <h2 className="mt-3 break-words font-serif text-2xl">
+                      {look.title}
+                    </h2>
+                    {catchphrase && (
+                      <p className="mt-1 whitespace-pre-wrap break-words font-serif italic text-crimson">
+                        {catchphrase}
+                      </p>
+                    )}
+                    <div className="mt-3">
+                      <ItemGrid items={look.items} compact />
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
             <section className="min-w-0">
               <div className="flex items-start justify-between gap-2">
                 <Dialog.Title className="font-serif text-3xl">
-                  Share this look
+                  {managing
+                    ? "Manage sharing"
+                    : shareUrl
+                      ? "Your link is ready"
+                      : "Share this look"}
                 </Dialog.Title>
                 <button
                   ref={safe}
@@ -348,49 +359,73 @@ export function ShareReviewDialog({
                   <Icon name="x" className="size-5" />
                 </button>
               </div>
-              {loading && (
-                <p role="status" className="mt-3 text-sm text-secondary">
-                  Loading the saved look and its links…
-                </p>
+              {loading ? (
+                <div
+                  role="status"
+                  aria-label="Preparing share preview"
+                  className="mt-5 space-y-3"
+                >
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-28 w-full rounded-lg" />
+                  <Skeleton className="h-4 w-3/4" />
+                </div>
+              ) : managing ? (
+                <>
+                  <p className="mt-3 text-sm leading-relaxed text-secondary">
+                    Published links keep their original description and image.
+                    Create a new link to share changes.
+                  </p>
+                  {children}
+                </>
+              ) : (
+                !shareUrl && (
+                  <>
+                    <label className="mt-4 block text-sm">
+                      Look description
+                      <textarea
+                        value={catchphrase}
+                        maxLength={240}
+                        rows={3}
+                        disabled={locked}
+                        onChange={(event) =>
+                          onCatchphraseChange(event.target.value)
+                        }
+                        className="mt-2 min-h-24 w-full resize-y rounded-lg border border-secondary bg-paper px-3 py-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crimson disabled:opacity-70"
+                      />
+                    </label>
+                    {children}
+                    <p className="mt-5 text-xs leading-relaxed text-secondary">
+                      Your link stays active until you turn it off.
+                    </p>
+                  </>
+                )
               )}
-              <label className="mt-4 block text-sm">
-                Look description
-                <textarea
-                  value={catchphrase}
-                  maxLength={240}
-                  rows={3}
-                  disabled={locked}
-                  onChange={(event) => onCatchphraseChange(event.target.value)}
-                  className="mt-2 min-h-24 w-full resize-y rounded-lg border border-secondary bg-paper px-3 py-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crimson disabled:opacity-70"
-                />
-              </label>
-              <p className="mt-3 text-xs leading-relaxed text-secondary">
-                This link stays active until you turn it off.
-              </p>
-              {children}
               {error && (
                 <p role="alert" className="mt-3 text-sm text-crimson">
                   {error}
                 </p>
               )}
               {shareUrl && (
-                <div className="mt-4 rounded-xl bg-blush p-3">
+                <div className="mt-5 rounded-xl bg-blush p-4">
                   <label className="block text-xs">
-                    New share link
+                    Share link
                     <input
                       readOnly
-                      aria-label="New share link"
+                      aria-label="Share link"
                       value={shareUrl}
                       onFocus={(event) => event.currentTarget.select()}
                       className="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-secondary bg-paper px-2 text-xs"
                     />
                   </label>
-                  <Button variant="quiet" onClick={copyLink}>
+                  <Button
+                    variant="secondary"
+                    onClick={copyLink}
+                    className="mt-3 w-full"
+                  >
                     {copied ? "Copied" : "Copy link"}
                   </Button>
-                  <p className="text-xs leading-relaxed text-secondary">
-                    Copy it now. The full link is hidden when you close this
-                    dialog.
+                  <p className="mt-3 text-xs leading-relaxed text-secondary">
+                    Save this link before closing. It cannot be shown again.
                   </p>
                   {copyFailed && (
                     <p role="status" className="mt-2 text-xs">
@@ -400,7 +435,15 @@ export function ShareReviewDialog({
                 </div>
               )}
               <div className="mt-6 flex items-center justify-between gap-3">
-                {shareUrl && onTurnOff ? (
+                {managing && onCreateNew ? (
+                  <Button
+                    variant="secondary"
+                    onClick={onCreateNew}
+                    disabled={busy || loading || !look || !canPublish}
+                  >
+                    Create new link
+                  </Button>
+                ) : shareUrl && onTurnOff ? (
                   <Button
                     variant="quiet"
                     onClick={onTurnOff}
@@ -414,10 +457,12 @@ export function ShareReviewDialog({
                 <Button
                   variant="primary"
                   disabled={
-                    busy || loading || !look || (!shareUrl && !canPublish)
+                    busy ||
+                    loading ||
+                    (!managing && (!look || (!shareUrl && !canPublish)))
                   }
                   onClick={() => {
-                    if (shareUrl) closeDialog();
+                    if (managing || shareUrl) closeDialog();
                     else {
                       setCopied(false);
                       onPublish({
@@ -426,7 +471,11 @@ export function ShareReviewDialog({
                     }
                   }}
                 >
-                  {busy ? "Saving…" : shareUrl ? "Done" : "Create link"}
+                  {busy
+                    ? "Saving…"
+                    : managing || shareUrl
+                      ? "Done"
+                      : "Create link"}
                 </Button>
               </div>
             </section>

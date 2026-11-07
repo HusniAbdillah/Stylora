@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { Button } from "@/components/ui";
 import {
   SavedLookAvatar,
   SavedLookDetail,
@@ -144,6 +145,35 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Collection: Story = { render: () => <GalleryDemo /> };
+export const MixedDescriptions: Story = {
+  render: () => (
+    <div className="mx-auto max-w-4xl p-6">
+      <SavedLooksGallery
+        looks={[
+          {
+            ...looks[0],
+            title: "Gingham, light trousers and a dark zip layer",
+            subtitle:
+              "Soft tailoring with a longer description that wraps across multiple lines.",
+            share: undefined,
+          },
+          {
+            ...looks[1],
+            title: "Your preview outfit",
+            subtitle: undefined,
+            share: { active: true, permanent: true },
+          },
+        ]}
+        getLookHref={(id) => `/saved-looks/${id}`}
+        renderShare={(look) => (
+          <Button variant="secondary" className="min-w-24 justify-center">
+            {look.share?.active ? "Manage" : "Share"}
+          </Button>
+        )}
+      />
+    </div>
+  ),
+};
 export const EmptyCollection: Story = {
   args: { looks: [] },
   render: (args) => (
@@ -160,7 +190,6 @@ export const SavedDetail: Story = {
         onRetryImage={() => undefined}
         onShare={() => undefined}
         onDelete={() => undefined}
-        onAddToCapsule={() => undefined}
       />
     </div>
   ),
