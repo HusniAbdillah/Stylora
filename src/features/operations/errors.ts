@@ -14,14 +14,11 @@ export class OperationError extends Error {
 export function canRetryOperationCode(code: string): boolean {
   return (
     [
-      "OPERATION_TIMEOUT",
-      "PROVIDER_UNAVAILABLE",
       "PROVIDER_TIMEOUT",
+      "PROVIDER_NETWORK_ERROR",
       "PROVIDER_RATE_LIMITED",
-      "MODEL_UNAVAILABLE",
-      "MODEL_TIMEOUT",
-      "MODEL_RATE_LIMITED",
+      "PROVIDER_SERVER_ERROR",
       "OPENAI_CONNECTION_FAILED",
-    ].includes(code) || /^OPENAI_HTTP_(429|5\d{2})$/.test(code)
+    ].includes(code) || /^OPENAI_HTTP_(429|500|502|503|504)$/.test(code)
   );
 }

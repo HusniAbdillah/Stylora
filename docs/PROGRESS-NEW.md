@@ -324,6 +324,17 @@ below the latest one.
 - Real text and image provider evidence: Not verified.
 - Unresolved work and next concrete action: Not reported.
 
+
+### Owner 4 operation controls increment, 7 November 2026
+
+- Task O4.1 and R01, R04–R06. Branch `o4/operation-controls`, based on merged runner and Owner 1 typed operation RPC contracts.
+- Implemented module-level request deduplication, three-second status polling and a five-minute resubmission window for queued or expired operations. Healthy leases only poll. Each started server request remains awaited and can finish beyond that resubmission window. Normal client navigation retains the request store.
+- Added scoped activity and atomic Studio controls while preserving published Create status metadata, retry execution and numeric event cursors. Default failure finalization now calls the attempt-fenced RPC with safe retry metadata. Domain success remains in its atomic feature callback.
+- Checks in the managed Windows worktree. `make fast` passed lint and typecheck, with one inherited Preview navigation warning. `pnpm exec vitest run src/features/operations` passed six files and eighteen tests. `git diff --check` passed. Fixtures are synthetic unit data in memory and required no hosted cleanup.
+- Covered concurrent active claims, request deduplication, queued resubmission, healthy lease polling without another execution request, completed output reaching commit, failure RPC fences, stable fingerprints, status projection and read-only RPC readiness.
+- Not run. Hosted migrations, database or Storage commands, paid provider calls, browser end-to-end journeys and local build. CI remains the full build and suite gate.
+- Limits. The app must be open for the bounded client pump. Server crashes need a later visit and lease recovery. Provider availability, Storage and end-to-end image completion still require the coordinator’s approved integration smoke. No cloud data was changed.
+
 ## 8. Task evidence ledger
 
 Add one row per meaningful task, not one vague row for an entire owner.
