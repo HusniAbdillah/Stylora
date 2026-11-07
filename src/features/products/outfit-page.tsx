@@ -12,6 +12,7 @@ import {
 } from "react";
 import { Button, Stepper } from "@/components/ui";
 import { BrowserApiError, requestData } from "@/lib/browser-api";
+import { explanationSchema } from "@/lib/ai/fashion-schema";
 import {
   OutfitDetail,
   type OutfitDetailOption,
@@ -150,19 +151,34 @@ function sentences(value: unknown): string[] {
 function inputLabels(value: unknown): string[] {
   const labels: Record<string, string> = {
     reference: "Reference",
+    inspiration: "Reference",
     wardrobe: "Wardrobe",
     occasion: "Occasion",
     undertone: "Undertone",
     skin_depth: "Skin tone",
     skinSwatchId: "Selected skin tone",
+    skinSwatchHex: "Selected skin tone",
     bodyProfile: "Selected body profile",
+    bodyIllustrationId: "Selected body profile",
+    bodyIllustrationGroup: "Selected body reference",
     fit: "Fit preferences",
     preferences: "Selected preferences",
   };
-  if (Array.isArray(value))
-    return value.flatMap((entry) =>
-      typeof entry === "string" && labels[entry] ? [labels[entry]] : [],
-    );
+  const keys = Array.isArray(value) ? value : object(value).keys;
+  if (Array.isArray(keys))
+    return [
+      ...new Set(
+        keys.flatMap((entry) =>
+          typeof entry === "string" && entry.trim()
+            ? [
+                labels[entry] ??
+                  labels[entry.replace(/^preferences\./, "")] ??
+                  readableField(entry),
+              ]
+            : [],
+        ),
+      ),
+    ];
   return Object.entries(object(value)).flatMap(([key, entry]) =>
     labels[key] &&
     (typeof entry === "string"
@@ -176,13 +192,23 @@ function inputLabels(value: unknown): string[] {
       : [],
   );
 }
+function readableField(value: string) {
+  const words = value
+    .replace(/^(attributes|preferences)\./, "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[._]/g, " ")
+    .trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 export function OutfitPage({
   data,
   writesEnabled,
+  createDraftId,
 }: {
   data: OutfitPageData;
   writesEnabled: boolean;
+  createDraftId?: string;
 }) {
   const router = useRouter();
   const storageKey = `stylora.outfit.v1.${data.lookId}`;
@@ -522,12 +548,7 @@ export function OutfitPage({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [
-    activeId,
-    hasRunningSearch,
-    data.lookId,
-    updateOption,
-  ]);
+  }, [activeId, hasRunningSearch, data.lookId, updateOption]);
 
   async function persistChoices(
     id: string,
@@ -848,6 +869,8 @@ export function OutfitPage({
     const state = cache[option.id];
     const detail = state?.detail;
     const explanation = object(detail?.option.explanation);
+    const canonical = explanationSchema.safeParse(detail?.option.explanation);
+    const canonicalExplanation = canonical.success ? canonical.data : null;
     const choices = detail ? selectionChoices(detail, drafts[option.id]) : [];
     return {
       id: option.id,
@@ -897,10 +920,42 @@ export function OutfitPage({
                     : ("missing" as const),
           };
         }) ?? [],
-      reasons: sentences(explanation.reasons).length
-        ? sentences(explanation.reasons)
-        : sentences(detail?.option.rationale),
-      inputsUsed: inputLabels(detail?.option.inputsUsed),
+      reasons: canonicalExplanation
+        ? canonicalExplanation.whyThis.map((reason) => reason.reason)
+        : sentences(explanation.reasons).length
+          ? sentences(explanation.reasons)
+          : sentences(detail?.option.rationale),
+      evidence: canonicalExplanation
+        ? [
+            ...new Set(
+              canonicalExplanation.whyThis.flatMap((reason) =>
+                reason.evidence.map((entry) => {
+                  const source = {
+                    inspiration: "Inspiration image",
+                    wardrobe: "Wardrobe item",
+                    preference: "Your selection",
+                    context: "Context",
+                  }[entry.source];
+                  const item =
+                    entry.source === "wardrobe" && entry.id !== null
+                      ? detail?.slots
+                          .flatMap((slot) => slot.candidates)
+                          .find(
+                            (candidate) =>
+                              candidate.wardrobeItemId === entry.id,
+                          )
+                      : undefined;
+                  return `${text(item?.name) || source}: ${readableField(entry.path)}`;
+                }),
+              ),
+            ),
+          ]
+        : undefined,
+      inputsUsed: inputLabels(
+        canonicalExplanation?.inputsUsed ??
+          explanation.inputsUsed ??
+          detail?.option.inputsUsed,
+      ),
       differences: sentences(explanation.differences),
       uncertainty: sentences(detail?.option.uncertainty),
       shoppingSlots:
@@ -1023,7 +1078,16 @@ export function OutfitPage({
               }),
     };
   });
-  const backHref = `/looks/${data.lookId}?step=ideas`;
+  function createStepHref(step: string) {
+    const query = new URLSearchParams({ step });
+    if (activeId) query.set("option_id", activeId);
+    if (createDraftId) query.set("draft", createDraftId);
+    return `/create/${data.lookId}?${query}`;
+  }
+  const backHref = createStepHref("ideas");
+  const usesSampleInventory = active?.detail.slots.some((slot) =>
+    slot.candidates.some((candidate) => candidate.sourceType === "sample"),
+  );
   if (!data.options.length || !activeId)
     return (
       <section className="rounded-2xl border border-stone bg-paper p-6">
@@ -1049,16 +1113,19 @@ export function OutfitPage({
           current={4}
           visited={[0, 1, 2, 3, 4]}
           onSelect={(index) => {
-            const url = new URL(window.location.href);
-            url.searchParams.delete("option_id");
-            url.searchParams.set(
-              "step",
-              ["upload", "review", "matches", "ideas", "details"][index],
-            );
-            router.push(url.pathname + url.search);
+            if (index < 4)
+              router.push(
+                createStepHref(["upload", "review", "matches", "ideas"][index]),
+              );
           }}
         />
       </div>
+      {usesSampleInventory && (
+        <p className="mb-4 rounded-xl border border-stone bg-paper px-4 py-3 text-sm text-secondary">
+          Sample inventory · Example wardrobe pieces are shown in this
+          direction. Live wardrobe integration is pending.
+        </p>
+      )}
       {!writesEnabled && (
         <p className="mb-4 rounded-xl bg-blush p-4 text-sm">
           This workspace is read only. You can review saved results; shopping,

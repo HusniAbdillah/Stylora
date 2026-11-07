@@ -56,6 +56,7 @@ export type OutfitDetailOption = {
   subtitle?: string;
   items: OutfitItem[];
   reasons: string[];
+  evidence?: string[];
   inputsUsed: string[];
   differences?: string[];
   uncertainty?: string[];
@@ -612,6 +613,18 @@ export function OutfitDetail({
                 No explanation was recorded for this direction.
               </p>
             )}
+            {active.evidence?.length ? (
+              <details className="mt-4 text-sm text-secondary">
+                <summary className="min-h-11 cursor-pointer py-3 font-medium text-crimson">
+                  Evidence used
+                </summary>
+                <ul className="space-y-2 text-xs leading-5">
+                  {active.evidence.map((entry) => (
+                    <li key={entry}>{entry}</li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
             {active.inputsUsed.length > 0 && (
               <>
                 <h3 className="mt-5 text-xs font-medium text-secondary">

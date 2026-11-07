@@ -1,12 +1,44 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Skeleton } from "@/components/ui";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { z } from "zod";
+import { Button, ConfirmDialog, Skeleton } from "@/components/ui";
+import {
+  preferencesClientSchema,
+  readPreferences,
+  savePreferences,
+} from "./client-contract";
+import { useLiveSettingsDraft } from "./live-settings-draft";
 import { PreferencesForm } from "./preferences-form";
-import { preferencesPreviewStore } from "./preferences-preview";
 import type { PreferencesDraft } from "./preferences-types";
+import styles from "./preferences.module.css";
 
-type SaveStatus = "idle" | "draftSaving" | "saving" | "saved" | "error";
+const preferencesConfiguration = {
+  feature: "preferences" as const,
+  read: async () => {
+    const snapshot = await readPreferences();
+    return { value: snapshot.preferences, revision: snapshot.revision };
+  },
+  save: async (value: PreferencesDraft, revision: number) => {
+    const snapshot = await savePreferences(value, revision);
+    window.dispatchEvent(
+      new CustomEvent("stylora:preferences-updated", {
+        detail: {
+          revision: snapshot.revision,
+          fingerprint: snapshot.fingerprint,
+        },
+      }),
+    );
+    return { value: snapshot.preferences, revision: snapshot.revision };
+  },
+  parse: (payload: unknown): PreferencesDraft =>
+    preferencesClientSchema.parse(payload),
+  input: (value: PreferencesDraft) => ({
+    featureKind: "preferences" as const,
+    payload: value,
+  }),
+};
 
 export function PreferencesLoading() {
   return (
@@ -34,97 +66,126 @@ export function PreferencesLoading() {
 }
 
 export function PreferencesPage() {
-  const state = preferencesPreviewStore.useValue();
-  const ready = preferencesPreviewStore.useReady();
-  const [fallbackDraft, setFallbackDraft] = useState<PreferencesDraft | null>(
-    null,
+  const settings = useLiveSettingsDraft<PreferencesDraft>(
+    preferencesConfiguration,
   );
-  const [status, setStatus] = useState<SaveStatus>("idle");
-  const [statusMessage, setStatusMessage] = useState("");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
 
-  useEffect(
-    () => () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    },
-    [],
-  );
+  useEffect(() => {
+    const destination = new URLSearchParams(window.location.search).get(
+      "returnTo",
+    );
+    if (
+      !destination ||
+      !destination.startsWith("/") ||
+      destination.startsWith("//") ||
+      destination.includes("\\")
+    )
+      return;
+    const url = new URL(destination, window.location.origin);
+    if (url.origin !== window.location.origin) return;
+    const lookId = /^\/(?:looks|create)\/([^/]+)$/.exec(url.pathname)?.[1];
+    if (
+      url.pathname !== "/create" &&
+      (!lookId || !z.uuid().safeParse(lookId).success)
+    )
+      return;
+    const params = new URLSearchParams();
+    const draft = url.searchParams.get("draft");
+    if (draft && z.uuid().safeParse(draft).success) params.set("draft", draft);
+    const step = url.searchParams.get("step");
+    if (
+      lookId &&
+      step &&
+      ["upload", "review", "matches", "ideas"].includes(step)
+    )
+      params.set("step", step);
+    const query = params.toString();
+    setReturnTo(`${url.pathname}${query ? `?${query}` : ""}`);
+  }, []);
 
-  function stopStatusTimer() {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = null;
+  if (settings.loading) return <PreferencesLoading />;
+
+  if (settings.value === null) {
+    return (
+      <section className={styles.notice} role="alert">
+        <h1>Preferences are unavailable</h1>
+        <p>{settings.message}</p>
+        <Button variant="secondary" onClick={() => void settings.reload()}>
+          Retry
+        </Button>
+      </section>
+    );
   }
-
-  function changeDraft(next: PreferencesDraft) {
-    stopStatusTimer();
-    setStatus("draftSaving");
-    try {
-      preferencesPreviewStore.set((previous) => ({ ...previous, draft: next }));
-      setFallbackDraft(null);
-      saveTimer.current = setTimeout(() => {
-        setStatus("saved");
-        setStatusMessage("Draft saved in this browser");
-      }, 600);
-    } catch {
-      setFallbackDraft(next);
-      setStatus("error");
-      setStatusMessage(
-        "This browser could not save your draft. Try Save preferences.",
-      );
-    }
-  }
-
-  function save() {
-    stopStatusTimer();
-    setStatus("saving");
-    const draft = fallbackDraft ?? preferencesPreviewStore.get().draft;
-    try {
-      preferencesPreviewStore.set((previous) => ({
-        ...previous,
-        draft,
-        saved: draft,
-        revision: previous.revision + 1,
-      }));
-      setFallbackDraft(null);
-      setStatus("saved");
-      setStatusMessage("Preferences saved in this browser");
-    } catch {
-      setStatus("error");
-      setStatusMessage(
-        "Could not save preferences in this browser. Check available storage and try again.",
-      );
-    }
-  }
-
-  function reset() {
-    stopStatusTimer();
-    try {
-      preferencesPreviewStore.set((previous) => ({
-        draft: {},
-        saved: {},
-        revision: previous.revision + 1,
-      }));
-      setFallbackDraft(null);
-      setStatus("saved");
-      setStatusMessage("Preferences cleared in this browser");
-    } catch {
-      setStatus("error");
-      setStatusMessage(
-        "Could not clear preferences in this browser. Try again.",
-      );
-    }
-  }
-
-  if (!ready) return <PreferencesLoading />;
 
   return (
-    <PreferencesForm
-      value={fallbackDraft ?? state.draft}
-      status={status}
-      statusMessage={statusMessage}
-      onChange={changeDraft}
-      onSave={save}
-      onReset={reset}
-    />
+    <>
+      {returnTo && (
+        <Link className={styles.returnLink} href={returnTo}>
+          Back to Create
+        </Link>
+      )}
+      {!settings.writesEnabled && (
+        <p className={styles.notice} role="status">
+          This workspace is read-only. You can view preferences; changes are
+          disabled.
+        </p>
+      )}
+      {(settings.conflict || settings.status === "error") && (
+        <div className={styles.notice} role="alert">
+          <p>{settings.message}</p>
+          {settings.conflict ? (
+            <Button
+              variant="secondary"
+              onClick={() => void settings.reloadRevision()}
+            >
+              Reload latest revision
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              disabled={!settings.writesEnabled}
+              onClick={() => void settings.save()}
+            >
+              Retry save
+            </Button>
+          )}
+        </div>
+      )}
+      {settings.dirty && settings.writesEnabled && (
+        <div className={styles.draftActions}>
+          <span>Your draft is separate from saved preferences.</span>
+          <Button
+            variant="quiet"
+            disabled={settings.status === "saving"}
+            onClick={() => setDiscardOpen(true)}
+          >
+            Discard draft
+          </Button>
+        </div>
+      )}
+      <PreferencesForm
+        value={settings.value}
+        status={settings.status}
+        statusMessage={settings.message}
+        readOnly={!settings.writesEnabled}
+        onChange={settings.change}
+        onSave={() => void settings.save()}
+        onReset={() => void settings.save({})}
+      />
+      <ConfirmDialog
+        open={discardOpen}
+        onClose={() => setDiscardOpen(false)}
+        title="Discard preference draft?"
+        description="Your unsaved choices will be removed. Saved preferences stay in place."
+        confirmLabel="Discard draft"
+        cancelLabel="Keep editing"
+        onConfirm={() => {
+          setDiscardOpen(false);
+          void settings.discard();
+        }}
+      />
+    </>
   );
 }

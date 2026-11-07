@@ -2,6 +2,7 @@
 
 import { Badge, Button, Icon } from "@/components/ui";
 import type { ColorSwatch, ConfidenceReview, DetectedPiece } from "./types";
+import styles from "./create-presentation.module.css";
 
 export type ReviewPiecesProps = {
   imageUrl: string;
@@ -13,6 +14,7 @@ export type ReviewPiecesProps = {
   confidence: ConfidenceReview;
   matchStatus?: "queued" | "running" | "ready" | "failed";
   onMatch?: () => void;
+  onBack?: () => void;
   onAddPiece?: () => void;
   onEditPiece?: (piece: DetectedPiece) => void;
   onRemovePiece?: (piece: DetectedPiece) => void;
@@ -46,15 +48,26 @@ export function DetectedPieceCard({
   return (
     <article className="rounded-2xl border border-stone bg-paper p-4 sm:p-5">
       <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-porcelain text-secondary">
+        <span className="hidden size-11 shrink-0 items-center justify-center rounded-xl bg-porcelain text-secondary sm:flex">
           <Icon
             name={piece.category === "accessory" ? "bag" : "shirt"}
             className="size-5"
           />
         </span>
+        <span
+          className="mt-0.5 size-7 shrink-0 rounded-full border border-stone bg-sand sm:hidden"
+          style={
+            piece.colors?.[0]?.hex
+              ? { backgroundColor: piece.colors[0].hex }
+              : undefined
+          }
+          aria-hidden="true"
+        />
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold leading-5 text-ink">
-            {number != null ? `${number} ` : ""}
+            {number != null && (
+              <span className="hidden sm:inline">{number} </span>
+            )}
             {piece.name}
           </h3>
           <p className="mt-0.5 text-xs text-secondary">
@@ -74,7 +87,7 @@ export function DetectedPieceCard({
             <button
               type="button"
               onClick={onEdit}
-              className="flex size-8 items-center justify-center rounded-lg text-secondary hover:bg-porcelain hover:text-crimson"
+              className="flex size-11 items-center justify-center rounded-lg text-secondary hover:bg-porcelain hover:text-crimson"
               aria-label={`Edit ${piece.name}`}
             >
               <Icon name="edit" className="size-4" />
@@ -84,7 +97,7 @@ export function DetectedPieceCard({
             <button
               type="button"
               onClick={onRemove}
-              className="flex size-8 items-center justify-center rounded-lg text-secondary hover:bg-porcelain hover:text-crimson"
+              className="hidden size-11 items-center justify-center rounded-lg text-secondary hover:bg-porcelain hover:text-crimson sm:flex"
               aria-label={`Remove ${piece.name}`}
             >
               <Icon name="trash" className="size-4" />
@@ -93,7 +106,7 @@ export function DetectedPieceCard({
         </div>
       </div>
       {piece.attributes?.length ? (
-        <dl className="mt-3 flex flex-wrap gap-1.5">
+        <dl className={`${styles.pieceAttributes} mt-3 flex flex-wrap gap-1.5`}>
           {piece.attributes.map(({ label, value }) => (
             <div
               key={`${label}-${value}`}
@@ -108,7 +121,7 @@ export function DetectedPieceCard({
         </dl>
       ) : null}
       {piece.evidence && (
-        <p className="mt-3 flex items-start gap-1.5 text-xs leading-5 text-secondary">
+        <p className="mt-3 hidden items-start gap-1.5 text-xs leading-5 text-secondary sm:flex">
           <Icon name="search" className="mt-0.5 size-3.5 shrink-0" />
           <span>Seen: {piece.evidence}</span>
         </p>
@@ -141,7 +154,7 @@ export function ConfidencePanel({
   const pending = review.status === "queued" || review.status === "running";
   return (
     <section
-      className="rounded-[20px] border border-stone bg-paper p-4 sm:p-6"
+      className={styles.confidencePanel}
       aria-labelledby="confidence-heading"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -153,14 +166,19 @@ export function ConfidencePanel({
           Review with confidence
         </h2>
         <Badge tone="neutral">
-          {review.status === "ready"
-            ? "Separate analysis"
-            : pending
-              ? "In progress"
-              : "Unavailable"}
+          {review.status === "ready" ? (
+            <>
+              <span className="sm:hidden">Ready</span>
+              <span className="hidden sm:inline">Separate analysis</span>
+            </>
+          ) : pending ? (
+            "In progress"
+          ) : (
+            "Unavailable"
+          )}
         </Badge>
       </div>
-      {pending && (
+      {pending && !review.insights?.length && (
         <div className="mt-5 space-y-3" aria-busy="true">
           <div className="h-4 w-2/3 animate-pulse rounded bg-sand motion-reduce:animate-none" />
           <div className="h-4 w-full animate-pulse rounded bg-sand motion-reduce:animate-none" />
@@ -173,57 +191,92 @@ export function ConfidencePanel({
             {review.errorMessage ??
               "This separate review is unavailable right now. Your piece descriptions remain available."}
           </p>
-          {onRetry && review.status === "failed" && (
+          {onRetry && (
             <Button
               type="button"
               variant="secondary"
               onClick={onRetry}
               className="mt-3"
             >
-              Retry review
+              {review.status === "failed" ? "Retry review" : "Refresh review"}
             </Button>
           )}
         </div>
       )}
-      {review.status === "ready" && (
+      {(review.status === "ready" ||
+        (pending && Boolean(review.insights?.length))) && (
         <>
-          <h3 className="mt-5 text-xs font-semibold text-secondary">Palette</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {review.palette?.map((color) => (
-              <div key={color.name} className="text-center">
-                <div
-                  className="h-9 w-14 rounded-lg border border-stone bg-sand"
-                  style={color.hex ? { backgroundColor: color.hex } : undefined}
-                />
-                <span className="mt-1 block text-[11px] text-secondary">
-                  {color.name}
-                </span>
+          {review.palette?.length ? (
+            <>
+              <h3 className="mt-5 hidden text-xs font-semibold text-secondary sm:block">
+                Palette
+              </h3>
+              <div className="mt-3 hidden flex-wrap gap-2 sm:flex">
+                {review.palette?.map((color) => (
+                  <div key={color.name} className="text-center">
+                    <div
+                      className="h-9 w-14 rounded-lg border border-stone bg-sand"
+                      style={
+                        color.hex ? { backgroundColor: color.hex } : undefined
+                      }
+                    />
+                    <span className="mt-1 block text-[11px] text-secondary">
+                      {color.name}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <h3 className="mt-5 text-xs font-semibold text-secondary">
-            With your selections
+            </>
+          ) : null}
+          <h3 className="mt-5 hidden text-xs font-semibold text-secondary sm:block">
+            Style review
           </h3>
           <ul className="mt-3 space-y-3">
             {review.insights?.map((insight) => (
-              <li key={insight.title} className="flex gap-2 text-sm">
+              <li
+                key={insight.title}
+                className="flex gap-2 text-xs leading-5 sm:text-sm"
+              >
                 <Icon
                   name="check"
                   className="mt-0.5 size-4 shrink-0 text-[var(--color-owned)]"
                 />
                 <span>
-                  <strong className="block font-medium text-ink">
+                  <strong className="font-medium text-ink sm:block">
                     {insight.title}
                   </strong>
-                  <span className="block text-secondary">
+                  <span className="sm:hidden">: </span>
+                  <span className="text-secondary sm:block">
                     {insight.description}
                   </span>
                 </span>
               </li>
             ))}
           </ul>
+          {review.reasons?.length ? (
+            <details className="mt-4 text-sm text-secondary">
+              <summary className="min-h-11 cursor-pointer py-3 font-medium text-crimson">
+                Why this review
+              </summary>
+              <ul className="list-disc space-y-2 pl-4">
+                {review.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+              {review.inputsUsed?.length ? (
+                <p className="mt-3 text-xs">
+                  Inputs used: {review.inputsUsed.join(", ")}
+                </p>
+              ) : null}
+              {review.evidence?.map((evidence) => (
+                <p key={evidence} className="mt-2 text-xs">
+                  {evidence}
+                </p>
+              ))}
+            </details>
+          ) : null}
           {review.occasions?.length ? (
-            <div className="mt-5 flex flex-wrap gap-1.5">
+            <div className="mt-5 hidden flex-wrap gap-1.5 sm:flex">
               {review.occasions.map((occasion) => (
                 <span
                   key={occasion}
@@ -256,6 +309,7 @@ export function ReviewPieces({
   confidence,
   matchStatus,
   onMatch,
+  onBack,
   onAddPiece,
   onEditPiece,
   onRemovePiece,
@@ -268,27 +322,35 @@ export function ReviewPieces({
   );
   const descriptionPending =
     descriptionStatus === "queued" || descriptionStatus === "running";
+  const palette =
+    confidence.palette ??
+    pieces
+      .flatMap((piece) => piece.colors ?? [])
+      .filter(
+        (color, index, colors) =>
+          colors.findIndex(
+            (candidate) =>
+              candidate.name === color.name && candidate.hex === color.hex,
+          ) === index,
+      );
   return (
-    <section
-      className="mx-auto w-full max-w-[1150px] pb-8"
-      aria-labelledby="review-pieces-title"
-    >
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-5">
+    <section className={styles.page} aria-labelledby="review-pieces-title">
+      <div className={styles.pageHeader}>
         <div>
-          <p className="text-sm font-semibold text-crimson">Step 2 of 5</p>
-          <h1
-            id="review-pieces-title"
-            className="mt-2 font-serif text-[clamp(2.2rem,4vw,3.2rem)] leading-tight"
-          >
+          <p className={styles.stepLabel}>Step 2 of 5</p>
+          <h1 id="review-pieces-title" className={styles.heading}>
             Review the <em className="text-crimson">pieces.</em>
           </h1>
-          <p className="mt-2 max-w-[620px] text-base leading-6 text-secondary">
+          <p className={styles.desktopDescription}>
             Correct anything that looks wrong. Edits refresh matches and ideas,
             never your upload.
           </p>
+          <p className="mt-2 text-sm text-secondary sm:hidden">
+            Edits refresh matches, never your upload.
+          </p>
         </div>
         {onMatch && (
-          <div className="hidden text-right sm:block">
+          <div className={styles.desktopAction}>
             <Button
               type="button"
               variant="primary"
@@ -307,28 +369,55 @@ export function ReviewPieces({
           </div>
         )}
       </div>
-      <div className="grid items-start gap-4 lg:grid-cols-[400px_minmax(0,1fr)] lg:gap-5">
+      <div className={styles.reviewGrid}>
         <div className="space-y-4">
           <figure className="flex gap-3 rounded-[20px] border border-stone bg-paper p-3 sm:block">
             <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sand sm:aspect-[4/5] sm:size-auto">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imageUrl}
-                alt={imageAlt}
-                className="h-full max-h-[460px] w-full object-contain"
-              />
+              {imageUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imageUrl}
+                    alt={imageAlt}
+                    className="h-full max-h-[460px] w-full object-contain"
+                  />
+                </>
+              ) : (
+                <Icon
+                  name="image"
+                  label="Reference image unavailable"
+                  className="size-8 text-secondary"
+                />
+              )}
             </div>
             <figcaption className="flex items-center gap-2 text-xs leading-5 text-secondary sm:mt-2">
-              <Icon name="image" className="size-4 shrink-0" />
+              <Icon
+                name="image"
+                className="hidden size-4 shrink-0 sm:inline-block"
+              />
               <span>
                 <strong className="mb-0.5 block font-medium text-ink sm:hidden">
                   Your reference
                 </strong>
-                Original reference. Pieces are text descriptions, not cutouts.
+                <span className="hidden sm:inline">Original reference. </span>
+                Pieces are text descriptions, not cutouts.
+                {palette.length > 0 && (
+                  <span className="mt-1 flex gap-0.5 sm:hidden">
+                    {palette.slice(0, 6).map((color) => (
+                      <Swatch
+                        key={`${color.name}-${color.hex}`}
+                        color={color}
+                      />
+                    ))}
+                  </span>
+                )}
               </span>
             </figcaption>
           </figure>
-          <ConfidencePanel review={confidence} onRetry={onRetryConfidence} />
+          <ConfidencePanel
+            review={{ ...confidence, palette }}
+            onRetry={onRetryConfidence}
+          />
         </div>
         <div>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -377,8 +466,9 @@ export function ReviewPieces({
                         <div className="h-3 w-1/3 animate-pulse rounded bg-sand motion-reduce:animate-none" />
                       </div>
                       <span className="text-xs text-crimson">
-                        Reading {pieces.length + index + 1} of{" "}
-                        {expectedPieceCount ?? "more"}
+                        {expectedPieceCount != null
+                          ? `Reading ${pieces.length + index + 1} of ${expectedPieceCount}`
+                          : "Reading pieces"}
                       </span>
                     </div>
                   </div>
@@ -426,17 +516,25 @@ export function ReviewPieces({
           </div>
         </div>
       </div>
-      {onMatch && (
-        <div className="sticky bottom-0 -mx-4 mt-5 flex items-center justify-between gap-3 border-t border-stone bg-paper px-4 py-3 sm:hidden">
-          <span className="text-sm text-crimson">Review pieces</span>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={onMatch}
-            disabled={pieces.length === 0 || descriptionPending}
-          >
-            Match wardrobe
-          </Button>
+      {(onMatch || onBack) && (
+        <div className={styles.mobileFooter}>
+          {onBack ? (
+            <Button variant="quiet" onClick={onBack}>
+              <Icon name="arrow-left" className="size-4" /> Back to Upload
+            </Button>
+          ) : (
+            <span />
+          )}
+          {onMatch && (
+            <Button
+              type="button"
+              variant="primary"
+              onClick={onMatch}
+              disabled={pieces.length === 0 || descriptionPending}
+            >
+              Match wardrobe
+            </Button>
+          )}
         </div>
       )}
     </section>

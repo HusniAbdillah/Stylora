@@ -48,6 +48,7 @@
 [data-rail="true"] .brandRow {
   flex-direction: column;
   gap: 0.5rem;
+  padding-inline: 0;
 }
 .links {
   display: grid;
@@ -129,29 +130,123 @@
   padding: 1.125rem;
   background: var(--color-paper);
   color: var(--color-ink);
-  border-radius: var(--radius-card);
+  border-radius: 20px;
   box-shadow: var(--shadow-overlay);
   max-height: 75dvh;
   overflow: auto;
   z-index: 10;
 }
 .activityPanel h2 {
-  font: 400 1.6rem var(--font-display);
+  font: 600 1rem var(--font-sans);
+}
+.activityPanel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.activityPanel > header p {
+  color: var(--color-muted);
+  font-size: 12px;
 }
 .activityPanel ul {
   list-style: none;
   padding: 0;
+  display: grid;
+  gap: 12px;
 }
 .activityPanel li {
-  padding: 0.75rem 0;
+  padding: 10px 12px;
   gap: 0.625rem;
-  border-bottom: 1px solid var(--color-border);
+  background: var(--color-porcelain);
+  border-radius: 12px;
+  font-size: 13px;
+}
+.activityPanel li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.activityPanel li a:hover {
+  text-decoration: underline;
+}
+.activityPanel li[data-state="complete"] > span {
+  color: var(--color-owned);
+}
+.activityPanel li[data-state="failed"] > span {
+  color: var(--color-missing);
+}
+.activityPanel li[data-state="running"] > span,
+.activityPanel li[data-state="queued"] > span,
+.activityPanel li[data-state="partial"] > span {
+  color: var(--color-crimson);
 }
 .activityPanel li button {
   margin-left: auto;
 }
 .activityPanel li small {
-  text-transform: capitalize;
+  font-size: 12px;
+}
+.shellNotice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-block: 12px;
+  color: var(--color-secondary);
+  font-size: 13px;
+}
+.shellNotice button {
+  min-height: 44px;
+  color: var(--color-crimson);
+  text-decoration: underline;
+}
+:global([role="dialog"]):has(> .drawerBrand) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  grid-template-rows: 44px auto auto 1fr auto;
+  align-content: stretch;
+  gap: 6px;
+  width: min(300px, calc(100vw - 40px));
+  height: 100dvh;
+  padding: 20px 16px;
+}
+:global([role="dialog"]):has(> .drawerBrand) > header {
+  grid-area: 1 / 2;
+}
+:global([role="dialog"]):has(> .drawerBrand) > header h2 {
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.drawerBrand {
+  grid-area: 1 / 1;
+  align-self: center;
+  padding-left: 6px;
+}
+.drawerBrand img {
+  width: 86px;
+  height: auto;
+}
+.drawerLinks {
+  grid-area: 2 / 1 / 3 / -1;
+  margin-top: 16px;
+}
+.drawerLinks .links a,
+.drawerLinks .unavailable {
+  min-height: 50px;
+  padding: 14px;
+  gap: 12px;
+  font-size: 16px;
+}
+:global([role="dialog"]):has(> .drawerBrand) > .resume {
+  grid-area: 3 / 1 / 4 / -1;
+  font-size: 13px;
+  padding: 12px;
+}
+:global([role="dialog"]):has(> .drawerBrand) > .profile {
+  grid-area: 5 / 1 / 6 / -1;
 }
 @media (max-width: 767px) {
   .sidebar {

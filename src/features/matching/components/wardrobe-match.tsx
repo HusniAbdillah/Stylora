@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge, Button, Icon } from "@/components/ui";
+import styles from "./matching.module.css";
 
 export type WardrobeMatch = {
   id: string;
@@ -11,8 +12,12 @@ export type WardrobeMatch = {
   differences?: string[];
   explanation?: string | null;
   missingBrief?: string | null;
+  reasons?: string[];
+  evidence?: string[];
+  inputsUsed?: string[];
+  uncertainty?: string[];
   rejectedCandidates?: {
-    name: string;
+    name?: string;
     reason: string;
     imageUrl?: string | null;
   }[];
@@ -25,6 +30,7 @@ export type WardrobeMatchViewProps = {
   errorMessage?: string;
   ideasStatus?: "queued" | "running" | "ready" | "failed";
   onGenerateIdeas?: () => void;
+  onBack?: () => void;
   onRetry?: () => void;
 };
 
@@ -50,12 +56,14 @@ export function MatchSummary({ matches }: { matches: WardrobeMatch[] }) {
   };
   return (
     <div
-      className="grid grid-cols-3 gap-2.5"
+      className="grid grid-cols-3 gap-2.5 sm:gap-4"
       aria-label="Wardrobe match summary"
     >
       <div className="rounded-2xl bg-[var(--color-owned-bg)] px-3 py-3 text-[var(--color-owned)] sm:flex sm:items-center sm:justify-between sm:px-5">
         <span className="hidden items-center gap-2 text-sm font-semibold sm:flex">
-          <Icon name="check" className="size-5" />
+          <span className={styles.summaryIcon}>
+            <Icon name="check" className="size-5" />
+          </span>
           In your wardrobe
         </span>
         <strong className="block font-serif text-3xl font-normal leading-none sm:order-2">
@@ -65,7 +73,9 @@ export function MatchSummary({ matches }: { matches: WardrobeMatch[] }) {
       </div>
       <div className="rounded-2xl bg-[var(--color-alternative-bg)] px-3 py-3 text-[var(--color-alternative)] sm:flex sm:items-center sm:justify-between sm:px-5">
         <span className="hidden items-center gap-2 text-sm font-semibold sm:flex">
-          <Icon name="swap" className="size-5" />
+          <span className={styles.summaryIcon}>
+            <Icon name="swap" className="size-5" />
+          </span>
           Alternative in your wardrobe
         </span>
         <strong className="block font-serif text-3xl font-normal leading-none sm:order-2">
@@ -75,7 +85,9 @@ export function MatchSummary({ matches }: { matches: WardrobeMatch[] }) {
       </div>
       <div className="rounded-2xl bg-[var(--color-missing-bg)] px-3 py-3 text-[var(--color-missing)] sm:flex sm:items-center sm:justify-between sm:px-5">
         <span className="hidden items-center gap-2 text-sm font-semibold sm:flex">
-          <Icon name="bag" className="size-5" />
+          <span className={styles.summaryIcon}>
+            <Icon name="bag" className="size-5" />
+          </span>
           Missing
         </span>
         <strong className="block font-serif text-3xl font-normal leading-none sm:order-2">
@@ -90,11 +102,9 @@ export function MatchSummary({ matches }: { matches: WardrobeMatch[] }) {
 export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
   const owned = match.outcome !== "missing";
   return (
-    <article
-      className={`rounded-[18px] border bg-paper p-3 sm:p-4 ${owned ? "border-stone" : "border-rose-wash"}`}
-    >
-      <div className="flex items-center gap-3 sm:gap-4">
-        <div className="hidden min-w-0 flex-1 sm:block">
+    <article className={`${styles.card} ${!owned ? styles.missing : ""}`}>
+      <div className={styles.matchRow}>
+        <div className={styles.inspiration}>
           <p className="text-xs text-secondary">From the inspiration</p>
           <h3 className="mt-1 font-semibold text-ink">
             {match.inspiration.name}
@@ -103,11 +113,11 @@ export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
             {match.inspiration.summary ?? match.inspiration.category}
           </p>
         </div>
-        <span className="hidden size-8 shrink-0 items-center justify-center rounded-full bg-porcelain text-secondary sm:flex">
+        <span className={styles.matchArrow}>
           <Icon name="arrow-right" className="size-4" />
         </span>
         <div
-          className={`flex size-[84px] shrink-0 items-center justify-center overflow-hidden rounded-xl sm:size-[94px] ${owned ? "bg-sand" : "bg-[var(--color-missing-bg)]"}`}
+          className={`${styles.thumbnail} ${owned ? "bg-sand" : "bg-[var(--color-missing-bg)]"}`}
         >
           {owned && match.wardrobeItem?.imageUrl ? (
             <>
@@ -115,7 +125,7 @@ export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
               <img
                 src={match.wardrobeItem.imageUrl}
                 alt={match.wardrobeItem.name}
-                className="size-full object-contain"
+                className="size-full object-cover"
               />
             </>
           ) : (
@@ -126,19 +136,32 @@ export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
                 name={owned ? "image" : "bag"}
                 className="mx-auto mb-1 size-6"
               />
-              {owned ? "Image unavailable" : "Text brief"}
+              {owned ? (
+                "Image unavailable"
+              ) : (
+                <span className="hidden sm:inline">Text brief</span>
+              )}
             </div>
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-secondary sm:hidden">
-            For: {match.inspiration.name}
-          </p>
+        <div className={styles.matchContent}>
+          {owned && (
+            <p className="text-xs text-secondary sm:hidden">
+              For: {match.inspiration.name}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-1.5">
             <h3 className="font-semibold leading-5 text-ink">
-              {owned
-                ? (match.wardrobeItem?.name ?? "Wardrobe item unavailable")
-                : "Nothing credible in your wardrobe"}
+              {owned ? (
+                (match.wardrobeItem?.name ?? "Wardrobe item unavailable")
+              ) : (
+                <>
+                  <span className="sm:hidden">{match.inspiration.name}</span>
+                  <span className="hidden sm:inline">
+                    Nothing credible in your wardrobe
+                  </span>
+                </>
+              )}
             </h3>
             <Badge tone={outcomeTone[match.outcome]}>
               {outcomeLabel[match.outcome]}
@@ -161,7 +184,7 @@ export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
             </div>
           ) : null}
           {match.sharedAttributes?.length ? (
-            <p className="mt-1 line-clamp-1 text-xs text-secondary sm:hidden">
+            <p className="mt-1 text-xs leading-5 text-secondary sm:hidden">
               Shared: {match.sharedAttributes.join(", ")}
             </p>
           ) : null}
@@ -173,41 +196,101 @@ export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
             </p>
           ) : null}
           {match.explanation && (
-            <p className="mt-1 text-xs leading-5 text-secondary">
+            <p className="mt-1 hidden text-xs leading-5 text-secondary sm:block">
               {match.explanation}
             </p>
           )}
           {match.missingBrief && (
-            <p className="mt-2 text-xs leading-5 text-secondary">
+            <p className="mt-2 hidden text-xs leading-5 text-secondary sm:block">
               Brief: {match.missingBrief}
             </p>
           )}
         </div>
+        {match.rejectedCandidates?.length ? (
+          <div className={`${styles.candidateRows} space-y-1.5`}>
+            {match.rejectedCandidates.map((candidate, index) => (
+              <div
+                key={`${candidate.name ?? "excluded"}-${index}`}
+                className="flex items-center gap-2 rounded-xl bg-porcelain px-2 py-1.5 text-xs leading-5 text-secondary"
+              >
+                {candidate.imageUrl ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={candidate.imageUrl}
+                      alt={candidate.name ?? "Excluded wardrobe candidate"}
+                      className="size-9 shrink-0 rounded-lg object-cover"
+                    />
+                  </>
+                ) : (
+                  <Icon
+                    name="x"
+                    className="size-4 shrink-0 text-[var(--color-missing)]"
+                  />
+                )}
+                <span>
+                  {candidate.name
+                    ? `${candidate.name} rejected: `
+                    : "Excluded: "}
+                  {candidate.reason}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {Boolean(
+          match.reasons?.length ||
+          match.evidence?.length ||
+          match.inputsUsed?.length ||
+          match.uncertainty?.length,
+        ) && (
+          <details className={styles.whyThis}>
+            <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-medium text-crimson">
+              Why this match <Icon name="chevron-down" className="size-3.5" />
+            </summary>
+            {match.reasons?.length ? (
+              <ul className="space-y-2">
+                {match.reasons.map((reason, index) => (
+                  <li
+                    key={`${index}-${reason}`}
+                    className="flex gap-2 text-xs leading-5"
+                  >
+                    <Icon
+                      name="check"
+                      className="mt-0.5 size-3.5 shrink-0 text-[var(--color-owned)]"
+                    />
+                    <span>{reason}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {match.evidence?.length ? (
+              <p className="mt-3 text-xs leading-5 text-secondary">
+                Evidence: {match.evidence.join("; ")}
+              </p>
+            ) : null}
+            {match.inputsUsed?.length ? (
+              <p className="mt-2 text-xs leading-5 text-secondary">
+                Uses: {match.inputsUsed.join(", ")}
+              </p>
+            ) : null}
+            {match.uncertainty?.length ? (
+              <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-secondary">
+                <Icon name="info" className="mt-0.5 size-3.5 shrink-0" />
+                <span>{match.uncertainty.join("; ")}</span>
+              </p>
+            ) : null}
+          </details>
+        )}
+        {match.outcome === "missing" && match.shoppingStatus === "running" && (
+          <p
+            className={`${styles.shoppingStatus} flex items-center gap-1.5 text-xs text-secondary`}
+          >
+            <Icon name="refresh" className="size-3.5 text-crimson" />
+            Shopping results for this piece are loading in the background
+          </p>
+        )}
       </div>
-      {match.rejectedCandidates?.length ? (
-        <div className="mt-3 space-y-1.5">
-          {match.rejectedCandidates.map((candidate) => (
-            <div
-              key={candidate.name}
-              className="flex items-center gap-2 rounded-xl bg-porcelain px-2 py-1.5 text-xs leading-5 text-secondary"
-            >
-              <Icon
-                name="x"
-                className="size-4 shrink-0 text-[var(--color-missing)]"
-              />
-              <span>
-                {candidate.name} rejected: {candidate.reason}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {match.outcome === "missing" && match.shoppingStatus === "running" && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs text-secondary">
-          <Icon name="refresh" className="size-3.5 text-crimson" />
-          Shopping results for this piece are loading in the background
-        </p>
-      )}
     </article>
   );
 }
@@ -218,23 +301,18 @@ export function WardrobeMatchView({
   errorMessage,
   ideasStatus,
   onGenerateIdeas,
+  onBack,
   onRetry,
 }: WardrobeMatchViewProps) {
   return (
-    <section
-      className="mx-auto w-full max-w-[1150px] pb-8"
-      aria-labelledby="wardrobe-match-title"
-    >
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-5">
+    <section className={styles.page} aria-labelledby="wardrobe-match-title">
+      <div className={styles.header}>
         <div>
-          <p className="text-sm font-semibold text-crimson">Step 3 of 5</p>
-          <h1
-            id="wardrobe-match-title"
-            className="mt-2 font-serif text-[clamp(2.2rem,4vw,3.2rem)] leading-tight"
-          >
+          <p className={styles.stepLabel}>Step 3 of 5</p>
+          <h1 id="wardrobe-match-title" className={styles.heading}>
             A clear view of <em className="text-crimson">what you have.</em>
           </h1>
-          <p className="mt-2 max-w-[620px] text-base leading-6 text-secondary">
+          <p className="mt-3 hidden max-w-[620px] text-base leading-6 text-secondary sm:block">
             We compare each piece with the clothes you own. Saved shopping
             candidates never count as owned.
           </p>
@@ -245,7 +323,7 @@ export function WardrobeMatchView({
               type="button"
               variant="primary"
               onClick={onGenerateIdeas}
-              disabled={status !== "ready"}
+              disabled={status !== "ready" || matches.length === 0}
             >
               Generate outfit ideas
             </Button>
@@ -288,14 +366,14 @@ export function WardrobeMatchView({
             {errorMessage ??
               "Your reviewed pieces are still saved. Try again when matching is available."}
           </p>
-          {onRetry && status === "error" && (
+          {onRetry && (
             <Button
               type="button"
               variant="secondary"
               onClick={onRetry}
               className="mt-4"
             >
-              Retry matching
+              {status === "error" ? "Retry matching" : "Refresh matching"}
             </Button>
           )}
         </div>
@@ -321,17 +399,25 @@ export function WardrobeMatchView({
           </div>
         </>
       )}
-      {onGenerateIdeas && (
-        <div className="sticky bottom-0 -mx-4 mt-5 flex items-center justify-between gap-3 border-t border-stone bg-paper px-4 py-3 sm:hidden">
-          <span className="text-sm text-crimson">Wardrobe match</span>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={onGenerateIdeas}
-            disabled={status !== "ready"}
-          >
-            Generate ideas
-          </Button>
+      {(onGenerateIdeas || onBack) && (
+        <div className={styles.mobileFooter}>
+          {onBack ? (
+            <Button variant="quiet" onClick={onBack}>
+              <Icon name="arrow-left" className="size-4" /> Review
+            </Button>
+          ) : (
+            <span />
+          )}
+          {onGenerateIdeas && (
+            <Button
+              type="button"
+              variant="primary"
+              onClick={onGenerateIdeas}
+              disabled={status !== "ready" || matches.length === 0}
+            >
+              Generate ideas
+            </Button>
+          )}
         </div>
       )}
     </section>

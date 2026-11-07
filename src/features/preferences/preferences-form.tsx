@@ -46,9 +46,15 @@ function PreferenceSection({
       </div>
       {children}
       {example && (
-        <p className={styles.example}>
-          <Icon name="info" size={14} /> {example}
-        </p>
+        <>
+          <p className={styles.example}>
+            <Icon name="info" size={14} /> {example}
+          </p>
+          <details className={styles.mobileExample}>
+            <summary>See an outfit example</summary>
+            <p>{example}</p>
+          </details>
+        </>
       )}
     </section>
   );
@@ -59,21 +65,23 @@ function ChoiceCard({
   selected,
   onClick,
   imageClassName,
+  className,
 }: {
   option: IllustrationOption;
   selected: boolean;
   onClick: () => void;
   imageClassName?: string;
+  className?: string;
 }) {
   return (
     <button
-      className={styles.choiceCard}
+      className={`${styles.choiceCard} ${className ?? ""}`}
       type="button"
       aria-pressed={selected}
       onClick={onClick}
     >
       <span className={`${styles.choiceImage} ${imageClassName ?? ""}`}>
-        <img src={option.imageSrc} alt="" />
+        <img src={option.imageSrc} width={80} height={140} alt="" />
       </span>
       <strong>{option.label}</strong>
       <small>{option.description}</small>
@@ -153,7 +161,7 @@ const practicalGroups: Array<{
   {
     key: "climate",
     label: "Climate",
-    choices: ["Hot and humid", "Mild", "Many seasons"],
+    choices: ["Hot and humid", "Mild", "Rainy season"],
   },
   {
     key: "occasions",
@@ -183,7 +191,7 @@ const practicalGroups: Array<{
   {
     key: "footwearComfort",
     label: "Footwear comfort",
-    choices: ["Flats only", "Low heels is fine", "Any height"],
+    choices: ["Flats only", "Low heel is fine", "Any height"],
   },
   {
     key: "careTolerance",
@@ -200,6 +208,7 @@ export type PreferencesFormProps = {
   >;
   status?: "idle" | "draftSaving" | "saving" | "saved" | "error";
   statusMessage?: string;
+  readOnly?: boolean;
   onChange: (value: PreferencesDraft) => void;
   onSave: () => void;
   onReset: () => void;
@@ -211,6 +220,7 @@ export function PreferencesForm({
   bodyIllustrations,
   status = "idle",
   statusMessage,
+  readOnly = false,
   onChange,
   onSave,
   onReset,
@@ -219,6 +229,7 @@ export function PreferencesForm({
     useState<BodyIllustrationGroup | null>(null);
   const bodyGroup = bodyGroupOverride ?? value.bodyIllustrationGroup ?? "women";
   const [resetOpen, setResetOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState("skin-and-color");
   const saveStatusText =
     status === "draftSaving"
       ? "Saving draft…"
@@ -228,7 +239,7 @@ export function PreferencesForm({
           ? (statusMessage ?? "Draft saved")
           : status === "error"
             ? (statusMessage ?? "Could not save")
-            : "";
+            : (statusMessage ?? "");
 
   const update = <K extends keyof PreferencesDraft>(
     key: K,
@@ -257,9 +268,14 @@ export function PreferencesForm({
             Your style <em>profile.</em>
           </h1>
           <p className={styles.intro}>
-            Tap pictures, not forms. Each choice shows where Stylora uses it.
-            Nothing here is ever guessed from your photos, and you can skip any
-            section. This sample profile stays in this browser.
+            <span className={styles.desktopIntro}>
+              Tap pictures, not forms. Each choice shows where Stylora uses it.
+              Nothing here is ever guessed from your photos, and you can skip
+              any section.
+            </span>
+            <span className={styles.mobileIntro}>
+              Tap pictures, not forms. Skip anything.
+            </span>
           </p>
         </div>
         <div className={styles.saveTop}>
@@ -268,7 +284,7 @@ export function PreferencesForm({
           </span>
           <Button
             variant="primary"
-            disabled={status === "saving"}
+            disabled={readOnly || status === "saving"}
             onClick={onSave}
           >
             Save preferences
@@ -277,292 +293,378 @@ export function PreferencesForm({
       </header>
 
       <nav className={styles.sectionNav} aria-label="Preference sections">
-        <a href="#skin-and-color">Skin and color</a>
-        <a href="#body-and-fit">Body and fit</a>
-        <a href="#style">Style</a>
-        <a href="#life-and-comfort">Life and comfort</a>
+        {[
+          ["skin-and-color", "Skin and color"],
+          ["body-and-fit", "Body and fit"],
+          ["style", "Style"],
+          ["life-and-comfort", "Life and comfort"],
+        ].map(([id, label]) => (
+          <a
+            key={id}
+            href={`#${id}`}
+            aria-current={activeSection === id ? "location" : undefined}
+            onClick={() => setActiveSection(id)}
+          >
+            {label}
+          </a>
+        ))}
       </nav>
 
-      <div id="skin-and-color" className={styles.sectionGroup}>
-        <PreferenceSection
-          id="skin-tone"
-          title="Skin tone"
-          description="Sets the color of your avatar and helps balance contrast near the face. It never limits what you can wear."
-          usedIn="Used in avatar, outfit advice"
-          example="A medium contrast palette can look balanced. Strong black and white is still yours to choose."
-        >
-          <div className={styles.swatchGrid}>
-            {skinSwatches.map((swatch) => (
+      <fieldset
+        className={styles.formFields}
+        disabled={readOnly || status === "saving"}
+      >
+        <legend className={styles.srOnly}>Optional style preferences</legend>
+        <div id="skin-and-color" className={styles.sectionGroup}>
+          <PreferenceSection
+            id="skin-tone"
+            title="Skin tone"
+            description="Sets the color of your avatar and helps balance contrast near the face. It never limits what you can wear."
+            usedIn="Used in avatar, outfit advice"
+            example="A medium contrast palette can look balanced. Strong black and white is still yours to choose."
+          >
+            <div className={styles.swatchGrid}>
+              {skinSwatches.map((swatch) => (
+                <button
+                  className={styles.swatchCard}
+                  key={swatch.id}
+                  type="button"
+                  aria-pressed={value.skinSwatchId === swatch.id}
+                  aria-label={`${swatch.label}, ${swatch.hex}`}
+                  onClick={() =>
+                    onChange({
+                      ...value,
+                      skinSwatchId: swatch.id,
+                      skinSwatchHex: swatch.hex,
+                    })
+                  }
+                >
+                  <img src={swatch.imageSrc} width={64} height={64} alt="" />
+                  <strong className={styles.desktopSwatchLabel}>
+                    Depth {swatch.id.slice(-2)}
+                  </strong>
+                  <strong className={styles.mobileSwatchLabel}>
+                    {swatch.id.slice(-2)}
+                  </strong>
+                  <small>{swatch.hex}</small>
+                  {value.skinSwatchId === swatch.id && (
+                    <span className={styles.check}>
+                      <Icon name="check" size={12} />
+                    </span>
+                  )}
+                </button>
+              ))}
               <button
-                className={styles.swatchCard}
-                key={swatch.id}
+                className={`${styles.swatchCard} ${styles.skipSwatchCard}`}
                 type="button"
-                aria-pressed={value.skinSwatchId === swatch.id}
-                aria-label={`${swatch.label}, ${swatch.hex}`}
+                aria-pressed={!value.skinSwatchId}
                 onClick={() =>
                   onChange({
                     ...value,
-                    skinSwatchId: swatch.id,
-                    skinSwatchHex: swatch.hex,
+                    skinSwatchId: null,
+                    skinSwatchHex: null,
                   })
                 }
               >
-                <img src={swatch.imageSrc} alt="" />
-                <strong>{swatch.label}</strong>
-                <small>{swatch.hex}</small>
-                {value.skinSwatchId === swatch.id && (
-                  <span className={styles.check}>
-                    <Icon name="check" size={12} />
-                  </span>
-                )}
+                <span className={styles.skipSwatch} />
+                <strong>Skip</strong>
+                <small>Neutral mannequin</small>
               </button>
-            ))}
+            </div>
             <button
-              className={styles.swatchCard}
+              className={styles.mobileClear}
               type="button"
-              aria-pressed={!value.skinSwatchId}
               onClick={() =>
                 onChange({ ...value, skinSwatchId: null, skinSwatchHex: null })
               }
             >
-              <span className={styles.skipSwatch} />
-              <strong>Skip</strong>
-              <small>Neutral mannequin</small>
+              Skip skin tone
             </button>
-          </div>
-        </PreferenceSection>
+          </PreferenceSection>
 
-        <PreferenceSection
-          id="undertone"
-          title="Undertone"
-          description="Guides which colors feel harmonious next to your face. Treat it as a palette experiment, not a rule."
-          usedIn="Used in color advice, avatar"
-          example="Warm example: an ivory shirt near the face and charcoal lower down keeps warmth where it shows most."
-        >
-          <div className={styles.paletteGrid}>
-            {undertones.map((option) => (
-              <ChoiceCard
-                key={option.id}
-                option={option}
-                selected={value.undertone === option.id}
-                onClick={() =>
-                  update(
-                    "undertone",
-                    value.undertone === option.id ? null : option.id,
-                  )
-                }
-                imageClassName={styles.paletteImage}
-              />
-            ))}
-          </div>
-        </PreferenceSection>
-
-        <PreferenceSection
-          id="contrast"
-          title="Contrast you enjoy"
-          description="How much light and dark you like within one outfit."
-          usedIn="Used in outfit ideas, capsules"
-          example="A soft tonal look uses close shades; a stronger look pairs light and dark pieces. Choose what feels right for you."
-        >
-          <div className={styles.contrastGrid}>
-            {contrastOptions.map((option) => (
-              <ChoiceCard
-                key={option.id}
-                option={option}
-                selected={value.contrast === option.id}
-                onClick={() =>
-                  update(
-                    "contrast",
-                    value.contrast === option.id ? null : option.id,
-                  )
-                }
-                imageClassName={styles.contrastImage}
-              />
-            ))}
-          </div>
-        </PreferenceSection>
-      </div>
-
-      <div id="body-and-fit" className={styles.sectionGroup}>
-        <PreferenceSection
-          id="body-shape"
-          title="Body shape"
-          description="Helps explain where hems fall and how volume sits. Shapes are shorthand for silhouette advice, never a judgment or a goal."
-          usedIn="Used in fit advice, avatar"
-          example="A half tuck or belted layer can add a waist point if you want one. Straight, boxy shapes work just as well."
-        >
-          <div
-            className={styles.groupTabs}
-            role="group"
-            aria-label="Body illustration set"
+          <PreferenceSection
+            id="undertone"
+            title="Undertone"
+            description="Guides which colors feel harmonious next to your face. Treat it as a palette experiment, not a rule."
+            usedIn="Used in color advice, avatar"
+            example="Warm example: an ivory shirt near the face and charcoal lower down keeps warmth where it shows most."
           >
-            {(["women", "men"] as const).map((group) => (
-              <button
-                key={group}
-                type="button"
-                aria-pressed={bodyGroup === group}
-                onClick={() => setBodyGroupOverride(group)}
-              >
-                {group === "women"
-                  ? "Women’s illustrations"
-                  : "Men’s illustrations"}
-              </button>
-            ))}
-          </div>
-          {selectedBodyGroup.length > 0 ? (
-            <div className={styles.bodyGrid}>
-              {selectedBodyGroup.map((option) => (
+            <div className={styles.paletteGrid}>
+              {undertones.map((option) => (
                 <ChoiceCard
                   key={option.id}
                   option={option}
-                  selected={
-                    value.bodyIllustrationGroup === bodyGroup &&
-                    value.bodyIllustrationId === option.id
+                  selected={value.undertone === option.id}
+                  onClick={() =>
+                    update(
+                      "undertone",
+                      value.undertone === option.id ? null : option.id,
+                    )
                   }
+                  imageClassName={styles.paletteImage}
+                  className={
+                    option.id === "olive" ? styles.oliveOption : undefined
+                  }
+                />
+              ))}
+            </div>
+            <details className={styles.mobileUndertone}>
+              <summary>
+                {value.undertone === "olive"
+                  ? "Olive selected"
+                  : "More undertones"}
+              </summary>
+              <button
+                className={styles.clearLink}
+                type="button"
+                aria-pressed={value.undertone === "olive"}
+                onClick={() =>
+                  update(
+                    "undertone",
+                    value.undertone === "olive" ? null : "olive",
+                  )
+                }
+              >
+                Olive: cream, sage, plum and bronze
+              </button>
+            </details>
+          </PreferenceSection>
+
+          <PreferenceSection
+            id="contrast"
+            title="Contrast you enjoy"
+            description="How much light and dark you like within one outfit."
+            usedIn="Used in outfit ideas, capsules"
+            example="A soft tonal look uses close shades; a stronger look pairs light and dark pieces. Choose what feels right for you."
+          >
+            <div className={styles.contrastGrid}>
+              {contrastOptions.map((option) => (
+                <ChoiceCard
+                  key={option.id}
+                  option={option}
+                  selected={value.contrast === option.id}
+                  onClick={() =>
+                    update(
+                      "contrast",
+                      value.contrast === option.id ? null : option.id,
+                    )
+                  }
+                  imageClassName={styles.contrastImage}
+                />
+              ))}
+            </div>
+          </PreferenceSection>
+        </div>
+
+        <div id="body-and-fit" className={styles.sectionGroup}>
+          <PreferenceSection
+            id="body-shape"
+            title="Body shape"
+            description="Helps explain where hems fall and how volume sits. Shapes are shorthand for silhouette advice, never a judgment or a goal."
+            usedIn="Used in fit advice, avatar"
+            example="A half tuck or belted layer can add a waist point if you want one. Straight, boxy shapes work just as well."
+          >
+            <div
+              className={styles.groupTabs}
+              role="group"
+              aria-label="Body illustration set"
+            >
+              {(["women", "men"] as const).map((group) => (
+                <button
+                  key={group}
+                  type="button"
+                  aria-pressed={bodyGroup === group}
+                  onClick={() => setBodyGroupOverride(group)}
+                >
+                  {group === "women"
+                    ? "Women’s illustrations"
+                    : "Men’s illustrations"}
+                </button>
+              ))}
+            </div>
+            {selectedBodyGroup.length > 0 ? (
+              <div className={styles.bodyGrid}>
+                {selectedBodyGroup.map((option) => (
+                  <ChoiceCard
+                    key={option.id}
+                    option={option}
+                    selected={
+                      value.bodyIllustrationGroup === bodyGroup &&
+                      value.bodyIllustrationId === option.id
+                    }
+                    onClick={() =>
+                      onChange(
+                        value.bodyIllustrationGroup === bodyGroup &&
+                          value.bodyIllustrationId === option.id
+                          ? {
+                              ...value,
+                              bodyIllustrationGroup: null,
+                              bodyIllustrationId: null,
+                            }
+                          : {
+                              ...value,
+                              bodyIllustrationGroup: bodyGroup,
+                              bodyIllustrationId: option.id,
+                            },
+                      )
+                    }
+                    imageClassName={styles.bodyImage}
+                  />
+                ))}
+                <button
+                  className={styles.skipCard}
+                  type="button"
                   onClick={() =>
                     onChange({
                       ...value,
-                      bodyIllustrationGroup: bodyGroup,
-                      bodyIllustrationId: option.id,
+                      bodyIllustrationGroup: null,
+                      bodyIllustrationId: null,
                     })
                   }
-                  imageClassName={styles.bodyImage}
+                >
+                  Skip
+                </button>
+              </div>
+            ) : (
+              <p className={styles.missingIllustrations}>
+                Illustrations for this tab are unavailable. You can skip this
+                choice and continue.
+              </p>
+            )}
+            <button
+              className={styles.clearLink}
+              type="button"
+              onClick={() =>
+                onChange({
+                  ...value,
+                  bodyIllustrationGroup: null,
+                  bodyIllustrationId: null,
+                })
+              }
+            >
+              Clear selection
+            </button>
+          </PreferenceSection>
+
+          <PreferenceSection
+            id="fit"
+            title="Fit you feel good in"
+            description="The ease you prefer around the body. We never promise fit without sizes and measurements."
+            usedIn="Used in outfit ideas, avatar"
+            example="A relaxed shirt and straight trousers leave room to move while keeping a clear silhouette."
+          >
+            <div className={styles.fitGrid}>
+              {fitIllustrations.map((option) => (
+                <ChoiceCard
+                  key={option.id}
+                  option={option}
+                  selected={value.fit === option.id}
+                  onClick={() =>
+                    update("fit", value.fit === option.id ? null : option.id)
+                  }
+                  imageClassName={styles.fitImage}
                 />
               ))}
-              <button
-                className={styles.skipCard}
-                type="button"
-                onClick={() =>
-                  onChange({
-                    ...value,
-                    bodyIllustrationGroup: null,
-                    bodyIllustrationId: null,
-                  })
-                }
-              >
-                Skip
-              </button>
             </div>
-          ) : (
-            <p className={styles.missingIllustrations}>
-              Illustrations for this tab are unavailable. You can skip this
-              choice and continue.
-            </p>
-          )}
-          <button
-            className={styles.clearLink}
-            type="button"
-            onClick={() =>
-              onChange({
-                ...value,
-                bodyIllustrationGroup: null,
-                bodyIllustrationId: null,
-              })
-            }
+          </PreferenceSection>
+        </div>
+
+        <div id="style" className={styles.sectionGroup}>
+          <PreferenceSection
+            id="style-references"
+            title="Styles you reach for"
+            description="Pick a few. They steer the fresh alternative idea and capsule templates."
+            usedIn="Used in outfit ideas, capsules"
+            example="A smart tailoring reference can suggest a crisp layer over pieces you already own."
           >
-            Clear selection
-          </button>
-        </PreferenceSection>
-
-        <PreferenceSection
-          id="fit"
-          title="Fit you feel good in"
-          description="The ease you prefer around the body. We never promise fit without sizes and measurements."
-          usedIn="Used in outfit ideas, avatar"
-          example="A relaxed shirt and straight trousers leave room to move while keeping a clear silhouette."
-        >
-          <div className={styles.fitGrid}>
-            {fitIllustrations.map((option) => (
-              <ChoiceCard
-                key={option.id}
-                option={option}
-                selected={value.fit === option.id}
-                onClick={() =>
-                  update("fit", value.fit === option.id ? null : option.id)
-                }
-                imageClassName={styles.fitImage}
-              />
-            ))}
-          </div>
-        </PreferenceSection>
-      </div>
-
-      <div id="style" className={styles.sectionGroup}>
-        <PreferenceSection
-          id="style-references"
-          title="Styles you reach for"
-          description="Pick a few. They steer the fresh alternative idea and capsule templates."
-          usedIn="Used in outfit ideas, capsules"
-          example="A smart tailoring reference can suggest a crisp layer over pieces you already own."
-        >
-          <div className={styles.styleGrid}>
-            {styleIllustrations.map((option) => (
-              <ChoiceCard
-                key={option.id}
-                option={option}
-                selected={value.styles?.includes(option.id) ?? false}
-                onClick={() => toggleList("styles", option.id)}
-                imageClassName={styles.styleImage}
-              />
-            ))}
-          </div>
-          <div className={styles.practicalRow}>
-            <strong>Color families</strong>
-            <div className={styles.chipRow}>
-              {[
-                "Warm neutrals",
-                "Cool neutrals",
-                "Earth tones",
-                "Soft color",
-                "Vivid accents",
-              ].map((choice) => (
-                <Chip
-                  key={choice}
-                  selected={value.colorFamilies?.includes(choice) ?? false}
-                  onClick={() => toggleList("colorFamilies", choice)}
-                >
-                  {choice}
-                </Chip>
+            <div className={styles.styleGrid}>
+              {styleIllustrations.map((option) => (
+                <ChoiceCard
+                  key={option.id}
+                  option={option}
+                  selected={value.styles?.includes(option.id) ?? false}
+                  onClick={() => toggleList("styles", option.id)}
+                  imageClassName={styles.styleImage}
+                />
               ))}
             </div>
-          </div>
-        </PreferenceSection>
-      </div>
-
-      <div id="life-and-comfort" className={styles.sectionGroup}>
-        <PreferenceSection
-          id="life-comfort"
-          title="Life and comfort"
-          description="Practical limits Stylora respects in every suggestion. Skip anything you are unsure about."
-          usedIn="Used in all suggestions"
-          example="Choosing flats and easy care keeps later recommendations aligned with your day."
-        >
-          <div className={styles.practicalGroups}>
-            {practicalGroups.map((group) => (
-              <div className={styles.practicalRow} key={group.key}>
-                <strong>{group.label}</strong>
-                <div className={styles.chipRow}>
-                  {group.choices.map((choice) => (
-                    <Chip
-                      key={choice}
-                      selected={
-                        Array.isArray(value[group.key]) &&
-                        (value[group.key] as string[]).includes(choice)
-                      }
-                      onClick={() => toggleList(group.key, choice)}
-                    >
-                      {choice}
-                    </Chip>
-                  ))}
-                </div>
+            <div className={styles.practicalRow}>
+              <strong>Color families</strong>
+              <div className={styles.chipRow}>
+                {[
+                  "Warm neutrals",
+                  "Cool neutrals",
+                  "Earth tones",
+                  "Soft color",
+                  "Vivid accents",
+                ].map((choice) => (
+                  <Chip
+                    key={choice}
+                    selected={value.colorFamilies?.includes(choice) ?? false}
+                    onClick={() => toggleList("colorFamilies", choice)}
+                  >
+                    {choice}
+                  </Chip>
+                ))}
               </div>
-            ))}
-          </div>
-        </PreferenceSection>
-      </div>
+            </div>
+          </PreferenceSection>
+        </div>
+
+        <div id="life-and-comfort" className={styles.sectionGroup}>
+          <PreferenceSection
+            id="life-comfort"
+            title="Life and comfort"
+            description="Practical limits Stylora respects in every suggestion. Skip anything you are unsure about."
+            usedIn="Used in all suggestions"
+            example="Choosing flats and easy care keeps later recommendations aligned with your day."
+          >
+            <div className={styles.practicalGroups}>
+              {practicalGroups.map((group) => (
+                <div className={styles.practicalRow} key={group.key}>
+                  <strong>{group.label}</strong>
+                  <div className={styles.chipRow}>
+                    {[
+                      ...new Set([
+                        ...group.choices,
+                        ...(Array.isArray(value[group.key])
+                          ? (value[group.key] as string[])
+                          : []),
+                      ]),
+                    ].map((choice) => (
+                      <Chip
+                        key={choice}
+                        selected={
+                          Array.isArray(value[group.key]) &&
+                          (value[group.key] as string[]).includes(choice)
+                        }
+                        onClick={() => toggleList(group.key, choice)}
+                      >
+                        {choice}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </PreferenceSection>
+        </div>
+      </fieldset>
+      <Button
+        className={styles.mobileReset}
+        variant="quiet"
+        disabled={readOnly || status === "saving"}
+        onClick={() => setResetOpen(true)}
+      >
+        Reset all preferences
+      </Button>
 
       <footer className={styles.footer}>
-        <Button variant="quiet" onClick={() => setResetOpen(true)}>
+        <Button
+          variant="quiet"
+          disabled={readOnly || status === "saving"}
+          onClick={() => setResetOpen(true)}
+        >
           Reset all preferences
         </Button>
         <span className={styles.mobileSaveStatus} role="status">
@@ -570,7 +672,7 @@ export function PreferencesForm({
         </span>
         <Button
           variant="primary"
-          disabled={status === "saving"}
+          disabled={readOnly || status === "saving"}
           onClick={onSave}
         >
           Save preferences
@@ -581,7 +683,7 @@ export function PreferencesForm({
         open={resetOpen}
         onClose={() => setResetOpen(false)}
         title="Reset all preferences?"
-        description="This clears saved style choices and the current draft in this browser. Wardrobe pieces stay in place."
+        description="This clears saved style choices and the current draft in this shared workspace. Wardrobe pieces stay in place."
         confirmLabel="Reset preferences"
         cancelLabel="Keep preferences"
         onConfirm={() => {

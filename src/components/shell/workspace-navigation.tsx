@@ -47,8 +47,8 @@ function Destinations({
             className={styles.unavailable}
             role="link"
             aria-disabled="true"
-            aria-label={link.label + ", unavailable in this preview"}
-            title={link.label + " is unavailable in this preview"}
+            aria-label={link.label + ", not available yet"}
+            title={link.label + " is not available yet"}
           >
             <Icon name={link.icon} />
             {!rail && link.label}
@@ -193,12 +193,22 @@ export function MobileTopBar({
         <div>{activity}</div>
       </div>
       <Drawer side="left" title="Workspace" open={open} onClose={close}>
-        <Destinations
-          activeHref={activeHref}
-          onNavigate={close}
-          availableHrefs={availableHrefs}
-          destinationHrefs={destinationHrefs}
-        />
+        <Link
+          href="/"
+          aria-label="Stylora home"
+          className={styles.drawerBrand}
+          onClick={close}
+        >
+          <Logo />
+        </Link>
+        <div className={styles.drawerLinks}>
+          <Destinations
+            activeHref={activeHref}
+            onNavigate={close}
+            availableHrefs={availableHrefs}
+            destinationHrefs={destinationHrefs}
+          />
+        </div>
         {resume && (
           <Link className={styles.resume} href={resume.href} onClick={close}>
             <Icon name="sparkle" />
@@ -223,6 +233,7 @@ export type ActivityItem = {
   id: string;
   label: string;
   detail?: string;
+  href?: string;
   state:
     | "queued"
     | "running"
@@ -256,23 +267,35 @@ export function ActivityMenu({ items }: { items: readonly ActivityItem[] }) {
         className={styles.activityPanel}
         aria-label="Activity"
       >
-        <h2>Activity</h2>
+        <header>
+          <h2>Activity</h2>
+          <p>Runs while you browse</p>
+        </header>
         {items.length ? (
           <ul>
             {items.map((item) => (
-              <li key={item.id}>
+              <li key={item.id} data-state={item.state}>
                 <Icon
                   name={
                     item.state === "complete"
                       ? "check"
                       : item.state === "failed"
                         ? "info"
-                        : "refresh"
+                        : item.state === "cancelled" ||
+                            item.state === "superseded"
+                          ? "x"
+                          : "refresh"
                   }
                   size={16}
                 />
                 <div>
-                  <strong>{item.label}</strong>
+                  {item.href ? (
+                    <Link href={item.href}>
+                      <strong>{item.label}</strong>
+                    </Link>
+                  ) : (
+                    <strong>{item.label}</strong>
+                  )}
                   <small>{item.detail ?? item.state}</small>
                 </div>
                 {item.onRetry && item.state === "failed" && (

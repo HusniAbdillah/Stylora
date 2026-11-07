@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import { Badge, Button, Chip, Icon } from "@/components/ui";
+import styles from "./create-presentation.module.css";
 
 export type UploadTaskStatus = {
   label: string;
@@ -13,7 +15,9 @@ export type UploadTaskStatus = {
 export type UploadPreferenceSummary = {
   undertone?: string | null;
   skinTone?: string | null;
+  skinToneHex?: string | null;
   bodyShape?: string | null;
+  bodyImageUrl?: string | null;
   fitGoal?: string | null;
 };
 
@@ -29,6 +33,7 @@ export type InspirationUploadProps = {
   preferences?: UploadPreferenceSummary | null;
   tasks?: UploadTaskStatus[];
   analyzeDisabled?: boolean;
+  readOnly?: boolean;
   onChooseFile: (file: File) => void;
   onRemove?: () => void;
   onOccasionChange?: (occasion: string | null) => void;
@@ -72,7 +77,9 @@ function UploadTask({ task }: { task: UploadTaskStatus }) {
               ? "Ready"
               : task.status === "failed"
                 ? "Needs retry"
-                : "In progress")}
+                : task.status === "queued"
+                  ? "Queued"
+                  : "In progress")}
         </span>
       </div>
       {task.status === "running" && task.progressFraction != null && (
@@ -97,11 +104,20 @@ export function UploadPreferenceCard({
   onPreferences?: () => void;
 }) {
   const hasSelections = Boolean(
-    preferences && Object.values(preferences).some(Boolean),
+    preferences &&
+    [
+      preferences.undertone,
+      preferences.skinTone,
+      preferences.bodyShape,
+      preferences.fitGoal,
+    ].some(Boolean),
+  );
+  const undertone = ["warm", "cool", "neutral", "olive", "unsure"].find(
+    (value) => preferences?.undertone?.toLowerCase().startsWith(value),
   );
   return (
     <section
-      className="rounded-[20px] border border-rose-wash bg-blush p-5 sm:p-6"
+      className={styles.preferenceCard}
       aria-labelledby="upload-preference-title"
     >
       <div className="flex items-center gap-2">
@@ -113,7 +129,7 @@ export function UploadPreferenceCard({
         </h2>
         {hasSelections && <Badge tone="owned">Set</Badge>}
       </div>
-      <p className="mt-3 text-sm leading-6 text-secondary">
+      <p className="mt-3 text-sm leading-5 text-secondary">
         {hasSelections
           ? "Used for color and fit advice and for your avatar. Never guessed from the photo."
           : "Set your skin tone, undertone and body shape for color and fit advice. Optional, never guessed from photos."}
@@ -122,11 +138,15 @@ export function UploadPreferenceCard({
         <div className="mt-4 space-y-2.5">
           {preferences?.undertone && (
             <div className="flex min-h-14 items-center gap-3 rounded-xl bg-paper px-3">
-              <span className="flex -space-x-1" aria-hidden="true">
-                <span className="size-5 rounded-full border border-paper bg-camel" />
-                <span className="size-5 rounded-full border border-paper bg-crimson" />
-                <span className="size-5 rounded-full border border-paper bg-sage" />
-              </span>
+              {undertone && (
+                <Image
+                  src={`/design/preferences/undertone-${undertone}.svg`}
+                  alt=""
+                  width={60}
+                  height={24}
+                  className="h-6 w-[60px] rounded object-cover"
+                />
+              )}
               <span>
                 <span className="block text-xs text-secondary">Undertone</span>
                 <strong className="text-sm font-medium">
@@ -138,7 +158,12 @@ export function UploadPreferenceCard({
           {preferences?.skinTone && (
             <div className="flex min-h-14 items-center gap-3 rounded-xl bg-paper px-3">
               <span
-                className="size-6 rounded-full bg-camel"
+                className="size-7 shrink-0 rounded-full border border-stone bg-porcelain"
+                style={
+                  preferences.skinToneHex
+                    ? { backgroundColor: preferences.skinToneHex }
+                    : undefined
+                }
                 aria-hidden="true"
               />
               <span>
@@ -151,7 +176,17 @@ export function UploadPreferenceCard({
           )}
           {preferences?.bodyShape && (
             <div className="flex min-h-14 items-center gap-3 rounded-xl bg-paper px-3">
-              <Icon name="user" className="size-6 text-crimson" />
+              {preferences.bodyImageUrl ? (
+                <Image
+                  src={preferences.bodyImageUrl}
+                  alt=""
+                  width={28}
+                  height={40}
+                  className="h-10 w-7 shrink-0 object-contain"
+                />
+              ) : (
+                <Icon name="user" className="size-7 text-crimson" />
+              )}
               <span>
                 <span className="block text-xs text-secondary">Body shape</span>
                 <strong className="text-sm font-medium">
@@ -161,19 +196,55 @@ export function UploadPreferenceCard({
               </span>
             </div>
           )}
+          {!preferences?.bodyShape && preferences?.fitGoal && (
+            <div className="flex min-h-14 items-center gap-3 rounded-xl bg-paper px-3">
+              <Icon name="shirt" className="size-7 text-crimson" />
+              <span>
+                <span className="block text-xs text-secondary">Fit goal</span>
+                <strong className="text-sm font-medium">
+                  {preferences.fitGoal}
+                </strong>
+              </span>
+            </div>
+          )}
         </div>
       ) : (
         <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
           <div className="rounded-xl bg-paper p-3">
-            <span className="mx-auto mb-2 block size-6 rounded-full bg-sage" />
+            <Image
+              src="/design/preferences/undertone-warm.svg"
+              alt=""
+              width={44}
+              height={18}
+              className="mx-auto mb-2 h-[18px] w-11 rounded object-cover"
+            />
             Undertone
           </div>
           <div className="rounded-xl bg-paper p-3">
-            <span className="mx-auto mb-2 block size-6 rounded-full bg-camel" />
+            <span
+              className="mx-auto mb-2 flex h-[18px] items-center justify-center -space-x-1"
+              aria-hidden="true"
+            >
+              {["02", "04", "06"].map((depth) => (
+                <Image
+                  key={depth}
+                  src={`/design/preferences/skin-depth-${depth}.svg`}
+                  alt=""
+                  width={18}
+                  height={18}
+                />
+              ))}
+            </span>
             Skin tone
           </div>
           <div className="rounded-xl bg-paper p-3">
-            <Icon name="user" className="mx-auto mb-2 size-6 text-crimson" />
+            <Image
+              src="/design/preferences/body-rectangle.svg"
+              alt=""
+              width={14}
+              height={18}
+              className="mx-auto mb-2 h-[18px] w-[14px] object-contain"
+            />
             Body shape
           </div>
         </div>
@@ -204,6 +275,7 @@ export function InspirationUpload({
   preferences,
   tasks = [],
   analyzeDisabled,
+  readOnly = false,
   onChooseFile,
   onRemove,
   onOccasionChange,
@@ -214,29 +286,25 @@ export function InspirationUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const canAnalyze = status === "verified" && !analyzeDisabled;
-  const openPicker = () => inputRef.current?.click();
+  const openPicker = () => {
+    if (!readOnly) inputRef.current?.click();
+  };
 
   return (
-    <section
-      className="mx-auto w-full max-w-[1150px] pb-8"
-      aria-labelledby="inspiration-upload-title"
-    >
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-5">
+    <section className={styles.page} aria-labelledby="inspiration-upload-title">
+      <div className={styles.pageHeader}>
         <div>
-          <p className="text-sm font-semibold text-crimson">Step 1 of 5</p>
-          <h1
-            id="inspiration-upload-title"
-            className="mt-2 font-serif text-[clamp(2.2rem,4vw,3.2rem)] leading-tight"
-          >
+          <p className={styles.stepLabel}>Step 1 of 5</p>
+          <h1 id="inspiration-upload-title" className={styles.heading}>
             Begin with an <em className="text-crimson">inspiration.</em>
           </h1>
-          <p className="mt-2 max-w-[620px] text-base leading-6 text-secondary">
+          <p className={styles.desktopDescription}>
             Upload an outfit you saved. We describe each piece, check what you
             already own and suggest three ways to wear it.
           </p>
         </div>
         {onAnalyze && (
-          <div className="hidden text-right sm:block">
+          <div className={styles.desktopAction}>
             <Button
               type="button"
               variant="primary"
@@ -246,18 +314,21 @@ export function InspirationUpload({
               Analyze inspiration
             </Button>
             <p className="mt-2 text-xs text-secondary">
-              Reading starts when the image is ready
+              {tasks.some((task) => task.status === "running")
+                ? "Reading has already started in the background"
+                : "Reading starts when the image is ready"}
             </p>
           </div>
         )}
       </div>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.68fr)_minmax(320px,1fr)] lg:gap-5">
-        <div className="rounded-[20px] border border-stone bg-paper p-3 sm:p-5">
+      <div className={styles.uploadGrid}>
+        <div className={styles.uploadCard}>
           <input
             ref={inputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
             className="sr-only"
+            disabled={readOnly}
             aria-label="Choose an outfit inspiration image"
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -276,14 +347,14 @@ export function InspirationUpload({
               event.target.value = "";
             }}
           />
-          <div className="relative flex min-h-[300px] items-center justify-center overflow-hidden rounded-2xl bg-sand p-3 sm:min-h-[520px]">
+          <div className={styles.uploadImageWell}>
             {imageUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={imageUrl}
                   alt={imageAlt}
-                  className="max-h-[500px] max-w-full rounded-xl object-contain"
+                  className={styles.uploadImage}
                 />
               </>
             ) : (
@@ -297,7 +368,9 @@ export function InspirationUpload({
               </div>
             )}
             {status === "verified" && (
-              <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-xs font-medium text-[var(--color-owned)]">
+              <span
+                className={`${styles.verifiedBadge} absolute left-4 top-4 items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-xs font-medium text-[var(--color-owned)]`}
+              >
                 <Icon name="check" className="size-3.5" />
                 Uploaded and verified
               </span>
@@ -313,9 +386,17 @@ export function InspirationUpload({
               type="button"
               variant="secondary"
               onClick={openPicker}
+              disabled={readOnly}
               className="flex-1 sm:flex-none"
             >
-              {imageUrl ? "Replace image" : "Choose image"}
+              {imageUrl ? (
+                <>
+                  <span className="sm:hidden">Replace</span>
+                  <span className="hidden sm:inline">Replace image</span>
+                </>
+              ) : (
+                "Choose image"
+              )}
             </Button>
             {onAnalyze && (
               <Button
@@ -333,12 +414,13 @@ export function InspirationUpload({
                 type="button"
                 variant="quiet"
                 onClick={onRemove}
-                className="w-full sm:w-auto"
+                disabled={readOnly}
+                className="hidden sm:inline-flex"
               >
                 Remove
               </Button>
             )}
-            <span className="min-w-0 w-full text-xs text-secondary sm:w-auto">
+            <span className="hidden min-w-0 flex-1 text-right text-xs text-secondary sm:block">
               {fileName
                 ? `${fileName}${fileSizeLabel ? `, ${fileSizeLabel}` : ""}`
                 : "JPEG, PNG or WebP up to 10 MiB"}
@@ -364,6 +446,7 @@ export function InspirationUpload({
                   type="button"
                   className="font-semibold underline"
                   onClick={onRetry}
+                  disabled={readOnly}
                 >
                   Retry
                 </button>
@@ -371,22 +454,41 @@ export function InspirationUpload({
             </div>
           )}
           {tasks.length > 0 && (
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {tasks.map((task) => (
-                <UploadTask key={task.label} task={task} />
-              ))}
-            </div>
+            <>
+              <div className="mt-3 hidden gap-3 sm:grid sm:grid-cols-2">
+                {tasks.map((task) => (
+                  <UploadTask key={task.label} task={task} />
+                ))}
+              </div>
+              <div
+                className="mt-3 flex items-start gap-2 rounded-xl bg-porcelain px-3 py-2.5 text-xs leading-4 sm:hidden"
+                aria-live="polite"
+              >
+                <Icon
+                  name="sparkle"
+                  className="mt-0.5 size-3.5 shrink-0 text-crimson"
+                />
+                <p>
+                  {tasks
+                    .map(
+                      (task) =>
+                        `${task.label}: ${task.detail ?? (task.status === "ready" ? "ready" : task.status === "failed" ? "needs retry" : task.status === "queued" ? "queued" : "in progress")}`,
+                    )
+                    .join(". ")}
+                </p>
+              </div>
+            </>
           )}
         </div>
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4 lg:space-y-5">
           <section
-            className="rounded-[20px] border border-stone bg-paper p-5 sm:p-6"
+            className={styles.occasionCard}
             aria-labelledby="upload-occasion-title"
           >
-            <h2 id="upload-occasion-title" className="text-lg font-semibold">
+            <h2 id="upload-occasion-title" className="text-base font-semibold">
               Where will you wear it?
             </h2>
-            <p className="mt-2 text-sm leading-6 text-secondary">
+            <p className="mt-3 hidden text-sm leading-5 text-secondary sm:block">
               Optional. Changing it refreshes only the advice that depends on
               it.
             </p>
@@ -395,6 +497,7 @@ export function InspirationUpload({
                 <Chip
                   key={choice}
                   selected={occasion === choice}
+                  disabled={readOnly || !onOccasionChange}
                   onClick={() =>
                     onOccasionChange?.(occasion === choice ? null : choice)
                   }
@@ -408,7 +511,7 @@ export function InspirationUpload({
             preferences={preferences}
             onPreferences={onPreferences}
           />
-          <p className="flex gap-2 px-1 text-xs leading-5 text-secondary">
+          <p className="hidden gap-2 px-1 text-xs leading-5 text-secondary sm:flex">
             <Icon name="info" className="mt-0.5 size-4 shrink-0" />
             Full-length photos in daylight give the most accurate descriptions.
             We never recreate the person in the photo.
