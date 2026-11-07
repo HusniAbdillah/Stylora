@@ -64,6 +64,15 @@ function OutfitCard({
             />
           ))}
         </div>
+        {outfit.proposedItems?.map((item) => (
+          <div
+            key={item.name}
+            className="mt-2 flex items-center gap-2 rounded-xl bg-missing-bg p-3 text-xs text-missing"
+          >
+            <Icon name="bag" size={16} />
+            <span>Proposed addition. {item.name}</span>
+          </div>
+        ))}
         <div className="mt-3 flex items-start justify-between gap-2">
           <h3 className="font-serif text-xl">{outfit.title}</h3>
           {outfit.occasion && (
@@ -162,9 +171,9 @@ export function CapsuleCollection({
                 <p className="mt-1 text-xs text-secondary">
                   {capsule.isDraft
                     ? "Draft ready to continue"
-                    : capsule.pieces.length +
+                    : (capsule.pieceCount ?? capsule.pieces.length) +
                       " pieces, " +
-                      capsule.outfits.length +
+                      (capsule.outfitCount ?? capsule.outfits.length) +
                       " outfits"}
                 </p>
                 <div className="mt-3 flex items-center justify-between">
@@ -221,6 +230,7 @@ export function CapsuleCollection({
 
 export function CapsuleResults({
   result,
+  onEditBrief,
   onSaveCapsule,
   onPreview,
   onSaveAsLook,
@@ -228,6 +238,7 @@ export function CapsuleResults({
   onFindAddition,
 }: {
   result: CapsuleResult;
+  onEditBrief?: () => void;
   onSaveCapsule?: (id: string) => void;
   onPreview?: (id: string) => void;
   onSaveAsLook?: (id: string) => void;
@@ -254,7 +265,12 @@ export function CapsuleResults({
             piece are shown separately.
           </p>
         </div>
-        <div className="hidden md:block">
+        <div className="hidden items-center gap-2 md:flex">
+          {onEditBrief && (
+            <Button variant="quiet" onClick={onEditBrief}>
+              Edit brief
+            </Button>
+          )}
           <Button variant="primary" onClick={() => onSaveCapsule?.(result.id)}>
             Save capsule
           </Button>
@@ -365,7 +381,12 @@ export function CapsuleResults({
           </div>
         </section>
       )}
-      <div className="fixed inset-x-0 bottom-0 z-20 flex justify-end border-t border-stone bg-paper p-4 md:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-20 flex justify-between border-t border-stone bg-paper p-4 md:hidden">
+        {onEditBrief && (
+          <Button variant="quiet" onClick={onEditBrief}>
+            Edit brief
+          </Button>
+        )}
         <Button variant="primary" onClick={() => onSaveCapsule?.(result.id)}>
           Save capsule
         </Button>
@@ -425,6 +446,18 @@ export function CapsuleOutfitDetail({
               </p>
             </div>
           ))}
+          {outfit.proposedItems?.map((item) => (
+            <div
+              key={item.name}
+              className="rounded-xl bg-missing-bg p-4 text-missing"
+            >
+              <Icon name="bag" />
+              <h2 className="mt-2 font-medium">{item.name}</h2>
+              <p className="mt-2 text-xs">
+                Proposed addition. {item.description}
+              </p>
+            </div>
+          ))}
         </div>
         <div className="space-y-3">
           <section className="rounded-2xl border border-stone bg-paper p-4">
@@ -436,7 +469,20 @@ export function CapsuleOutfitDetail({
                     name="check"
                     className="mt-0.5 size-4 shrink-0 text-crimson"
                   />
-                  {reason}
+                  <span>
+                    {reason}
+                    {outfit.evidence?.[i] && (
+                      <small className="mt-1 block text-secondary">
+                        {outfit.evidence[i].evidenceItemIds
+                          .map(
+                            (id) =>
+                              outfit.items.find((item) => item.id === id)?.name,
+                          )
+                          .filter(Boolean)
+                          .join(", ")}
+                      </small>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -450,6 +496,26 @@ export function CapsuleOutfitDetail({
                     {input}
                   </span>
                 ))}
+              </div>
+            ) : null}
+            {outfit.differences?.length ? (
+              <div className="mt-4">
+                <h3 className="text-sm font-medium">Differences</h3>
+                <ul className="mt-2 space-y-1 text-xs text-secondary">
+                  {outfit.differences.map((difference) => (
+                    <li key={difference}>{difference}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {outfit.uncertainty?.length ? (
+              <div className="mt-4">
+                <h3 className="text-sm font-medium">Uncertainty</h3>
+                <ul className="mt-2 space-y-1 text-xs text-secondary">
+                  {outfit.uncertainty.map((uncertainty) => (
+                    <li key={uncertainty}>{uncertainty}</li>
+                  ))}
+                </ul>
               </div>
             ) : null}
           </section>
