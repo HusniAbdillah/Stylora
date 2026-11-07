@@ -958,6 +958,22 @@ which data, code revision or provider behavior was verified.
   running; CI remains the full gate. No provider calls, shared fixtures or
   production environment settings were changed.
 
+## Owner 4 Preview personalization validation harness, 7 November 2026
+
+- Added `scripts/verify-preview-personalization.mjs` for root-operated A, B and
+  high-quality comparisons on port 3114 and the `dev-owner-4` sample fixture.
+  Two sample garment references remain constant. Preferences use the real API
+  with revision checks, and each single image POST is reserved in the external
+  smoke journal before execution. Reserved cases cannot submit again.
+- The script requires server `avatar-render.v2` settings before paid work,
+  verifies operation inputs and ready private PNG bytes, and saves external
+  images with metadata marked pending visual review. Preference restoration
+  checks the last written values and revision before using the API.
+- Local syntax check, dry-run, scoped ESLint and guards rejecting port 3104
+  and paths inside a Git checkout passed. No application HTTP request, hosted
+  data change or provider call ran in this task. Full checks and visual review
+  remain with CI and the coordinating root session, respectively.
+
 ## Owner 3 marketplace and sharing polish, 7 November 2026
 
 - Branch `codex/owner3-marketplace-polish`. Integrated Owner 2 Create navigation
