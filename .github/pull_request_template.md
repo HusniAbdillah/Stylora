@@ -12,9 +12,9 @@
 
 <!-- List the commands actually run. Write "not run" and the reason for the rest. -->
 
-- [ ] `make fast` before each commit
-- [ ] `make check`
-- [ ] `make build` (only when the diff can break it; CI also builds)
+- [ ] `make fast` once before opening this pull request
+- [ ] `make test` (only if the diff touches code with existing tests)
+- [ ] CI runs `pnpm check` and `pnpm build` on this pull request
 - [ ] Changed flow clicked once on preview or `make dev` (UI changes)
 
 Not run and why:
@@ -23,10 +23,9 @@ Not run and why:
 
 - [ ] Only files for this task changed
 - [ ] No secrets, signed URLs or personal payloads
-- [ ] Reads and writes scoped to server-side `STYLORA_WORKSPACE_ID`
-- [ ] Inputs and provider output validated with Zod
+- [ ] No AI attribution (`Co-authored-by`, "Generated with") in commits or this description
+- [ ] Reads and writes scoped to server-side `STYLORA_WORKSPACE_ID`; Zod validation
 - [ ] No invented IDs or model output; failures show an unavailable state
-- [ ] Tokens and shared primitives used; loading, empty, error and retry states exist
 - [ ] `docs/PROGRESS-NEW.md` row added with actual evidence
 
 ## Screenshots or preview link

@@ -8,7 +8,7 @@ PNPM ?= pnpm
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install env dev build start lint typecheck test fast check format format-write ci pre-pr db-new db-push db-types
+.PHONY: help install env dev build start lint typecheck test fast check format format-write ci pre-pr wt wt-rm db-new db-push db-types
 
 help:
 	@echo Stylora make targets
@@ -24,12 +24,15 @@ help:
 	@echo   make lint          ESLint
 	@echo   make typecheck     next typegen and tsc
 	@echo   make test          Vitest, single run
-	@echo   make fast          lint and typecheck, run before every commit
+	@echo   make fast          lint and typecheck, run once before a pull request
 	@echo   make check         lint, typecheck and test, same as pnpm check
 	@echo   make format        Prettier check
 	@echo   make format-write  Prettier write
 	@echo   make ci            Same steps as .github/workflows/check.yml
 	@echo   make pre-pr        check then build, run after rebasing on origin/main
+	@echo [Parallel work]
+	@echo   make wt name=o2/review-stream     New worktree and branch from origin/main
+	@echo   make wt-rm name=o2/review-stream  Remove that worktree after merge
 	@echo [Database, Owner 1 only]
 	@echo   make db-new name=add_operations   Create a new migration with the CLI
 	@echo   make db-types                     Regenerate src/types/database.ts
@@ -59,7 +62,7 @@ typecheck:
 test:
 	$(PNPM) test
 
-# Fast gate for every commit: lint and typecheck, no tests.
+# Fast gate, run once before opening a pull request: lint and typecheck, no tests.
 fast: lint typecheck
 
 check:
@@ -74,6 +77,23 @@ format-write:
 ci: install check build
 
 pre-pr: check build
+
+# One worktree per task so parallel sessions never share a working tree. The
+# folder is created next to the repo, for example ../Stylora-o2-review-stream.
+# Run pnpm install --frozen-lockfile once inside it.
+wt:
+ifndef name
+	$(error Usage: make wt name=oN/short-slug)
+endif
+	git fetch origin
+	git worktree add ../Stylora-$(subst /,-,$(name)) -b $(name) origin/main
+
+# Only after the branch is merged. Refuses to remove a worktree with local changes.
+wt-rm:
+ifndef name
+	$(error Usage: make wt-rm name=oN/short-slug)
+endif
+	git worktree remove ../Stylora-$(subst /,-,$(name))
 
 # Owner 1 only. Never edit an applied migration; add a new one instead.
 db-new:

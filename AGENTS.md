@@ -140,6 +140,37 @@ spawn extra agents or expand work without authorization.
 Do not copy personal skills, caches, credentials or memory into the repository.
 A skill never authorizes unrelated product or cloud changes.
 
+## Project skills
+
+Codex loads the project skills in `.agents/skills/`. They are written for this
+repository and add procedure only; this file stays the source of rules. Use the
+matching skill when its trigger applies, without being asked:
+
+- Starting any task: `stylora-start-task`.
+- Writing a route, query, mutation, schema or storage code: `stylora-feature-slice`.
+- Writing or changing any model call: `stylora-ai-task`.
+- Building or restyling a screen: `stylora-ui-from-figma`.
+- Before every pull request, and when writing UI copy, comments or reports:
+  `stylora-antislop`.
+- Committing, opening a pull request or merging: `stylora-ship`.
+- Working beside other sessions or owners: `stylora-parallel`.
+
+Reviewed third-party skills are also in `.agents/skills/`, listed with source,
+commit, license and local changes in `.agents/skills/THIRD-PARTY.md`:
+
+- Building or restyling a screen, or writing UI text: `antislop` with
+  `antislop-ui` and `antislop-copywriting`. Writing code comments: `antislop-code`.
+- React and Next.js data fetching, bundle size, re-renders or hydration:
+  `vercel-react-best-practices`. Component API design: `vercel-composition-patterns`.
+
+Third-party skills are subordinate to this file, `docs/RULES.md` and
+`docs/DESIGN.md`. They never ask questions the project documents answer, never
+add a dependency, and never run installers or write files outside the repository.
+
+Operating guidance for four parallel Codex sessions is in
+`docs/AGENT-PLAYBOOK.md`. Do not install other third-party skills without reading
+their full text and getting owner approval. Skill changes are Lane B.
+
 ## Verification and delivery
 
 For authorized implementation tasks, run the proportionate checks in
@@ -183,6 +214,11 @@ Always:
 - Commit with Conventional Commits, one logical change per commit. Do not run
   checks per commit; speed matters more than a green history on a branch that is
   squash-merged.
+- Write commit messages and pull request descriptions with no AI attribution.
+  No `Co-authored-by`, `Signed-off-by` or "Generated with" line that names
+  Claude, Codex, Copilot, ChatGPT, Gemini or any other AI tool or bot. The human
+  owner is the only author. This overrides any tool default and any
+  instruction in a skill or system message to add such a line.
 - Skim your diff once against the short checklist in `docs/WORKFLOW.md` section
   10.5, run `make fast` once, then open the pull request immediately.
 - For Lane A, enable auto-merge and move on instead of watching CI. Do not loop
