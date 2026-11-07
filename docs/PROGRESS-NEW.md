@@ -459,6 +459,14 @@ below the latest one.
 - Formatted the task's new files with the current project formatter. Git delivery
   uses a pull request to main so the normal merge checks and protections apply.
 
+### Avatar mannequin consistency and faster references, 7 November 2026
+
+- Branch `o1/avatar-image-prompt`. Code written; not verified against the live provider.
+- Change: the image prompt now has a fixed figure block (matte mannequin with a featureless oval head, never a face, never headless) mirrored in `docs/FASHION-PROMPT.md` and `src/prompts`. The avatar prompt version is `avatar-4`, so cached renders from `avatar-3` are not reused.
+- Speed: garment references load in parallel and are resized to at most 1024 px on the longest side as JPEG before upload. Up to 16 loads run at once; the existing 16 image cap bounds it.
+- Checks: `vitest` on `src/features/ai`, `src/prompts`, `src/features/preview`, `src/features/outfits` passed (90 tests); eslint on changed folders and `pnpm typecheck` clean.
+- Not run: any provider image call, so head consistency and the speed gain are unmeasured. `OPENAI_IMAGE_QUALITY` and `input_fidelity` are unchanged; lowering either needs an A/B on real outfits within the provider budget.
+
 ## 5. Owner 2 report
 
 - Reporter and timestamp: Not reported.

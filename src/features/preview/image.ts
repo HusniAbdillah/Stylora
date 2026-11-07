@@ -18,6 +18,7 @@ import {
   createWorkspaceSignedUpload,
   verifyWorkspaceStorageAsset,
 } from "@/lib/supabase/storage";
+import { prepareReferenceImage } from "@/features/ai/reference-image";
 import { avatarIoError } from "./image-errors";
 import { buildAvatarVisualDirection } from "./visual-direction";
 import {
@@ -166,42 +167,49 @@ export async function renderAndStoreAvatar(input: {
     if (existing)
       return { assetId: existing.id, renderFingerprint, createdAsset: false };
   }
-  const images = [];
-  for (const item of items) {
-    if (!item.asset_id) {
-      if (!input.allowIllustrativeItems)
-        throw new Error("AVATAR_IMAGE_UNAVAILABLE");
-      continue;
-    }
-    const {
-      data: asset,
-      error,
-      status,
-    } = await client
-      .from("assets")
-      .select("id,status")
-      .eq("workspace_id", workspaceId)
-      .eq("id", item.asset_id)
-      .eq("status", "ready")
-      .maybeSingle();
-    if (error) throw avatarIoError(error, "AVATAR_IMAGE_UNAVAILABLE", status);
-    if (!asset) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
-    const verified = await verifyWorkspaceStorageAsset(asset.id).catch(
-      (failure: unknown) => {
-        throw avatarIoError(failure, "AVATAR_IMAGE_UNAVAILABLE");
-      },
-    );
-    const { data: image, error: downloadError } = await client.storage
-      .from(verified.bucket)
-      .download(verified.storagePath);
-    if (downloadError)
-      throw avatarIoError(downloadError, "AVATAR_IMAGE_UNAVAILABLE");
-    if (!image) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
-    images.push({
-      bytes: new Uint8Array(await image.arrayBuffer()),
-      mimeType: verified.mimeType,
-    });
-  }
+  // Load every reference at once: each lookup, verification and download is
+  // independent, and the sequential version added one round trip per garment.
+  const loaded = await Promise.all(
+    items.map(async (item) => {
+      if (!item.asset_id) {
+        if (!input.allowIllustrativeItems)
+          throw new Error("AVATAR_IMAGE_UNAVAILABLE");
+        return null;
+      }
+      const {
+        data: asset,
+        error,
+        status,
+      } = await client
+        .from("assets")
+        .select("id,status")
+        .eq("workspace_id", workspaceId)
+        .eq("id", item.asset_id)
+        .eq("status", "ready")
+        .maybeSingle();
+      if (error) throw avatarIoError(error, "AVATAR_IMAGE_UNAVAILABLE", status);
+      if (!asset) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
+      const verified = await verifyWorkspaceStorageAsset(asset.id).catch(
+        (failure: unknown) => {
+          throw avatarIoError(failure, "AVATAR_IMAGE_UNAVAILABLE");
+        },
+      );
+      const { data: image, error: downloadError } = await client.storage
+        .from(verified.bucket)
+        .download(verified.storagePath);
+      if (downloadError)
+        throw avatarIoError(downloadError, "AVATAR_IMAGE_UNAVAILABLE");
+      if (!image) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
+      const bytes = new Uint8Array(await image.arrayBuffer());
+      // A smaller reference uploads and processes faster. If it cannot be
+      // decoded here, send the verified original unchanged.
+      return prepareReferenceImage(bytes).catch(() => ({
+        bytes,
+        mimeType: verified.mimeType,
+      }));
+    }),
+  );
+  const images = loaded.filter((image) => image !== null);
   const generated = await generateFashionImage({
     items: items.map((item) => ({
       ...item,
