@@ -40,7 +40,7 @@ export async function apiRoute(run: () => Promise<unknown>) {
         error.code.toLowerCase(),
         error.message,
         error.code.includes("INVALID") ? 400 : 502,
-        true,
+        error.retryable,
       );
     } else {
       failure = new ApiError(
