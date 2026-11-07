@@ -154,7 +154,6 @@ describe("per-request recommendation evidence", () => {
             properties: {
               evidence: {
                 items: {
-                  type: "string",
                   type: "integer",
                   minimum: 1,
                   maximum: projection.catalog.length,
