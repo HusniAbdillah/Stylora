@@ -159,10 +159,10 @@ async function capsuleContext(id: string) {
         subcategory: z.string().max(120).nullable(),
         description: z.string().max(600),
         revision: z.number().int().positive(),
-        attributes: z.record(z.string(), z.unknown()),
-        inferred_attributes: z.record(z.string(), z.unknown()),
-        corrections: z.record(z.string(), z.unknown()),
-        provenance: z.record(z.string(), z.unknown()),
+        attributes: z.record(z.string(), z.json()),
+        inferred_attributes: z.record(z.string(), z.json()),
+        corrections: z.record(z.string(), z.json()),
+        provenance: z.record(z.string(), z.json()),
       }),
     )
     .parse(data)
