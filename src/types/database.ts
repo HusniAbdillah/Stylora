@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.18"
-  }
   public: {
     Tables: {
       assets: {
@@ -29,6 +24,7 @@ export type Database = {
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           bucket: string
           byte_size: number
@@ -73,6 +69,7 @@ export type Database = {
           wardrobe_item_id: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           capsule_id: string
           wardrobe_item_id: string
@@ -115,6 +112,7 @@ export type Database = {
           wardrobe_item_id: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           capsule_id: string
           outfit_id: string
@@ -154,43 +152,44 @@ export type Database = {
         Row: {
           capsule_id: string
           created_at: string
-          explanation: Json
+          explanation: NonNullable<Json>
           id: string
-          inputs_used: Json
-          proposed_slots: Json
+          inputs_used: NonNullable<Json>
+          proposed_slots: NonNullable<Json>
           rationale: string
           source_revision: number
           source_type: string
           title: string
-          uncertainty: Json
+          uncertainty: NonNullable<Json>
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           capsule_id: string
           created_at?: string
-          explanation?: Json
+          explanation?: NonNullable<Json>
           id?: string
-          inputs_used?: Json
-          proposed_slots?: Json
+          inputs_used?: NonNullable<Json>
+          proposed_slots?: NonNullable<Json>
           rationale?: string
           source_revision: number
           source_type?: string
           title: string
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           workspace_id: string
         }
         Update: {
           capsule_id?: string
           created_at?: string
-          explanation?: Json
+          explanation?: NonNullable<Json>
           id?: string
-          inputs_used?: Json
-          proposed_slots?: Json
+          inputs_used?: NonNullable<Json>
+          proposed_slots?: NonNullable<Json>
           rationale?: string
           source_revision?: number
           source_type?: string
           title?: string
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           workspace_id?: string
         }
         Relationships: [
@@ -205,11 +204,11 @@ export type Database = {
       }
       capsules: {
         Row: {
-          brief: Json
+          brief: NonNullable<Json>
           created_at: string
           description: string
           id: string
-          missing_additions: Json
+          missing_additions: NonNullable<Json>
           occasion: string | null
           revision: number
           season: string | null
@@ -218,12 +217,13 @@ export type Database = {
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
-          brief?: Json
+          brief?: NonNullable<Json>
           created_at?: string
           description?: string
           id?: string
-          missing_additions?: Json
+          missing_additions?: NonNullable<Json>
           occasion?: string | null
           revision?: number
           season?: string | null
@@ -233,11 +233,11 @@ export type Database = {
           workspace_id: string
         }
         Update: {
-          brief?: Json
+          brief?: NonNullable<Json>
           created_at?: string
           description?: string
           id?: string
-          missing_additions?: Json
+          missing_additions?: NonNullable<Json>
           occasion?: string | null
           revision?: number
           season?: string | null
@@ -258,65 +258,66 @@ export type Database = {
       }
       inspiration_pieces: {
         Row: {
-          attributes: Json
+          attributes: NonNullable<Json>
           category: string
           confidence: number | null
-          corrections: Json
+          corrections: NonNullable<Json>
           created_at: string
           description: string
           id: string
-          image_context: Json
+          image_context: NonNullable<Json>
           look_id: string
           name: string
           position: number
-          provenance: Json
+          provenance: NonNullable<Json>
           removed_at: string | null
           revision: number
           source_type: string
           subcategory: string | null
-          uncertainty: Json
+          uncertainty: NonNullable<Json>
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
-          attributes?: Json
+          attributes?: NonNullable<Json>
           category: string
           confidence?: number | null
-          corrections?: Json
+          corrections?: NonNullable<Json>
           created_at?: string
           description?: string
           id?: string
-          image_context?: Json
+          image_context?: NonNullable<Json>
           look_id: string
           name: string
           position?: number
-          provenance?: Json
+          provenance?: NonNullable<Json>
           removed_at?: string | null
           revision?: number
           source_type?: string
           subcategory?: string | null
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           updated_at?: string
           workspace_id: string
         }
         Update: {
-          attributes?: Json
+          attributes?: NonNullable<Json>
           category?: string
           confidence?: number | null
-          corrections?: Json
+          corrections?: NonNullable<Json>
           created_at?: string
           description?: string
           id?: string
-          image_context?: Json
+          image_context?: NonNullable<Json>
           look_id?: string
           name?: string
           position?: number
-          provenance?: Json
+          provenance?: NonNullable<Json>
           removed_at?: string | null
           revision?: number
           source_type?: string
           subcategory?: string | null
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           updated_at?: string
           workspace_id?: string
         }
@@ -333,38 +334,45 @@ export type Database = {
       look_reviews: {
         Row: {
           created_at: string
-          explanation: Json
+          explanation: NonNullable<Json>
           id: string
-          inputs_used: Json
+          input_metadata: NonNullable<Json>
+          inputs_used: NonNullable<Json>
+          is_current: boolean
           look_id: string
           preference_revision: number | null
           source_revision: number
           source_type: string
-          uncertainty: Json
+          uncertainty: NonNullable<Json>
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
-          explanation: Json
+          explanation: NonNullable<Json>
           id?: string
-          inputs_used?: Json
+          input_metadata?: NonNullable<Json>
+          inputs_used?: NonNullable<Json>
+          is_current?: boolean
           look_id: string
           preference_revision?: number | null
           source_revision: number
           source_type?: string
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           workspace_id: string
         }
         Update: {
           created_at?: string
-          explanation?: Json
+          explanation?: NonNullable<Json>
           id?: string
-          inputs_used?: Json
+          input_metadata?: NonNullable<Json>
+          inputs_used?: NonNullable<Json>
+          is_current?: boolean
           look_id?: string
           preference_revision?: number | null
           source_revision?: number
           source_type?: string
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           workspace_id?: string
         }
         Relationships: [
@@ -387,6 +395,7 @@ export type Database = {
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           look_id: string
           option_id: string
@@ -445,6 +454,7 @@ export type Database = {
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           id?: string
@@ -482,7 +492,7 @@ export type Database = {
           inspiration_asset_id: string | null
           notes: string
           occasion: string | null
-          provider_metadata: Json
+          provider_metadata: NonNullable<Json>
           revision: number
           selected_option_id: string | null
           source_type: string
@@ -491,13 +501,14 @@ export type Database = {
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           id?: string
           inspiration_asset_id?: string | null
           notes?: string
           occasion?: string | null
-          provider_metadata?: Json
+          provider_metadata?: NonNullable<Json>
           revision?: number
           selected_option_id?: string | null
           source_type?: string
@@ -512,7 +523,7 @@ export type Database = {
           inspiration_asset_id?: string | null
           notes?: string
           occasion?: string | null
-          provider_metadata?: Json
+          provider_metadata?: NonNullable<Json>
           revision?: number
           selected_option_id?: string | null
           source_type?: string
@@ -567,6 +578,7 @@ export type Database = {
           wardrobe_item_id: string | null
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           candidate_position?: number
           category: string
@@ -651,57 +663,61 @@ export type Database = {
         Row: {
           concept: string
           created_at: string
-          explanation: Json
+          explanation: NonNullable<Json>
           id: string
-          inputs_used: Json
+          inputs_used: NonNullable<Json>
+          is_current: boolean
           look_id: string
           option_type: string
-          provider_metadata: Json
+          provider_metadata: NonNullable<Json>
           rationale: string
           revision: number
           source_revision: number
           source_type: string
           status: string
           title: string
-          uncertainty: Json
+          uncertainty: NonNullable<Json>
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           concept?: string
           created_at?: string
-          explanation?: Json
+          explanation?: NonNullable<Json>
           id?: string
-          inputs_used?: Json
+          inputs_used?: NonNullable<Json>
+          is_current?: boolean
           look_id: string
           option_type: string
-          provider_metadata?: Json
+          provider_metadata?: NonNullable<Json>
           rationale?: string
           revision?: number
           source_revision: number
           source_type?: string
           status?: string
           title: string
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           updated_at?: string
           workspace_id: string
         }
         Update: {
           concept?: string
           created_at?: string
-          explanation?: Json
+          explanation?: NonNullable<Json>
           id?: string
-          inputs_used?: Json
+          inputs_used?: NonNullable<Json>
+          is_current?: boolean
           look_id?: string
           option_type?: string
-          provider_metadata?: Json
+          provider_metadata?: NonNullable<Json>
           rationale?: string
           revision?: number
           source_revision?: number
           source_type?: string
           status?: string
           title?: string
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           updated_at?: string
           workspace_id?: string
         }
@@ -717,10 +733,10 @@ export type Database = {
       }
       products: {
         Row: {
-          attributes: Json
+          attributes: NonNullable<Json>
           category: string
           commercial_disclosure: string | null
-          corrections: Json
+          corrections: NonNullable<Json>
           created_at: string
           currency: string | null
           description: string
@@ -728,7 +744,7 @@ export type Database = {
           image_url: string | null
           price_minor: number | null
           product_url: string
-          provenance: Json
+          provenance: NonNullable<Json>
           provider: string
           provider_product_id: string
           rating: number | null
@@ -740,15 +756,16 @@ export type Database = {
           source_type: string
           subcategory: string | null
           title: string
-          uncertainty: Json
+          uncertainty: NonNullable<Json>
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
-          attributes?: Json
+          attributes?: NonNullable<Json>
           category: string
           commercial_disclosure?: string | null
-          corrections?: Json
+          corrections?: NonNullable<Json>
           created_at?: string
           currency?: string | null
           description?: string
@@ -756,7 +773,7 @@ export type Database = {
           image_url?: string | null
           price_minor?: number | null
           product_url: string
-          provenance?: Json
+          provenance?: NonNullable<Json>
           provider: string
           provider_product_id: string
           rating?: number | null
@@ -768,15 +785,15 @@ export type Database = {
           source_type?: string
           subcategory?: string | null
           title: string
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           updated_at?: string
           workspace_id: string
         }
         Update: {
-          attributes?: Json
+          attributes?: NonNullable<Json>
           category?: string
           commercial_disclosure?: string | null
-          corrections?: Json
+          corrections?: NonNullable<Json>
           created_at?: string
           currency?: string | null
           description?: string
@@ -784,7 +801,7 @@ export type Database = {
           image_url?: string | null
           price_minor?: number | null
           product_url?: string
-          provenance?: Json
+          provenance?: NonNullable<Json>
           provider?: string
           provider_product_id?: string
           rating?: number | null
@@ -796,7 +813,7 @@ export type Database = {
           source_type?: string
           subcategory?: string | null
           title?: string
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           updated_at?: string
           workspace_id?: string
         }
@@ -822,6 +839,7 @@ export type Database = {
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           id?: string
@@ -873,11 +891,11 @@ export type Database = {
           created_at: string
           id: string
           idempotency_key: string
-          inputs_used: Json
-          items: Json
+          inputs_used: NonNullable<Json>
+          items: NonNullable<Json>
           look_id: string | null
           option_id: string | null
-          preference_snapshot: Json
+          preference_snapshot: NonNullable<Json>
           rationale: string
           selection_revision: number | null
           source_kind: string
@@ -886,18 +904,19 @@ export type Database = {
           spend_currency: string | null
           spend_minor: number | null
           title: string
-          uncertainty: Json
+          uncertainty: NonNullable<Json>
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           id?: string
           idempotency_key: string
-          inputs_used?: Json
-          items: Json
+          inputs_used?: NonNullable<Json>
+          items: NonNullable<Json>
           look_id?: string | null
           option_id?: string | null
-          preference_snapshot?: Json
+          preference_snapshot?: NonNullable<Json>
           rationale?: string
           selection_revision?: number | null
           source_kind?: string
@@ -906,18 +925,18 @@ export type Database = {
           spend_currency?: string | null
           spend_minor?: number | null
           title: string
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           workspace_id: string
         }
         Update: {
           created_at?: string
           id?: string
           idempotency_key?: string
-          inputs_used?: Json
-          items?: Json
+          inputs_used?: NonNullable<Json>
+          items?: NonNullable<Json>
           look_id?: string | null
           option_id?: string | null
-          preference_snapshot?: Json
+          preference_snapshot?: NonNullable<Json>
           rationale?: string
           selection_revision?: number | null
           source_kind?: string
@@ -926,7 +945,7 @@ export type Database = {
           spend_currency?: string | null
           spend_minor?: number | null
           title?: string
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           workspace_id?: string
         }
         Relationships: [
@@ -960,19 +979,20 @@ export type Database = {
           created_at: string
           expires_at: string
           id: string
-          public_snapshot: Json
+          public_snapshot: NonNullable<Json>
           revoked_at: string | null
           saved_look_id: string
           token_hash: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           approved_media_ids?: string[]
           catchphrase?: string
           created_at?: string
           expires_at: string
           id?: string
-          public_snapshot: Json
+          public_snapshot: NonNullable<Json>
           revoked_at?: string | null
           saved_look_id: string
           token_hash: string
@@ -984,7 +1004,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
-          public_snapshot?: Json
+          public_snapshot?: NonNullable<Json>
           revoked_at?: string | null
           saved_look_id?: string
           token_hash?: string
@@ -1004,7 +1024,7 @@ export type Database = {
         Row: {
           created_at: string
           explanation: string
-          factors: Json
+          factors: NonNullable<Json>
           position: number
           product_id: string
           score_version: string
@@ -1012,10 +1032,11 @@ export type Database = {
           value_score: number | null
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           explanation?: string
-          factors?: Json
+          factors?: NonNullable<Json>
           position: number
           product_id: string
           score_version?: string
@@ -1026,7 +1047,7 @@ export type Database = {
         Update: {
           created_at?: string
           explanation?: string
-          factors?: Json
+          factors?: NonNullable<Json>
           position?: number
           product_id?: string
           score_version?: string
@@ -1065,12 +1086,13 @@ export type Database = {
           provider: string
           query: string
           score_version: string
-          score_weights: Json
+          score_weights: NonNullable<Json>
           slot_id: string
           status: string
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           country?: string
           created_at?: string
@@ -1084,7 +1106,7 @@ export type Database = {
           provider: string
           query: string
           score_version?: string
-          score_weights?: Json
+          score_weights?: NonNullable<Json>
           slot_id: string
           status?: string
           updated_at?: string
@@ -1103,7 +1125,7 @@ export type Database = {
           provider?: string
           query?: string
           score_version?: string
-          score_weights?: Json
+          score_weights?: NonNullable<Json>
           slot_id?: string
           status?: string
           updated_at?: string
@@ -1133,34 +1155,35 @@ export type Database = {
       }
       user_preferences: {
         Row: {
-          body_profile: Json
+          body_profile: NonNullable<Json>
           created_at: string
           display_name: string | null
-          fit_preferences: Json
+          fit_preferences: NonNullable<Json>
           revision: number
-          style_dna: Json
+          style_dna: NonNullable<Json>
           style_notes: string
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
-          body_profile?: Json
+          body_profile?: NonNullable<Json>
           created_at?: string
           display_name?: string | null
-          fit_preferences?: Json
+          fit_preferences?: NonNullable<Json>
           revision?: number
-          style_dna?: Json
+          style_dna?: NonNullable<Json>
           style_notes?: string
           updated_at?: string
           workspace_id: string
         }
         Update: {
-          body_profile?: Json
+          body_profile?: NonNullable<Json>
           created_at?: string
           display_name?: string | null
-          fit_preferences?: Json
+          fit_preferences?: NonNullable<Json>
           revision?: number
-          style_dna?: Json
+          style_dna?: NonNullable<Json>
           style_notes?: string
           updated_at?: string
           workspace_id?: string
@@ -1179,75 +1202,76 @@ export type Database = {
         Row: {
           archived_at: string | null
           asset_id: string | null
-          attributes: Json
+          attributes: NonNullable<Json>
           category: string
           color: string
           confidence: number | null
-          corrections: Json
+          corrections: NonNullable<Json>
           created_at: string
           description: string
           id: string
           import_idempotency_key: string | null
-          inferred_attributes: Json
+          inferred_attributes: NonNullable<Json>
           inventory_status: string
           name: string
           notes: string
-          provenance: Json
+          provenance: NonNullable<Json>
           revision: number
           source_product_id: string | null
           source_type: string
           subcategory: string | null
-          uncertainty: Json
+          uncertainty: NonNullable<Json>
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           archived_at?: string | null
           asset_id?: string | null
-          attributes?: Json
+          attributes?: NonNullable<Json>
           category: string
           color?: string
           confidence?: number | null
-          corrections?: Json
+          corrections?: NonNullable<Json>
           created_at?: string
           description?: string
           id?: string
           import_idempotency_key?: string | null
-          inferred_attributes?: Json
+          inferred_attributes?: NonNullable<Json>
           inventory_status?: string
           name: string
           notes?: string
-          provenance?: Json
+          provenance?: NonNullable<Json>
           revision?: number
           source_product_id?: string | null
           source_type?: string
           subcategory?: string | null
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           updated_at?: string
           workspace_id: string
         }
         Update: {
           archived_at?: string | null
           asset_id?: string | null
-          attributes?: Json
+          attributes?: NonNullable<Json>
           category?: string
           color?: string
           confidence?: number | null
-          corrections?: Json
+          corrections?: NonNullable<Json>
           created_at?: string
           description?: string
           id?: string
           import_idempotency_key?: string | null
-          inferred_attributes?: Json
+          inferred_attributes?: NonNullable<Json>
           inventory_status?: string
           name?: string
           notes?: string
-          provenance?: Json
+          provenance?: NonNullable<Json>
           revision?: number
           source_product_id?: string | null
           source_type?: string
           subcategory?: string | null
-          uncertainty?: Json
+          uncertainty?: NonNullable<Json>
           updated_at?: string
           workspace_id?: string
         }
@@ -1279,32 +1303,39 @@ export type Database = {
         Row: {
           confidence: number | null
           created_at: string
-          differences: Json
+          differences: NonNullable<Json>
           evidence_coverage: number | null
+          explanation: NonNullable<Json>
           id: string
+          input_metadata: NonNullable<Json>
+          is_current: boolean
           look_id: string
           match_type: string
           piece_id: string
           rationale: string
-          rejected_candidates: Json
-          shared_attributes: Json
+          rejected_candidates: NonNullable<Json>
+          shared_attributes: NonNullable<Json>
           source_revision: number
           source_type: string
           wardrobe_item_id: string | null
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           confidence?: number | null
           created_at?: string
-          differences?: Json
+          differences?: NonNullable<Json>
           evidence_coverage?: number | null
+          explanation?: NonNullable<Json>
           id?: string
+          input_metadata?: NonNullable<Json>
+          is_current?: boolean
           look_id: string
           match_type: string
           piece_id: string
           rationale: string
-          rejected_candidates?: Json
-          shared_attributes?: Json
+          rejected_candidates?: NonNullable<Json>
+          shared_attributes?: NonNullable<Json>
           source_revision: number
           source_type?: string
           wardrobe_item_id?: string | null
@@ -1313,15 +1344,18 @@ export type Database = {
         Update: {
           confidence?: number | null
           created_at?: string
-          differences?: Json
+          differences?: NonNullable<Json>
           evidence_coverage?: number | null
+          explanation?: NonNullable<Json>
           id?: string
+          input_metadata?: NonNullable<Json>
+          is_current?: boolean
           look_id?: string
           match_type?: string
           piece_id?: string
           rationale?: string
-          rejected_candidates?: Json
-          shared_attributes?: Json
+          rejected_candidates?: NonNullable<Json>
+          shared_attributes?: NonNullable<Json>
           source_revision?: number
           source_type?: string
           wardrobe_item_id?: string | null
@@ -1360,13 +1394,14 @@ export type Database = {
           feature_kind: string
           id: string
           look_id: string | null
-          payload: Json
+          payload: NonNullable<Json>
           revision: number
           status: string
           updated_at: string
-          visited_steps: Json
+          visited_steps: NonNullable<Json>
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           asset_id?: string | null
           capsule_id?: string | null
@@ -1375,11 +1410,11 @@ export type Database = {
           feature_kind: string
           id?: string
           look_id?: string | null
-          payload?: Json
+          payload?: NonNullable<Json>
           revision?: number
           status?: string
           updated_at?: string
-          visited_steps?: Json
+          visited_steps?: NonNullable<Json>
           workspace_id: string
         }
         Update: {
@@ -1390,11 +1425,11 @@ export type Database = {
           feature_kind?: string
           id?: string
           look_id?: string | null
-          payload?: Json
+          payload?: NonNullable<Json>
           revision?: number
           status?: string
           updated_at?: string
-          visited_steps?: Json
+          visited_steps?: NonNullable<Json>
           workspace_id?: string
         }
         Relationships: [
@@ -1434,17 +1469,18 @@ export type Database = {
           event_type: string
           id: string
           operation_id: string
-          payload: Json
+          payload: NonNullable<Json>
           sequence: number
           source_revision: number
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           event_type: string
           id?: string
           operation_id: string
-          payload?: Json
+          payload?: NonNullable<Json>
           sequence: number
           source_revision: number
           workspace_id: string
@@ -1454,7 +1490,7 @@ export type Database = {
           event_type?: string
           id?: string
           operation_id?: string
-          payload?: Json
+          payload?: NonNullable<Json>
           sequence?: number
           source_revision?: number
           workspace_id?: string
@@ -1476,13 +1512,15 @@ export type Database = {
           completed_at: string | null
           created_at: string
           id: string
-          input: Json
+          input: NonNullable<Json>
           input_fingerprint: string
           input_revision: number
           kind: string
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1493,19 +1531,22 @@ export type Database = {
           updated_at: string
           workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           attempt_count?: number
           cancel_requested_at?: string | null
           completed_at?: string | null
           created_at?: string
           id?: string
-          input?: Json
+          input?: NonNullable<Json>
           input_fingerprint: string
           input_revision: number
           kind: string
           lease_until?: string | null
           model?: string | null
           prompt_version?: string | null
+          provider_call_count?: number
+          provider_inflight?: number
           provider_request_id?: string | null
           result_ref?: Json | null
           safe_error_code?: string | null
@@ -1522,13 +1563,15 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
-          input?: Json
+          input?: NonNullable<Json>
           input_fingerprint?: string
           input_revision?: number
           kind?: string
           lease_until?: string | null
           model?: string | null
           prompt_version?: string | null
+          provider_call_count?: number
+          provider_inflight?: number
           provider_request_id?: string | null
           result_ref?: Json | null
           safe_error_code?: string | null
@@ -1557,6 +1600,7 @@ export type Database = {
           revision: number
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           id?: string
@@ -1579,28 +1623,29 @@ export type Database = {
         Row: {
           archived_at: string | null
           asset_id: string | null
-          attributes: Json | null
-          category: string | null
-          color: string | null
+          attributes: NonNullable<Json>
+          category: string
+          color: string
           confidence: number | null
-          corrections: Json | null
-          created_at: string | null
-          description: string | null
-          id: string | null
+          corrections: NonNullable<Json>
+          created_at: string
+          description: string
+          id: string
           import_idempotency_key: string | null
-          inferred_attributes: Json | null
-          inventory_status: string | null
-          name: string | null
-          notes: string | null
-          provenance: Json | null
-          revision: number | null
+          inferred_attributes: NonNullable<Json>
+          inventory_status: string
+          name: string
+          notes: string
+          provenance: NonNullable<Json>
+          revision: number
           source_product_id: string | null
-          source_type: string | null
+          source_type: string
           subcategory: string | null
-          uncertainty: Json | null
-          updated_at: string | null
-          workspace_id: string | null
+          uncertainty: NonNullable<Json>
+          updated_at: string
+          workspace_id: string
         }
+        ComputedFields: never
         Insert: {
           archived_at?: string | null
           asset_id?: string | null
@@ -1677,6 +1722,87 @@ export type Database = {
       }
     }
     Functions: {
+      append_create_event: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_payload?: Json
+          p_type: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          event_type: string
+          id: string
+          operation_id: string
+          payload: NonNullable<Json>
+          sequence: number
+          source_revision: number
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operation_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      append_workflow_operation_event: {
+        Args: {
+          p_attempt_count: number
+          p_event_type: string
+          p_input_fingerprint: string
+          p_operation_id: string
+          p_payload: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          event_type: string
+          id: string
+          operation_id: string
+          payload: NonNullable<Json>
+          sequence: number
+          source_revision: number
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operation_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      attach_inspiration_upload: {
+        Args: {
+          p_asset_id: string
+          p_draft_id: string
+          p_expected_revision: number
+          p_occasion?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          inspiration_asset_id: string | null
+          notes: string
+          occasion: string | null
+          provider_metadata: NonNullable<Json>
+          revision: number
+          selected_option_id: string | null
+          source_type: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "looks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       attach_product_candidate: {
         Args: {
           p_expected_option_revision: number
@@ -1715,26 +1841,23 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      claim_workflow_operation: {
-        Args: {
-          p_input_revision: number
-          p_lease_seconds?: number
-          p_operation_id: string
-          p_workspace_id: string
-        }
+      cancel_workflow_operation: {
+        Args: { p_operation_id: string; p_workspace_id: string }
         Returns: {
           attempt_count: number
           cancel_requested_at: string | null
           completed_at: string | null
           created_at: string
           id: string
-          input: Json
+          input: NonNullable<Json>
           input_fingerprint: string
           input_revision: number
           kind: string
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1752,9 +1875,310 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claim_workflow_operation: {
+        Args: {
+          p_input_revision: number
+          p_lease_seconds?: number
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      commit_capsule_generation: {
+        Args: {
+          p_attempt_count: number
+          p_capsule_id: string
+          p_expected_revision: number
+          p_input_fingerprint: string
+          p_missing_additions: Json
+          p_operation_id: string
+          p_outfits: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      complete_preview_operation: {
+        Args: {
+          p_attempt_count: number
+          p_input_fingerprint: string
+          p_operation_id: string
+          p_output_asset_id: string
+          p_render_fingerprint: string
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      complete_saved_avatar: {
+        Args: {
+          p_attempt_count: number
+          p_input_fingerprint: string
+          p_operation_id: string
+          p_output_asset_id: string
+          p_render_fingerprint: string
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      control_create_operation: {
+        Args: {
+          p_action: string
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      delete_capsule: {
+        Args: {
+          p_capsule_id: string
+          p_expected_revision: number
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      delete_capsule_outfit: {
+        Args: {
+          p_capsule_id: string
+          p_expected_revision: number
+          p_outfit_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       delete_saved_look: {
         Args: { p_saved_look_id: string; p_workspace_id: string }
         Returns: string
+      }
+      finish_create_operation: {
+        Args: {
+          p_attempt: number
+          p_metadata: Json
+          p_operation_id: string
+          p_result: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      finish_workflow_operation: {
+        Args: {
+          p_attempt_count: number
+          p_input_fingerprint: string
+          p_operation_id: string
+          p_result_ref?: Json
+          p_safe_error_code?: string
+          p_status: string
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       list_saved_looks: {
         Args: {
@@ -1765,6 +2189,22 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      release_create_provider_call: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      reserve_create_provider_call: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
       }
       retry_saved_look_media: {
         Args: { p_saved_look_id: string; p_workspace_id: string }
@@ -1782,6 +2222,80 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "saved_look_media"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      retry_workflow_operation: {
+        Args: { p_operation_id: string; p_workspace_id: string }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_capsule_draft: {
+        Args: {
+          p_brief: Json
+          p_capsule_id: string
+          p_expected_revision: number
+          p_item_ids: string[]
+          p_title: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      save_inspiration_pieces: {
+        Args: {
+          p_expected_revision: number
+          p_look_id: string
+          p_pieces: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          inspiration_asset_id: string | null
+          notes: string
+          occasion: string | null
+          provider_metadata: NonNullable<Json>
+          revision: number
+          selected_option_id: string | null
+          source_type: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "looks"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1824,11 +2338,11 @@ export type Database = {
           created_at: string
           id: string
           idempotency_key: string
-          inputs_used: Json
-          items: Json
+          inputs_used: NonNullable<Json>
+          items: NonNullable<Json>
           look_id: string | null
           option_id: string | null
-          preference_snapshot: Json
+          preference_snapshot: NonNullable<Json>
           rationale: string
           selection_revision: number | null
           source_kind: string
@@ -1837,7 +2351,7 @@ export type Database = {
           spend_currency: string | null
           spend_minor: number | null
           title: string
-          uncertainty: Json
+          uncertainty: NonNullable<Json>
           workspace_id: string
         }
         SetofOptions: {
@@ -1846,6 +2360,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      save_studio_look: {
+        Args: {
+          p_expected_revision: number
+          p_idempotency_key: string
+          p_parent_id: string
+          p_source_id: string
+          p_source_kind: string
+          p_title: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       start_workflow_operation: {
         Args: {
@@ -1866,13 +2392,15 @@ export type Database = {
           completed_at: string | null
           created_at: string
           id: string
-          input: Json
+          input: NonNullable<Json>
           input_fingerprint: string
           input_revision: number
           kind: string
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1886,6 +2414,72 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      stylora_complete_image_operation: {
+        Args: {
+          p_attempt_count: number
+          p_input_fingerprint: string
+          p_kind: string
+          p_operation_id: string
+          p_output_asset_id: string
+          p_render_fingerprint: string
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      stylora_record_operation_event: {
+        Args: {
+          p_event_type: string
+          p_operation_id: string
+          p_payload?: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          event_type: string
+          id: string
+          operation_id: string
+          payload: NonNullable<Json>
+          sequence: number
+          source_revision: number
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operation_events"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1943,8 +2537,7 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -1968,8 +2561,7 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -1993,8 +2585,7 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }

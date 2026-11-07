@@ -26,6 +26,10 @@ database configuration is missing or invalid. HTTP 200 confirms valid
 configuration shape and reports whether provider keys are present. Use an
 approved scoped query to verify actual connectivity.
 
+## Owner 1 workspace preview
+
+Open [Wardrobe](http://localhost:3000/wardrobe), [Preferences](http://localhost:3000/preferences) or [Profile](http://localhost:3000/profile) in the running app. The Wardrobe collection, item detail, intake, preferences and profile routes use browser-local sample data. The inventory examples share the existing ivory-shirt image. Newly selected photos stay in IndexedDB, and drafts and selections persist in this browser. Enter garment details manually or use the labeled sample to review intake while automated description and hosted persistence await integration.
+
 ## Component catalog
 
 Run `pnpm storybook` and open [the catalog](http://localhost:6006). Foundations contains the tokens, icons, brand assets and shared controls. Shell contains responsive navigation. Features contains interactive component examples for all four owners. Use `pnpm build:storybook` for a static catalog in `storybook-static/`.

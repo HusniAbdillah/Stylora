@@ -17,6 +17,19 @@
   padding: 24px 0 48px;
 }
 
+.profile :is(button, input):focus-visible {
+  outline: 2px solid var(--color-crimson);
+  outline-offset: 3px;
+}
+
+:global(#workspace-content) .profile {
+  padding: 0 0 48px;
+}
+
+:global(#workspace-content) .breadcrumb {
+  display: none;
+}
+
 .breadcrumb {
   color: var(--color-secondary);
   font-size: 13px;
@@ -168,6 +181,13 @@
   font-size: 36px;
   line-height: 1;
   margin: 0;
+}
+
+.statsNote {
+  color: var(--color-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 14px 0 0;
 }
 
 .error {
