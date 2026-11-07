@@ -85,7 +85,7 @@ configuration and contract validation.
 | `SUPABASE_SECRET_KEY`   | Server-only privileged access             |
 | `STYLORA_WORKSPACE_ID`  | Workspace used by every server query      |
 | `DEMO_WRITES_ENABLED`   | Shared write gate, defaults to false      |
-| `MODEL_API_KEY`         | OpenAI API access on the server           |
+| `OPENAI_API_KEY`        | OpenAI API access on the server           |
 | `SERPAPI_API_KEY`       | Marketplace search on the server          |
 | `SUPABASE_PROJECT_ID`   | CLI project selection and type generation |
 | `SUPABASE_ACCESS_TOKEN` | CLI-only credential                       |
@@ -93,6 +93,12 @@ configuration and contract validation.
 
 Never prefix secrets with `NEXT_PUBLIC_`. The write gate is not authentication.
 Signed URLs are temporary; records store paths and asset IDs.
+
+`OPENAI_TEXT_MODEL` defaults to `gpt-5-mini` and `OPENAI_IMAGE_MODEL` to
+`gpt-image-1.5`. Existing environment files can use `MODEL_API_KEY` as an
+OpenAI credential alias. The server prefers `OPENAI_API_KEY` when both exist.
+Run `node scripts/bundle-fashion-prompts.mjs` after editing canonical fashion
+sources. The source-freshness test checks the bundled text against those files.
 
 ## Working as one of four owners
 
