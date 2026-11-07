@@ -335,7 +335,7 @@ below the latest one.
   `retryable` Storage error contract. It does not change shared Storage code,
   SQL retry rules, operation fences or provider execution.
 - `pnpm exec vitest run src/features/preview/image-errors.test.ts` passed all
-  17 cases using in-memory errors. `make fast` is running before review.
+  17 cases using in-memory errors. `make fast` passed lint and typecheck.
   No hosted reads, writes, fixtures or model calls were run for this change.
   CI remains the full suite and build gate.
 
