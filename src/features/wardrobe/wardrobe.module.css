@@ -242,11 +242,6 @@
   color: var(--color-secondary);
 }
 
-.search:focus-within {
-  outline: 2px solid var(--color-crimson);
-  outline-offset: 3px;
-}
-
 .filters {
   display: flex;
   gap: 8px;

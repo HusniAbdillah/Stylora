@@ -257,7 +257,7 @@ export function WardrobeCollectionScreen({
             categoryCounts={counts}
             onCategoryChange={(category) => updateView({ category })}
           />
-          <label className={styles.search}>
+          <label className={styles.search} data-field-surface="">
             <Icon name="search" size={18} />
             <span className={styles.srOnly}>Search archived pieces</span>
             <input

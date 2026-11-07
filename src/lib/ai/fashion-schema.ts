@@ -150,7 +150,9 @@ const listShape = Object.fromEntries(
 export const attributesSchema = z
   .strictObject({ ...scalarShape, ...listShape })
   .superRefine((attributes, context) => {
-    if (Buffer.byteLength(JSON.stringify(attributes), "utf8") > 8192) {
+    if (
+      new TextEncoder().encode(JSON.stringify(attributes)).byteLength > 8192
+    ) {
       context.addIssue({
         code: "custom",
         message: "Item attributes exceed 8 KiB.",

@@ -30,15 +30,16 @@ export async function getOutfitPage(
   const [look, options] = await Promise.all([
     client
       .from("looks")
-      .select("id,selected_option_id")
+      .select("id,selected_option_id,revision")
       .eq("workspace_id", workspaceId)
       .eq("id", lookId)
       .maybeSingle(),
     client
       .from("outfit_options")
-      .select("id,option_type,title,status,revision")
+      .select("id,option_type,title,status,revision,source_revision")
       .eq("workspace_id", workspaceId)
       .eq("look_id", lookId)
+      .eq("is_current", true)
       .order("created_at"),
   ]);
   if (look.error || options.error)
@@ -50,15 +51,18 @@ export async function getOutfitPage(
     );
   if (!look.data)
     throw new ApiError("OUTFIT_NOT_FOUND", "This outfit is unavailable.", 404);
-  const directions = (options.data ?? []).map((option) => ({
-    id: option.id,
-    type: z
-      .enum(["closest", "from_wardrobe", "fresh_alternative"])
-      .parse(option.option_type),
-    title: option.title,
-    status: option.status,
-    revision: option.revision,
-  }));
+  const sourceRevision = look.data.revision;
+  const directions = (options.data ?? [])
+    .filter((option) => option.source_revision === sourceRevision)
+    .map((option) => ({
+      id: option.id,
+      type: z
+        .enum(["closest", "from_wardrobe", "fresh_alternative"])
+        .parse(option.option_type),
+      title: option.title,
+      status: option.status,
+      revision: option.revision,
+    }));
   const preferred = optionId ?? look.data.selected_option_id;
   if (optionId && !directions.some((option) => option.id === optionId))
     throw new ApiError(

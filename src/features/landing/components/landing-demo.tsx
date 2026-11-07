@@ -1,20 +1,29 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { Icon } from "@/components/ui";
+import { Badge, Icon } from "@/components/ui";
+import styles from "./landing.module.css";
 
-const stages = [
-  { label: "Scan", caption: "Reading visible clothing, never the person." },
-  { label: "Describe", caption: "Clear descriptions with evidence." },
-  { label: "Match", caption: "See what you own and what is missing." },
-  {
-    label: "Style and shop",
-    caption: "Three directions and shopping for gaps.",
-  },
-] as const;
+export type LandingSample = {
+  imageUrl: string;
+  pieces: { name: string; description: string }[];
+  matches: {
+    name: string;
+    outcome: "owned" | "alternative" | "missing";
+    imageUrl: string | null;
+  }[];
+};
 
-export function LandingDemo() {
-  const [stage, setStage] = useState(0);
+const stages = ["Scan", "Describe", "Match", "Style and shop"] as const;
+const labels = {
+  owned: "In sample wardrobe",
+  alternative: "Alternative",
+  missing: "Missing",
+} as const;
+
+export function LandingDemo({ sample }: { sample?: LandingSample }) {
+  const [stage, setStage] = useState(1);
   const [paused, setPaused] = useState(false);
   const [visible, setVisible] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -22,126 +31,149 @@ export function LandingDemo() {
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => {
-      setReducedMotion(media.matches);
-      if (media.matches) setStage(stages.length - 1);
-    };
+    const update = () => setReducedMotion(media.matches);
     update();
     media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  useEffect(() => {
     const observer = new IntersectionObserver(([entry]) =>
       setVisible(entry.isIntersecting),
     );
     if (containerRef.current) observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => {
+      media.removeEventListener("change", update);
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
-    if (paused || reducedMotion || !visible) return;
+    if (paused || reducedMotion || !visible || !sample) return;
     const timer = window.setInterval(
       () => setStage((current) => (current + 1) % stages.length),
-      3000,
+      1500,
     );
     return () => window.clearInterval(timer);
-  }, [paused, reducedMotion, visible]);
+  }, [paused, reducedMotion, visible, sample]);
 
+  const frame = reducedMotion ? 2 : stage;
   return (
     <div
       ref={containerRef}
-      className="relative mx-auto w-full max-w-[580px]"
+      className={styles.demo}
       aria-label="Illustrative Stylora demonstration"
+      data-stage={frame}
     >
-      <div className="absolute -right-4 top-6 hidden h-[88%] w-[88%] rounded-[32px] bg-blush lg:block" />
-      <div className="relative overflow-hidden rounded-[24px] bg-sand shadow-xl">
-        {/* The reference is a prepared design asset; no live analysis runs here. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/design/images/inspiration-sample.webp"
-          alt="Illustrative outfit with a trench coat, ivory shirt and dark trousers"
-          className="aspect-[4/5] w-full object-cover object-top"
-        />
-        <div
-          className="absolute inset-x-0 top-[42%] h-px bg-crimson shadow-lg shadow-crimson/40 motion-reduce:hidden"
-          aria-hidden="true"
-          hidden={stage !== 0}
-        />
-        {stage >= 1 && (
-          <div className="absolute right-3 top-[14%] max-w-[68%] rounded-xl bg-paper px-3 py-2 text-[11px] shadow-lg sm:right-5 sm:text-xs">
-            <span className="flex items-center gap-2 font-semibold text-ink">
-              <Icon name="shirt" className="size-4 text-crimson" />
-              Ivory relaxed shirt
-            </span>
-            <span className="block pl-6 text-secondary">
-              Linen-like finish, relaxed fit
-            </span>
+      <div className={styles.demoCircle} />
+      <Image
+        src={sample?.imageUrl ?? "/design/images/inspiration-sample.webp"}
+        width={380}
+        height={600}
+        loading="eager"
+        unoptimized
+        alt="Sample outfit inspiration"
+        className={styles.demoPhoto}
+      />
+      <span className={styles.demoLabel}>
+        {sample ? "Illustrative sample, no live AI" : "Sample unavailable"}
+      </span>
+      {sample && (
+        <>
+          <div className={styles.scan} aria-hidden="true" />
+          {sample.matches.slice(0, 3).map((match, index) => (
+            <div
+              key={`${match.name}-${index}`}
+              className={`${styles.demoMatch} ${styles[`demoMatch${index}`]}`}
+              data-visible={frame > 0 && frame < 3}
+              aria-hidden={frame === 0 || frame === 3}
+            >
+              {match.imageUrl ? (
+                <Image
+                  src={match.imageUrl}
+                  width={44}
+                  height={44}
+                  unoptimized
+                  alt=""
+                />
+              ) : (
+                <span className={styles.matchIcon}>
+                  <Icon
+                    name={match.outcome === "missing" ? "bag" : "shirt"}
+                    size={20}
+                  />
+                </span>
+              )}
+              <div>
+                <strong>{match.name}</strong>
+                <p>
+                  {sample.pieces.find((piece) => piece.name === match.name)
+                    ?.description ?? "Sample wardrobe comparison"}
+                </p>
+              </div>
+              <Badge tone={match.outcome}>{labels[match.outcome]}</Badge>
+            </div>
+          ))}
+          {sample.matches.length === 0 && sample.pieces[0] && (
+            <div
+              className={`${styles.demoMatch} ${styles.demoMatch0}`}
+              data-visible={frame > 0 && frame < 3}
+              aria-hidden={frame === 0 || frame === 3}
+            >
+              <Icon name="shirt" />
+              <div>
+                <strong>{sample.pieces[0].name}</strong>
+                <p>{sample.pieces[0].description}</p>
+              </div>
+            </div>
+          )}
+          {frame === 3 && (
+            <div className={styles.demoDirections}>
+              <span>Closest to the reference</span>
+              <span>From your wardrobe</span>
+              <span>Fresh alternative</span>
+            </div>
+          )}
+          <div className={styles.demoControls}>
+            <button
+              type="button"
+              onClick={() => setPaused((value) => !value)}
+              disabled={reducedMotion}
+              aria-label={
+                reducedMotion
+                  ? "Static demonstration, reduced motion enabled"
+                  : paused
+                    ? "Play demonstration"
+                    : "Pause demonstration"
+              }
+              aria-pressed={paused || reducedMotion}
+            >
+              <Icon name={paused ? "arrowRight" : "pause"} size={14} />
+              <span>
+                Demo {frame + 1} of 4
+                <span className={styles.desktop}>, {stages[frame]}</span>
+              </span>
+            </button>
+            <div
+              className={styles.demoPagination}
+              role="group"
+              aria-label="Demonstration steps"
+            >
+              {stages.map((label, index) => (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={reducedMotion}
+                  aria-label={`Show ${label.toLowerCase()} step`}
+                  aria-current={frame === index ? "step" : undefined}
+                  onClick={() => {
+                    setStage(index);
+                    setPaused(true);
+                  }}
+                >
+                  <span />
+                </button>
+              ))}
+            </div>
           </div>
-        )}
-        {stage >= 2 && (
-          <div className="absolute left-3 top-[52%] max-w-[72%] rounded-xl bg-paper px-3 py-2 text-[11px] shadow-lg sm:left-5 sm:text-xs">
-            <span className="flex items-center gap-2 font-semibold text-ink">
-              <Icon name="check" className="size-4 text-[var(--color-owned)]" />
-              In your wardrobe
-            </span>
-            <span className="block pl-6 text-secondary">
-              A useful match is already yours
-            </span>
-          </div>
-        )}
-        {stage >= 3 && (
-          <div className="absolute bottom-[16%] right-3 max-w-[70%] rounded-xl bg-paper px-3 py-2 text-[11px] shadow-lg sm:right-5 sm:text-xs">
-            <span className="flex items-center gap-2 font-semibold text-ink">
-              <Icon name="bag" className="size-4 text-crimson" />
-              Stone trench coat
-            </span>
-            <span className="block pl-6 text-secondary">
-              A missing piece to explore
-            </span>
-          </div>
-        )}
-        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-night/75 to-transparent px-4 pb-4 pt-14 text-paper">
-          <div>
-            <p className="text-xs font-medium">{stages[stage].label}</p>
-            <p className="text-[11px] text-paper/85">{stages[stage].caption}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setPaused((value) => !value)}
-            className="flex min-h-9 shrink-0 items-center gap-1 rounded-full bg-night/90 px-3 text-xs font-medium text-paper focus-visible:outline-paper"
-            aria-label={paused ? "Play demonstration" : "Pause demonstration"}
-          >
-            <Icon
-              name={paused ? "arrow-right" : "pause"}
-              className="size-3.5"
-            />
-            {paused ? "Play" : "Pause"}
-          </button>
-        </div>
-      </div>
-      <p className="mt-2 text-center text-xs text-secondary">
-        Illustrative demo with prepared sample data
-      </p>
-      <div
-        className="mt-2 flex justify-center gap-1.5"
-        role="group"
-        aria-label="Demonstration steps"
-      >
-        {stages.map((item, index) => (
-          <button
-            key={item.label}
-            type="button"
-            onClick={() => {
-              setStage(index);
-              setPaused(true);
-            }}
-            className={`h-1.5 rounded-full transition-all motion-reduce:transition-none ${stage === index ? "w-7 bg-crimson" : "w-3 bg-stone"}`}
-            aria-label={`Show ${item.label} step`}
-            aria-current={stage === index ? "step" : undefined}
-          />
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 }

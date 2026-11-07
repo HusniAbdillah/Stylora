@@ -36,7 +36,7 @@ export async function readOperationActivity(
   let query = context.client
     .from("workflow_operations")
     .select(
-      "id,kind,status,subject_type,subject_id,input_revision,attempt_count,safe_error_code,created_at,updated_at",
+      "id,kind,status,subject_type,subject_id,input_revision,attempt_count,safe_error_code,created_at,updated_at,input",
     )
     .eq("workspace_id", context.workspaceId)
     .order("updated_at", { ascending: false })
@@ -53,7 +53,17 @@ export async function readOperationActivity(
     );
   return z
     .array(activitySchema)
-    .parse(data)
+    .parse(
+      data.filter(
+        (row) =>
+          !(
+            row.input &&
+            typeof row.input === "object" &&
+            !Array.isArray(row.input) &&
+            row.input.purpose === "fixed_landing_sample"
+          ),
+      ),
+    )
     .map((row) => ({
       id: row.id,
       kind: row.kind,

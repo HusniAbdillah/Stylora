@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button, Icon } from "@/components/ui";
-import { LandingDemo } from "./landing-demo";
+import { LandingDemo, type LandingSample } from "./landing-demo";
+import styles from "./landing.module.css";
 
 export type LandingLinks = {
   createHref: string;
@@ -13,71 +14,118 @@ export type LandingLinks = {
   preferencesHref: string;
 };
 
+const images = "/design/images/";
+const avatars = [
+  "avatar-aivory-charcoal.webp",
+  "avatar-btrench-denim.webp",
+  "avatar-cevening.webp",
+  "avatar-dnavy-polo.webp",
+];
 const steps = [
   {
-    number: "1",
     title: "Scan",
     description: "Upload a photo. We read the outfit, never the person.",
-    image: "/design/images/inspiration-sample.webp",
+    mobile: "We read the outfit, never the person.",
+    image: "inspiration-sample.webp",
   },
   {
-    number: "2",
     title: "Describe",
-    description: "Every piece becomes an editable description with evidence.",
-    image: "/design/images/wardrobe-ivory-shirt.webp",
+    description: "Each piece becomes an editable description with evidence.",
+    mobile: "Editable descriptions with evidence.",
+    image: null,
   },
   {
-    number: "3",
     title: "Match",
-    description: "See what you own, what could stand in, and what is missing.",
-    image: "/design/images/wardrobe-charcoal-trousers.webp",
+    description: "See what you own, what could stand in and what is missing.",
+    mobile: "What you own, what can stand in, what is missing.",
+    image: "wardrobe-ivory-shirt.webp",
   },
   {
-    number: "4",
     title: "Style and shop",
     description: "Three ideas, then shopping only for the missing pieces.",
-    image: "/design/images/product-trench1.webp",
+    mobile: "Three ideas, shopping only for gaps.",
+    image: "product-trench1.webp",
   },
 ] as const;
+
+function Picture({
+  file,
+  className = "",
+}: {
+  file: string;
+  className?: string;
+}) {
+  return (
+    <Image
+      src={images + file}
+      width={600}
+      height={600}
+      alt=""
+      className={`${styles.picture} ${className}`}
+    />
+  );
+}
 
 export function LandingHero({
   createHref,
   sampleHref,
-}: Pick<LandingLinks, "createHref" | "sampleHref">) {
+  sample,
+}: Pick<LandingLinks, "createHref" | "sampleHref"> & {
+  sample?: LandingSample;
+}) {
   return (
-    <section className="mx-auto grid max-w-[1320px] items-center gap-10 px-4 pb-16 pt-8 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:gap-16 lg:px-12 lg:pb-24 lg:pt-20">
-      <div className="order-1 max-w-[650px]">
-        <p className="mb-5 inline-flex items-center gap-2 rounded-full bg-blush px-3 py-1.5 text-xs font-medium text-crimson">
-          <Icon name="sparkle" className="size-3.5" />
-          AI stylist for clothes you own
+    <section className={styles.hero}>
+      <div className={styles.heroCopy}>
+        <p className={styles.eyebrow}>
+          <Icon name="sparkle" size={14} />
+          <span className={styles.desktop}>
+            An AI stylist for the clothes you already own
+          </span>
+          <span className={styles.mobile}>AI stylist for clothes you own</span>
         </p>
-        <h1 className="font-serif text-[clamp(2.65rem,5vw,5rem)] leading-[1.04] tracking-[-0.045em] text-ink">
-          Wear the look you saved,{" "}
-          <em className="font-normal text-crimson">with what you own.</em>
+        <h1>
+          Wear the look you saved,<em>with what you own.</em>
         </h1>
-        <p className="mt-6 max-w-[530px] text-base leading-7 text-secondary">
-          Upload an outfit from your feed. Stylora describes every piece, finds
-          what is already in your wardrobe, suggests three ways to wear it and
-          helps shop for the real gaps.
+        <p className={styles.heroDescription}>
+          <span className={styles.desktop}>
+            Upload an outfit from your feed. Stylora describes every piece,
+            finds what is already in your wardrobe, suggests three ways to wear
+            it and shops only for the real gaps.
+          </span>
+          <span className={styles.mobile}>
+            Upload an outfit. See every piece, what you already own and three
+            ways to wear it.
+          </span>
         </p>
-        <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
-          <Button variant="primary" asChild>
+      </div>
+      <div className={styles.heroVisual}>
+        <LandingDemo sample={sample} />
+      </div>
+      <div className={styles.heroActions}>
+        <div className={styles.actions}>
+          <Button size="large" asChild>
             <Link href={createHref}>Upload inspiration</Link>
           </Button>
           {sampleHref && (
-            <Button variant="secondary" asChild>
+            <Button variant="secondary" size="large" asChild>
               <Link href={sampleHref}>Try the sample look</Link>
             </Button>
           )}
         </div>
-        <p className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-secondary">
-          <span>✓ Editable text descriptions</span>
-          <span>✓ Real wardrobe matches</span>
-          <span>✓ Shopping for gaps only</span>
-        </p>
-      </div>
-      <div className="order-2">
-        <LandingDemo />
+        <ul className={styles.claims}>
+          <li>
+            <Icon name="check" size={16} />
+            Editable text descriptions
+          </li>
+          <li>
+            <Icon name="swap" size={16} />
+            Real wardrobe matches
+          </li>
+          <li>
+            <Icon name="bag" size={16} />
+            Shopping for gaps only
+          </li>
+        </ul>
       </div>
     </section>
   );
@@ -85,92 +133,54 @@ export function LandingHero({
 
 export function LandingSteps() {
   return (
-    <section className="bg-paper px-4 py-14 sm:px-8 lg:px-12 lg:py-20">
-      <div className="mx-auto max-w-[1320px]">
-        <p className="text-xs font-semibold text-crimson">How it works</p>
-        <h2 className="mt-2 font-serif text-3xl tracking-tight sm:text-[40px]">
-          From a saved post to a plan in four steps
+    <section className={`${styles.section} ${styles.stepsSection}`}>
+      <div className={styles.sectionInner}>
+        <p className={styles.kicker}>How it works</p>
+        <h2>
+          <span className={styles.desktop}>
+            From a saved post to a plan in four steps
+          </span>
+          <span className={styles.mobile}>Four steps, about a minute</span>
         </h2>
-        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {steps.map((step) => (
-            <article
-              key={step.number}
-              className="overflow-hidden rounded-2xl border border-stone bg-porcelain p-3"
-            >
-              <div className="relative hidden aspect-[1.35] overflow-hidden rounded-xl bg-sand sm:block">
-                <Image
-                  src={step.image}
-                  alt=""
-                  fill
-                  sizes="(max-width: 1024px) 45vw, 23vw"
-                  className="object-contain"
-                />
+        <div className={styles.steps}>
+          {steps.map((step, index) => (
+            <article key={step.title} className={styles.step}>
+              <div className={styles.stepProgress} />
+              <div className={styles.stepVisual}>
+                {step.image ? (
+                  <Picture file={step.image} />
+                ) : (
+                  <div className={styles.descriptionExample}>
+                    <strong>Stone trench coat</strong>
+                    <span>Outerwear, belted trench</span>
+                    <p>Fabric look: Gabardine-like</p>
+                    <p>Fit: Relaxed</p>
+                    <p>Length: Below the knee</p>
+                    <p>
+                      <Icon name="sparkle" size={12} />
+                      For you: warm neutral
+                    </p>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 pt-2 sm:pt-4">
-                <span className="font-serif text-2xl italic text-crimson">
-                  {step.number}
-                </span>
+              <div className={styles.stepText}>
+                <span className={styles.stepNumber}>{index + 1}</span>
                 <div>
-                  <h3 className="font-semibold text-ink">{step.title}</h3>
-                  <p className="mt-1 text-sm leading-5 text-secondary">
-                    {step.description}
+                  <h3>{step.title}</h3>
+                  <p>
+                    <span className={styles.desktop}>{step.description}</span>
+                    <span className={styles.mobile}>{step.mobile}</span>
                   </p>
                 </div>
               </div>
             </article>
           ))}
         </div>
+        <p className={styles.illustrative}>
+          Illustrative process and sample imagery
+        </p>
       </div>
     </section>
-  );
-}
-
-function FeatureCard({
-  title,
-  description,
-  href,
-  images,
-  className = "",
-}: {
-  title: string;
-  description: string;
-  href: string;
-  images: string[];
-  className?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`group block min-w-0 overflow-hidden rounded-[20px] bg-paper p-3 transition-shadow hover:shadow-lg focus-visible:outline-crimson ${className}`}
-    >
-      <div
-        className={`grid h-[200px] gap-1.5 overflow-hidden rounded-xl bg-sand ${images.length > 1 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}
-      >
-        {images.map((src) => (
-          <div key={src} className="relative min-w-0 overflow-hidden">
-            <Image
-              src={src}
-              alt=""
-              fill
-              sizes="(max-width: 640px) 45vw, 20vw"
-              className="object-cover"
-            />
-          </div>
-        ))}
-      </div>
-      <div className="flex items-start justify-between gap-3 px-1 pb-2 pt-4">
-        <div>
-          <h3 className="font-serif text-2xl">{title}</h3>
-          <p className="mt-1 max-w-[480px] text-sm leading-5 text-secondary">
-            {description}
-          </p>
-        </div>
-        <Icon
-          name="arrow-right"
-          className="mt-1 size-5 shrink-0 text-crimson transition-transform group-hover:translate-x-1"
-        />
-      </div>
-    </Link>
   );
 }
 
@@ -183,46 +193,98 @@ export function LandingFeatures({
   LandingLinks,
   "wardrobeHref" | "capsulesHref" | "previewHref" | "savedLooksHref"
 >) {
+  const cards = [
+    {
+      title: "Wardrobe",
+      href: wardrobeHref,
+      description:
+        "Add a piece with one photo. AI writes the description; you confirm it.",
+      files: [
+        "wardrobe-ivory-shirt.webp",
+        "wardrobe-charcoal-trousers.webp",
+        "wardrobe-dark-loafers.webp",
+        "wardrobe-oxblood-tote.webp",
+        "ds-pink-floral-dress.webp",
+        "ds-brown-stripe-polo.webp",
+      ],
+      kind: "wardrobe",
+    },
+    {
+      title: "Capsules",
+      href: capsulesHref,
+      description:
+        "Pick one of five templates and get several outfits from the same pieces.",
+      files: ["tpl-weekend-travel.webp"],
+      kind: "capsules",
+    },
+    {
+      title: "Preview",
+      href: previewHref,
+      description:
+        "Choose one piece per category and see it on an avatar that uses your selected swatch and body reference.",
+      files: avatars.slice(1),
+      kind: "preview",
+    },
+    {
+      title: "Saved looks",
+      href: savedLooksHref,
+      description:
+        "Every saved look gets an avatar image and a clean public page you can control.",
+      files: [avatars[0]],
+      kind: "saved",
+    },
+  ];
   return (
-    <section className="px-4 py-16 sm:px-8 lg:px-12 lg:py-20">
-      <div className="mx-auto max-w-[1320px]">
-        <p className="text-xs font-semibold text-crimson">
+    <section className={`${styles.section} ${styles.featuresSection}`}>
+      <div className={styles.sectionInner}>
+        <p className={`${styles.kicker} ${styles.desktop}`}>
           One wardrobe, many ways
         </p>
-        <h2 className="mt-2 max-w-xl font-serif text-3xl tracking-tight sm:text-[40px]">
-          Everything connects to what you own
-        </h2>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <FeatureCard
-            title="Wardrobe"
-            description="Add a piece with one photo. AI writes the description; you confirm it."
-            href={wardrobeHref}
-            images={[
-              "/design/images/wardrobe-ivory-shirt.webp",
-              "/design/images/wardrobe-charcoal-trousers.webp",
-              "/design/images/wardrobe-dark-loafers.webp",
-              "/design/images/wardrobe-oxblood-tote.webp",
-            ]}
-          />
-          <FeatureCard
-            title="Capsules"
-            description="Pick one of five templates and get several outfits from the clothes you own."
-            href={capsulesHref}
-            images={["/design/images/tpl-weekend-travel.webp"]}
-          />
-          <FeatureCard
-            title="Preview"
-            description="Choose one piece per category and see it on an avatar that uses your own selections."
-            href={previewHref}
-            images={["/design/images/avatar-btrench-denim.webp"]}
-          />
-          <FeatureCard
-            title="Saved looks"
-            description="Every saved look gets an avatar image and a clean public page you can control."
-            href={savedLooksHref}
-            images={["/design/images/avatar-aivory-charcoal.webp"]}
-          />
+        <h2>Everything connects to what you own</h2>
+        <div className={styles.features}>
+          {cards.map((card) => (
+            <Link
+              key={card.title}
+              href={card.href}
+              className={styles.feature}
+              data-kind={card.kind}
+            >
+              <div className={styles.featureImages}>
+                {card.files.map((file) => (
+                  <Picture key={file} file={file} />
+                ))}
+                {card.kind === "saved" && (
+                  <div className={styles.savedExample}>
+                    <h4>Ivory and charcoal</h4>
+                    <p>Relaxed tailoring for everyday plans.</p>
+                    <div>
+                      {[
+                        "wardrobe-ivory-shirt.webp",
+                        "wardrobe-charcoal-trousers.webp",
+                        "wardrobe-dark-loafers.webp",
+                      ].map((file) => (
+                        <Picture key={file} file={file} />
+                      ))}
+                    </div>
+                    <span>
+                      <Icon name="link" size={14} />
+                      Share link, expires in 7 days
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className={styles.featureHeading}>
+                <h3>{card.title}</h3>
+                <span>
+                  Open {card.title.toLowerCase()}
+                  <Icon name="arrowRight" size={16} />
+                </span>
+              </div>
+              <p className={styles.featureDescription}>{card.description}</p>
+            </Link>
+          ))}
         </div>
+        <p className={styles.illustrative}>Illustrative feature previews</p>
       </div>
     </section>
   );
@@ -230,70 +292,47 @@ export function LandingFeatures({
 
 export function LandingAbout() {
   return (
-    <section
-      id="about"
-      className="bg-paper px-4 py-16 sm:px-8 lg:px-12 lg:py-20"
-    >
-      <div className="mx-auto grid max-w-[1320px] items-center gap-8 lg:grid-cols-2 lg:gap-14">
-        <div className="relative aspect-[1.35] overflow-hidden rounded-[20px] bg-sand">
-          <Image
-            src="/design/images/about-flatlay.webp"
-            alt="A considered flat-lay of clothing and accessories"
-            fill
-            sizes="(max-width: 1024px) 100vw, 48vw"
-            className="object-cover"
-          />
-        </div>
+    <section id="about" className={`${styles.section} ${styles.aboutSection}`}>
+      <div className={styles.about}>
+        <Picture file="about-flatlay.webp" />
         <div>
-          <p className="text-xs font-semibold text-crimson">About Stylora</p>
-          <h2 className="mt-2 font-serif text-3xl tracking-tight sm:text-[40px]">
-            The best outfit is often already in your closet
-          </h2>
-          <p className="mt-4 text-base leading-7 text-secondary">
+          <p className={styles.kicker}>About Stylora</p>
+          <h2>The best outfit is often already in your closet</h2>
+          <p className={styles.aboutIntro}>
             We built Stylora for people who save outfits but rarely recreate
-            them. It reads the details, finds a credible match, and shows what
-            is worth looking for when something is missing.
+            them. It reads the look like a senior stylist, then starts with what
+            you own.
           </p>
-          <ul className="mt-7 space-y-5 text-sm leading-6">
-            <li className="flex gap-3">
-              <Icon
-                name="search"
-                className="mt-1 size-5 shrink-0 text-crimson"
-              />
-              <span>
-                <strong className="block text-ink">
-                  Transparent reasoning
-                </strong>
-                <span className="text-secondary">
-                  Every idea tells why it works, what you own and what it cannot
-                  know.
-                </span>
-              </span>
+          <ul>
+            <li>
+              <Icon name="search" size={22} />
+              <div>
+                <h3>Transparent reasoning</h3>
+                <p>
+                  Every idea lists why it works, which of your inputs it used
+                  and what it cannot know.
+                </p>
+              </div>
             </li>
-            <li className="flex gap-3">
-              <Icon name="swap" className="mt-1 size-5 shrink-0 text-crimson" />
-              <span>
-                <strong className="block text-ink">
-                  Strict, honest matches
-                </strong>
-                <span className="text-secondary">
+            <li>
+              <Icon name="swap" size={22} />
+              <div>
+                <h3>Strict, honest matches</h3>
+                <p>
                   A football jersey is never sold to you as a blouse
                   alternative. Missing is a valid answer.
-                </span>
-              </span>
+                </p>
+              </div>
             </li>
-            <li className="flex gap-3">
-              <Icon
-                name="heart"
-                className="mt-1 size-5 shrink-0 text-crimson"
-              />
-              <span>
-                <strong className="block text-ink">Reuse before buying</strong>
-                <span className="text-secondary">
+            <li>
+              <Icon name="heart" size={22} />
+              <div>
+                <h3>Reuse before buying</h3>
+                <p>
                   Shopping appears only for a real gap, and saved items stay
                   candidates until you own them.
-                </span>
-              </span>
+                </p>
+              </div>
             </li>
           </ul>
         </div>
@@ -306,19 +345,21 @@ export function LandingCallToAction({
   createHref,
 }: Pick<LandingLinks, "createHref">) {
   return (
-    <section className="bg-crimson px-4 py-10 text-paper sm:px-8 lg:px-12">
-      <div className="mx-auto flex max-w-[1320px] flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="font-serif text-3xl tracking-tight">
-            Start with one saved outfit.
-          </h2>
-          <p className="mt-1 text-sm text-rose-wash">
-            It takes an image. Your closet is already less of a mystery.
-          </p>
-        </div>
-        <Button variant="secondary" asChild>
-          <Link href={createHref}>Upload inspiration</Link>
-        </Button>
+    <section className={styles.cta}>
+      <div>
+        <h2>Start with one saved outfit.</h2>
+        <p>It takes a minute. Your draft is kept if you leave and come back.</p>
+      </div>
+      <Button variant="secondary" size="large" asChild>
+        <Link href={createHref}>Upload inspiration</Link>
+      </Button>
+      <div
+        className={styles.ctaPortraits}
+        aria-label="Illustrative outfit previews"
+      >
+        {avatars.map((file) => (
+          <Picture key={file} file={file} />
+        ))}
       </div>
     </section>
   );
