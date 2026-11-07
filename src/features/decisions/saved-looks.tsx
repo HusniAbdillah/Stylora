@@ -286,7 +286,7 @@ export function SavedLooksGallery({
       ) : filtered.length ? (
         <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 xl:grid-cols-4">
           {filtered.map((look) => (
-            <article key={look.id} className="min-w-0">
+            <article key={look.id} className="@container flex min-w-0 flex-col">
               {getLookHref ? (
                 <Link
                   href={getLookHref(look.id)}
@@ -340,7 +340,7 @@ export function SavedLooksGallery({
                     </Button>
                   </div>
                 )}
-              <div className="mt-2 flex items-center justify-between gap-2">
+              <div className="mt-auto flex flex-col gap-3 pt-3 @[260px]:flex-row @[260px]:items-center @[260px]:justify-between">
                 <div className="flex gap-1">
                   {look.items.slice(0, 4).map((item) => (
                     <span key={item.id} className="w-8">
@@ -353,7 +353,7 @@ export function SavedLooksGallery({
                   ))}
                 </div>
                 {renderShare && (
-                  <span className="hidden shrink-0 xl:block">
+                  <span className="shrink-0 self-end @[260px]:self-auto">
                     {renderShare(look)}
                   </span>
                 )}
@@ -368,17 +368,19 @@ export function SavedLooksGallery({
                   </button>
                 )}
               </div>
-              {look.share?.active && (
-                <p className="mt-1 text-xs text-crimson">
-                  <Icon name="link" className="mr-1 inline size-3" />
-                  {look.share.permanent
-                    ? "Shared until turned off"
-                    : "Shared" +
-                      (look.share.expiresLabel
-                        ? ", " + look.share.expiresLabel
-                        : "")}
-                </p>
-              )}
+              <div className="min-h-6 pt-1">
+                {look.share?.active && (
+                  <p className="text-xs text-crimson">
+                    <Icon name="link" className="mr-1 inline size-3" />
+                    {look.share.permanent
+                      ? "Shared until turned off"
+                      : "Shared" +
+                        (look.share.expiresLabel
+                          ? ", " + look.share.expiresLabel
+                          : "")}
+                  </p>
+                )}
+              </div>
             </article>
           ))}
         </div>
@@ -406,7 +408,6 @@ export function SavedLookDetail({
   onDelete,
   onShare,
   onManageShare,
-  onAddToCapsule,
   writesEnabled = true,
   shareAction,
   manageShareAction,
@@ -420,7 +421,6 @@ export function SavedLookDetail({
   onDelete?: (id: string) => void | Promise<void>;
   onShare?: (id: string) => void;
   onManageShare?: (id: string) => void;
-  onAddToCapsule?: (id: string) => void;
   writesEnabled?: boolean;
   shareAction?: ReactNode;
   manageShareAction?: ReactNode;
@@ -566,23 +566,6 @@ export function SavedLookDetail({
             </div>
           )}
           <div className="flex gap-2">
-            {onAddToCapsule && (
-              <Button
-                variant="secondary"
-                onClick={() => onAddToCapsule(look.id)}
-              >
-                Add to capsule
-              </Button>
-            )}
-            {!onAddToCapsule && (
-              <Button
-                variant="secondary"
-                disabled
-                title="Saved looks cannot be added to a capsule here yet."
-              >
-                Add to capsule
-              </Button>
-            )}
             {shareAction ??
               (onShare && (
                 <Button
@@ -600,18 +583,10 @@ export function SavedLookDetail({
               ))}
           </div>
         </div>
-        {onAddToCapsule && (
-          <div className="mt-4 md:hidden">
-            <Button variant="secondary" onClick={() => onAddToCapsule(look.id)}>
-              Add to capsule
-            </Button>
-          </div>
-        )}
         {(onShare || shareAction) &&
           (look.mediaStatus !== "succeeded" || !look.avatarUrl) && (
             <p className="mt-2 text-xs text-secondary">
-              You can share the item composition now. Review and approve the
-              overview image separately when it is ready.
+              You can share this look without an image.
             </p>
           )}
       </div>

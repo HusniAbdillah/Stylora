@@ -112,6 +112,7 @@ export function SavedCollectionWorkspace({
               savedLookId={look.id}
               writesEnabled={writesEnabled}
               label={look.share?.active ? "Manage" : "Share"}
+              mode={look.share?.active ? "manage" : "create"}
               onChanged={() => router.refresh()}
             />
           ) : (
@@ -279,6 +280,7 @@ export function SavedDetailWorkspace({
         savedLookId={initial.id}
         writesEnabled={writesEnabled}
         label={label}
+        mode={label === "Manage" ? "manage" : "create"}
         onChanged={() => router.refresh()}
       />
     ) : (
@@ -329,9 +331,6 @@ export function SavedDetailWorkspace({
           </Button>
         </div>
       )}
-      <p className="mt-5 text-sm text-secondary">
-        Capsule actions are unavailable for this saved look.
-      </p>
       <Link
         href={backHref}
         className="mt-6 inline-flex min-h-11 items-center text-sm text-crimson hover:underline"

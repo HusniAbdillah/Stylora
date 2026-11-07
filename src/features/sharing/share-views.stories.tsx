@@ -37,12 +37,22 @@ const look: PublicLook = {
   ],
 };
 
-function ReviewDemo() {
+function ReviewDemo({
+  initialLink = true,
+  loading = false,
+  initialManaging = false,
+}: {
+  initialLink?: boolean;
+  loading?: boolean;
+  initialManaging?: boolean;
+}) {
   const [open, setOpen] = useState(true);
   const [revokeOpen, setRevokeOpen] = useState(false);
+  const [revoked, setRevoked] = useState(false);
+  const [managing, setManaging] = useState(initialManaging);
   const [description, setDescription] = useState(look.catchphrase ?? "");
   const [url, setUrl] = useState<string | null>(
-    "https://stylora.example/shared/sample",
+    initialLink ? "https://stylora.example/shared/sample" : null,
   );
   return (
     <div className="p-6">
@@ -57,6 +67,9 @@ function ReviewDemo() {
         open={open}
         look={look}
         shareUrl={url}
+        loading={loading}
+        managing={managing}
+        onCreateNew={() => setManaging(false)}
         catchphrase={description}
         onCatchphraseChange={setDescription}
         onClose={() => setOpen(false)}
@@ -65,17 +78,33 @@ function ReviewDemo() {
           setOpen(false);
           setRevokeOpen(true);
         }}
-      />
+      >
+        {managing && (
+          <section className="mt-5 border-t border-stone pt-4">
+            <h3 className="text-sm font-medium">Published links</h3>
+            <p className="mt-3 text-xs text-crimson">Active until turned off</p>
+            <p className="mt-2 text-sm">{look.catchphrase}</p>
+            <button
+              type="button"
+              className="mt-3 min-h-11 text-sm text-crimson"
+              onClick={() => setRevokeOpen(true)}
+            >
+              Turn off link
+            </button>
+          </section>
+        )}
+      </ShareReviewDialog>
       <ShareRevocationDialog
         open={revokeOpen}
         lookTitle={look.title}
         onClose={() => setRevokeOpen(false)}
         onRevoke={() => {
           setUrl(null);
+          setRevoked(true);
           setRevokeOpen(false);
         }}
       />
-      {!url && (
+      {revoked && (
         <p role="status" className="mt-4 text-sm">
           Sample link turned off.
         </p>
@@ -106,4 +135,13 @@ export const LegacyExpiringLink: Story = {
   args: { look: { ...look, expiresLabel: "14 November 2026" } },
 };
 export const ReviewAndRevoke: Story = { render: () => <ReviewDemo /> };
+export const ReviewBeforeSharing: Story = {
+  render: () => <ReviewDemo initialLink={false} />,
+};
+export const ReviewLoading: Story = {
+  render: () => <ReviewDemo initialLink={false} loading />,
+};
+export const ManagePublishedLinks: Story = {
+  render: () => <ReviewDemo initialLink={false} initialManaging />,
+};
 export const LinkUnavailable: Story = { render: () => <ShareUnavailable /> };
