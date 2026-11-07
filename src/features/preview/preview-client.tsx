@@ -189,11 +189,13 @@ export function PreviewClient({
     if (!activeDraftId || (!savedSelection && !pendingRender.current)) return;
     let active = true;
     async function refresh() {
+      const selection = latestSelection.current;
       const response = await fetch(`/api/previews?draftId=${activeDraftId}`, {
         cache: "no-store",
       });
       if (!response.ok || !active) return;
       const result = statusResponse.parse(await response.json()).data;
+      if (!active || selection !== latestSelection.current) return;
       if (
         result.revision === draft.current.revision ||
         (pendingRender.current &&
