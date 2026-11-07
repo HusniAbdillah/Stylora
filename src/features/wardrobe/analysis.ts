@@ -36,6 +36,18 @@ export async function startWardrobeAnalysis(draftId: string, input: unknown) {
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
   const draft = await getWardrobeDraft(draftId);
+  const occasion = z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .safeParse(draft.payload.metadata.occasion);
+  if (!occasion.success)
+    throw new ApiError(
+      "occasion_required",
+      "Choose an occasion before describing this photo.",
+      409,
+    );
   if (
     draft.status !== "active" ||
     draft.revision !== expectedRevision ||
@@ -54,9 +66,10 @@ export async function startWardrobeAnalysis(draftId: string, input: unknown) {
   const snapshot = {
     draftRevision: draft.revision,
     assetId: draft.assetId,
+    occasion: occasion.data,
     versions: prompt.versions,
     model,
-    handlerVersion: "wardrobe-description.v1",
+    handlerVersion: "wardrobe-description.v2",
   };
   const op = await startOperation({
     kind: "wardrobe_description",
@@ -85,6 +98,18 @@ export async function executeWardrobeAnalysis(
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
   const operation = await readOperation(operationId);
+  const occasion = z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .safeParse(operation.input.occasion);
+  if (!occasion.success)
+    throw new ApiError(
+      "occasion_required",
+      "Choose an occasion before describing this photo.",
+      409,
+    );
   if (
     operation.kind !== "wardrobe_description" ||
     operation.subject_type !== "draft"
@@ -163,6 +188,7 @@ export async function executeWardrobeAnalysis(
                 purpose:
                   "Describe garments for an owned wardrobe intake. These are proposed descriptions until the visitor confirms each item.",
                 assetId: draft.asset_id,
+                occasion: occasion.data,
                 sourceRevision: draft.revision,
               },
               imageDataUrl,
@@ -213,6 +239,7 @@ export async function executeWardrobeAnalysis(
         saved: {},
         metadata: z.json().parse({
           ...output.metadata,
+          occasion: occasion.data,
           extractionTask: "inspiration_description",
         }),
       });

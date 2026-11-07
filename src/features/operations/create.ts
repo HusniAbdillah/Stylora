@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { setTimeout as delay } from "node:timers/promises";
 import { ApiError } from "@/lib/api";
@@ -26,27 +26,28 @@ import {
 } from "@/lib/ai/provider";
 import { buildFashionPrompt } from "@/prompts/fashion";
 import type { Database, Json } from "@/types/database";
+import {
+  CREATE_RUNTIME_VERSION, createKindSchema, createInputSnapshot,
+  createOperationFingerprint, createOperationPolicy,
+} from "./create-policy";
 
 type Operation = Database["public"]["Tables"]["workflow_operations"]["Row"];
-const kindSchema = z.enum([
-  "inspiration_description",
-  "inspiration_confidence",
-  "wardrobe_match",
-  "outfit_options",
-  "option_regeneration",
-]);
+const kindSchema = createKindSchema;
 const requestSchema = z.strictObject({
   kind: kindSchema,
-  inventoryMode: z.enum(["sample", "live"]).default("live"),
+  inventoryMode: z.enum(["sample", "live", "combined"]).default("combined"),
   execute: z.boolean().default(true),
   intentId: z.uuid().optional(),
 });
 const snapshotSchema = z.object({
   lookId: z.uuid(),
   lookRevision: z.number().int().positive(),
-  inventoryMode: z.enum(["sample", "live"]),
+  inventoryMode: z.enum(["sample", "live", "combined"]),
   preferenceFingerprint: z.string().optional(),
   optionType: optionTypeSchema.optional(),
+  assetId: z.uuid().optional(),
+  runtimeVersion: z.string().optional(),
+  intentId: z.uuid().optional(),
 });
 const asJson = (value: unknown): Json => z.json().parse(value);
 
@@ -84,7 +85,7 @@ async function readOperation(id: string) {
   return data;
 }
 
-function toOperation(op: Operation) {
+function toOperation(op: Operation, currentFingerprint: string | null = null) {
   const input = snapshotSchema.safeParse(op.input);
   return {
     id: op.id,
@@ -102,19 +103,22 @@ function toOperation(op: Operation) {
     inventoryMode: input.success ? input.data.inventoryMode : null,
     subjectId: op.subject_id,
     leaseUntil: op.lease_until,
+    ...createOperationPolicy(op, currentFingerprint),
   };
 }
 export async function getOperation(id: string) {
-  return toOperation(await readOperation(id));
+  return projectOperation(await readOperation(id));
 }
 
 async function operationInput(
   lookId: string,
   kind: z.infer<typeof kindSchema>,
-  inventoryMode: "sample" | "live",
+  inventoryMode: "sample" | "live" | "combined",
   optionType?: z.infer<typeof optionTypeSchema>,
 ) {
   const { look, pieces } = await getLookContext(lookId);
+  if (!look.occasion?.trim())
+    throw new ApiError("occasion_required", "Choose an occasion before starting analysis.", 409);
   const { client, workspaceId } = getWorkspaceDatabase();
   if (!look.inspiration_asset_id)
     throw new ApiError(
@@ -146,31 +150,45 @@ async function operationInput(
       "Wait for complete garment descriptions before continuing.",
       409,
     );
-  const input: Record<string, Json> = {
-    lookId,
-    lookRevision: look.revision,
-    assetId: look.inspiration_asset_id,
-    occasion: look.occasion,
-    inventoryMode,
-  };
-  if (kind !== "inspiration_description") {
-    const snapshot = await getPersonalizationSnapshot();
-    input.preferenceFingerprint = snapshot.fingerprint;
-    input.preferenceData = asJson(snapshot.preferenceData);
-    input.preferences = asJson(snapshot.preferences);
-  }
-  if (
-    ["wardrobe_match", "outfit_options", "option_regeneration"].includes(kind)
-  ) {
-    const inventory = await listInventory(inventoryMode);
-    input.inventoryState = inventory.items
-      .map((item) => ({ id: item.id, revision: item.revision }))
-      .sort((a, b) => a.id.localeCompare(b.id));
-    input.inventoryFingerprint = inventory.fingerprint;
-    input.pieces = asJson(pieces);
-  }
-  if (optionType) input.optionType = optionType;
+  const personalization = kind !== "inspiration_description"
+    ? await getPersonalizationSnapshot() : undefined;
+  const inventory = ["wardrobe_match", "outfit_options", "option_regeneration"].includes(kind)
+    ? await listInventory(inventoryMode) : undefined;
+  const input = createInputSnapshot({ kind, look, pieces, inventoryMode,
+    personalization, inventory, optionType });
   return { look, input };
+}
+
+async function projectOperation(op: Operation) {
+  let fingerprint: string | null = null;
+  const captured = snapshotSchema.safeParse(op.input);
+  const kind = kindSchema.safeParse(op.kind);
+  if (captured.success && kind.success) {
+    try {
+      const { look, input } = await operationInput(captured.data.lookId, kind.data,
+        captured.data.inventoryMode, captured.data.optionType);
+      let subjectId = look.id;
+      let revision = look.revision;
+      if (captured.data.optionType) {
+        const { client, workspaceId } = getWorkspaceDatabase();
+        const current = await client.from("outfit_options").select("id,revision")
+          .eq("workspace_id", workspaceId).eq("look_id", look.id)
+          .eq("option_type", captured.data.optionType).eq("is_current", true)
+          .eq("source_revision", look.revision).maybeSingle();
+        if (current.error || !current.data) return toOperation(op);
+        subjectId = current.data.id;
+        revision = current.data.revision;
+      }
+      if (captured.data.intentId) input.intentId = captured.data.intentId;
+      if (look.source_type !== "sample") fingerprint = createOperationFingerprint({
+        kind: kind.data, input, versions: buildFashionPrompt(kind.data).versions,
+        model: process.env.OPENAI_MODEL || "gpt-6-luna", subjectId, revision,
+      });
+    } catch {
+      // Unavailable current inputs disable recovery controls without hiding saved operation state.
+    }
+  }
+  return toOperation(op, fingerprint);
 }
 
 export async function startLookOperation(
@@ -228,19 +246,8 @@ export async function startLookOperation(
   }
   const prompt = buildFashionPrompt(parsed.kind);
   const model = process.env.OPENAI_MODEL || "gpt-6-luna";
-  const fingerprint = createHash("sha256")
-    .update(
-      JSON.stringify({
-        kind: parsed.kind,
-        input,
-        versions: prompt.versions,
-        handlerVersion: "owner2-create.v2",
-        model,
-        subjectId,
-        revision,
-      }),
-    )
-    .digest("hex");
+  const fingerprint = createOperationFingerprint({ kind: parsed.kind, input,
+    versions: prompt.versions, model, subjectId, revision });
   const { data, error } = await context.client.rpc("start_workflow_operation", {
     p_workspace_id: context.workspaceId,
     p_kind: parsed.kind,
@@ -254,7 +261,7 @@ export async function startLookOperation(
     p_model: model,
   });
   if (error) throw sqlFailure(error);
-  return parsed.execute ? executeOperation(data.id) : toOperation(data);
+  return parsed.execute ? executeOperation(data.id) : toOperation(data, fingerprint);
 }
 
 export async function startDraftOperation(draftId: string, input: unknown) {
@@ -293,6 +300,9 @@ export async function executeOperation(id: string) {
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
   const pending = await readOperation(id);
+  const pendingInput = snapshotSchema.safeParse(pending.input);
+  if (!pendingInput.success || pendingInput.data.runtimeVersion !== CREATE_RUNTIME_VERSION)
+    throw new ApiError("operation_runtime_changed", "This analysis uses an older runtime. Start a new analysis for the current inputs.", 409);
   if (!kindSchema.safeParse(pending.kind).success)
     throw new ApiError(
       "operation_not_supported",
@@ -302,7 +312,7 @@ export async function executeOperation(id: string) {
   if (
     ["succeeded", "failed", "cancelled", "superseded"].includes(pending.status)
   )
-    return toOperation(pending);
+    return projectOperation(pending);
   const { data: op, error } = await context.client.rpc(
     "claim_workflow_operation",
     {
@@ -313,7 +323,7 @@ export async function executeOperation(id: string) {
     },
   );
   if (error) throw sqlFailure(error);
-  if (op.status !== "running") return toOperation(op);
+  if (op.status !== "running") return projectOperation(op);
   const snapshot = snapshotSchema.parse(op.input);
   let metadata: unknown = {};
   return withFashionOperation(
@@ -534,6 +544,7 @@ export async function executeOperation(id: string) {
           const matchContext = {
             preferences: personalization.preferences,
             occasion: look.occasion,
+            inventoryMode: snapshot.inventoryMode,
             sourceRevision: look.revision,
             onProviderMetadata: (value: unknown) => {
               metadata = value;
@@ -557,7 +568,7 @@ export async function executeOperation(id: string) {
               .eq("is_current", true);
             if (matchError) throw sqlFailure(matchError);
             const matchInputs = z.object({
-              inventoryMode: z.enum(["sample", "live"]),
+              inventoryMode: z.enum(["sample", "live", "combined"]),
               inventoryFingerprint: z.string(),
               preferenceFingerprint: z.string(),
             });
@@ -641,7 +652,7 @@ export async function executeOperation(id: string) {
           },
         );
         if (finishError) throw sqlFailure(finishError);
-        return toOperation(finished);
+        return projectOperation(finished);
       } catch (failure) {
         const safe =
           failure instanceof ApiError
@@ -675,7 +686,7 @@ export async function executeOperation(id: string) {
           .eq("attempt_count", op.attempt_count)
           .in("status", ["running", "partial"]);
         if (updateError) throw sqlFailure(updateError);
-        return toOperation(await readOperation(id));
+        return projectOperation(await readOperation(id));
       }
     },
   );
@@ -684,7 +695,19 @@ export async function executeOperation(id: string) {
 export async function controlOperation(id: string, action: "retry" | "cancel") {
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
-  await readOperation(id);
+  const operation = await readOperation(id);
+  if (action === "retry") {
+    const policy = await projectOperation(operation);
+    if (!policy.canRetry) throw new ApiError(
+      "operation_retry_unavailable",
+      policy.canRestart
+        ? "The analysis inputs or runtime changed. Start a new analysis instead."
+        : policy.retryBlockedReason === "non_retryable"
+          ? "This analysis did not pass validation and cannot be retried unchanged. Change the input or adopt valid pieces manually."
+          : "This analysis has no eligible retry remaining. Check its status before continuing.",
+      409,
+    );
+  }
   const { data, error } = await context.client.rpc("control_create_operation", {
     p_workspace_id: context.workspaceId,
     p_operation_id: id,
@@ -696,7 +719,7 @@ export async function controlOperation(id: string, action: "retry" | "cancel") {
       "The operation cannot be changed in its current state.",
       409,
     );
-  return action === "retry" ? executeOperation(id) : toOperation(data);
+  return action === "retry" ? executeOperation(id) : projectOperation(data);
 }
 
 export async function getEvents(id: string, after = 0) {

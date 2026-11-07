@@ -1,11 +1,33 @@
 # Owner 2 frontend integration contract
 
 This change connects the existing Create, Preferences and Profile surfaces to
-hosted persistence. It adds no migrations, generated types or dependencies.
+hosted persistence. The original delivery added no migrations or dependencies.
+The follow-up below adds a reviewed combined-inventory migration and regenerated
+hosted types after explicit user authorization.
 All privileged reads and writes use the server workspace; requests never accept
 a workspace ID. Mutations enforce the existing writes gate.
 
 ## Inspiration context
+
+The follow-up user requirement supersedes the original sample selector and
+automatic-on-upload behavior: verified photo plus a nonempty persisted occasion
+automatically starts description and confidence. Analyze opens Review. Wardrobe
+intake persists occasion in draft metadata and uses the same readiness rule.
+Upload alone never starts AI. Landing `/create?sample=1` prepares a fresh live
+draft from the fixed public photo, then replaces the URL with its draft ID.
+
+Create now uses `inventoryMode=combined` and compares all scoped rows, including
+sample, archived and saved candidates. Source and ownership status remain
+visible; candidates never become owned slots. Legacy live/sample results remain
+readable. Migration `20261107071123_owner2_combined_create_inventory.sql` changes
+Create snapshot/reference checks only; other features retain their eligibility.
+
+Operation reads expose asset/runtime/current fingerprint, `canRetry`,
+`retryBlockedReason` and `canRestart`. Old failed work can allocate the corrected
+runtime fingerprint; invalid output stays nonretryable. Correction payloads may
+include `adoptedFromPieceId`: the server verifies a complete event in the current
+failed description and preserves trusted visual provenance. Applying a
+provisional edit confirms saving the complete provisional set together.
 
 `PATCH /api/looks/[lookId]/context` accepts:
 

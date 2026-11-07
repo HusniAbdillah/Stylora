@@ -1,0 +1,153 @@
+import { createHash } from "node:crypto";
+import { z } from "zod";
+import type { Json } from "@/types/database";
+
+export const CREATE_RUNTIME_VERSION = "owner2-create.v3";
+export const createKindSchema = z.enum([
+  "inspiration_description",
+  "inspiration_confidence",
+  "wardrobe_match",
+  "outfit_options",
+  "option_regeneration",
+]);
+export type CreateKind = z.infer<typeof createKindSchema>;
+
+export function createInputSnapshot(input: {
+  kind: CreateKind;
+  look: {
+    id: string;
+    revision: number;
+    inspiration_asset_id: string | null;
+    occasion: string | null;
+  };
+  pieces: unknown[];
+  inventoryMode: "sample" | "live" | "combined";
+  personalization?: {
+    fingerprint: string;
+    preferenceData: unknown;
+    preferences: unknown;
+  };
+  inventory?: {
+    items: { id: string; revision: number }[];
+    fingerprint: string;
+  };
+  optionType?: string;
+  intentId?: string;
+}): Record<string, Json> {
+  const snapshot: Record<string, Json> = {
+    lookId: input.look.id,
+    lookRevision: input.look.revision,
+    assetId: input.look.inspiration_asset_id,
+    occasion: input.look.occasion,
+    inventoryMode: input.inventoryMode,
+    runtimeVersion: CREATE_RUNTIME_VERSION,
+  };
+  if (input.kind !== "inspiration_description") {
+    if (!input.personalization)
+      throw new Error("create_personalization_required");
+    snapshot.preferenceFingerprint = input.personalization.fingerprint;
+    snapshot.preferenceData = z
+      .json()
+      .parse(input.personalization.preferenceData);
+    snapshot.preferences = z.json().parse(input.personalization.preferences);
+  }
+  if (
+    ["wardrobe_match", "outfit_options", "option_regeneration"].includes(
+      input.kind,
+    )
+  ) {
+    if (!input.inventory) throw new Error("create_inventory_required");
+    snapshot.inventoryState = input.inventory.items
+      .map((item) => ({ id: item.id, revision: item.revision }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    snapshot.inventoryFingerprint = input.inventory.fingerprint;
+    snapshot.pieces = z.json().parse(input.pieces);
+  }
+  if (input.optionType) snapshot.optionType = input.optionType;
+  if (input.intentId) snapshot.intentId = input.intentId;
+  return snapshot;
+}
+
+export function createOperationFingerprint(input: {
+  kind: CreateKind;
+  input: Record<string, Json>;
+  versions: unknown;
+  model: string;
+  subjectId: string;
+  revision: number;
+}) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        kind: input.kind,
+        input: input.input,
+        versions: input.versions,
+        handlerVersion: CREATE_RUNTIME_VERSION,
+        model: input.model,
+        subjectId: input.subjectId,
+        revision: input.revision,
+      }),
+    )
+    .digest("hex");
+}
+
+type OperationPolicyInput = {
+  input: unknown;
+  status: string;
+  input_fingerprint: string;
+  attempt_count: number;
+  provider_call_count: number;
+  result_ref: unknown;
+};
+
+export function createOperationPolicy(
+  op: OperationPolicyInput,
+  currentFingerprint: string | null,
+) {
+  const captured = z
+    .object({
+      assetId: z.uuid().optional(),
+      runtimeVersion: z.string().optional(),
+    })
+    .safeParse(op.input);
+  const retryable = z
+    .object({ retryable: z.literal(true) })
+    .safeParse(op.result_ref).success;
+  const terminal = ["succeeded", "failed", "cancelled", "superseded"].includes(
+    op.status,
+  );
+  const runtimeVersion = captured.success
+    ? (captured.data.runtimeVersion ?? null)
+    : null;
+  const retryBlockedReason =
+    op.status !== "failed"
+      ? "not_failed"
+      : !currentFingerprint
+        ? "current_input_unavailable"
+        : runtimeVersion !== CREATE_RUNTIME_VERSION
+          ? "runtime_changed"
+          : currentFingerprint !== op.input_fingerprint
+            ? "input_changed"
+            : op.attempt_count >= 3
+              ? "attempt_limit"
+              : op.provider_call_count >= 3
+                ? "provider_call_limit"
+                : !retryable
+                  ? "non_retryable"
+                  : null;
+  return {
+    assetId: captured.success ? (captured.data.assetId ?? null) : null,
+    runtimeVersion,
+    currentRuntimeVersion: CREATE_RUNTIME_VERSION,
+    currentInputFingerprint: currentFingerprint,
+    canRetry: retryBlockedReason === null,
+    retryBlockedReason,
+    canRestart:
+      terminal &&
+      currentFingerprint !== null &&
+      currentFingerprint !== op.input_fingerprint,
+    providerCallCount: op.provider_call_count,
+    attemptsRemaining: Math.max(0, 3 - op.attempt_count),
+    providerCallsRemaining: Math.max(0, 3 - op.provider_call_count),
+  };
+}

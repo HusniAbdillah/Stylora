@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   attributesSchema,
   compactAttributes,
   canonicalDescriptionSchema,
   confidenceOutputSchema,
   descriptionSchema,
+  descriptionPieceSchema,
   garmentSchema,
   type Garment,
 } from "./fashion-schema";
@@ -29,6 +31,30 @@ function garment(overrides: Partial<Garment> = {}): Garment {
 }
 
 describe("canonical fashion contracts", () => {
+  it("limits provider attribute keys by garment category without weakening canonical validation", () => {
+    const evidence = { source: "visual_inference", state: "observed", confidence: 0.8,
+      evidence: "Visible construction in the reference.", uncertainty: null };
+    const projected = (category: string, key: string, value: string | null) => ({
+      name: "Construction fixture", category, subcategory: null,
+      description: "An explicit provider schema test fixture.",
+      coreEvidence: { name: evidence, category: evidence, subcategory: evidence, description: evidence },
+      attributes: [{ key, value, ...evidence }], confidence: 0.8, uncertainty: [],
+    });
+    for (const category of ["top", "outerwear", "shoes", "accessory"]) {
+      const invalid = descriptionPieceSchema.safeParse(projected(category, "frontConstruction", "pleated front"));
+      expect(invalid.success).toBe(false);
+      if (!invalid.success) expect(invalid.error.issues[0].code).toBe("invalid_union");
+    }
+    for (const category of ["bottom", "dress"])
+      expect(descriptionPieceSchema.safeParse(projected(category, "frontConstruction", "pleated front")).success).toBe(true);
+    expect(descriptionPieceSchema.safeParse(projected("top", "shoeType", "cleat")).success).toBe(false);
+    expect(descriptionPieceSchema.safeParse(projected("shoes", "collar", "spread")).success).toBe(false);
+    expect(descriptionPieceSchema.safeParse(projected("accessory", "bagType", "tote")).success).toBe(true);
+    expect(garmentSchema.safeParse(garment({ attributes: { frontConstruction: "pleated front" } })).success).toBe(false);
+    z.object({ type: z.literal("object"), properties: z.object({ pieces: z.object({
+      items: z.object({ anyOf: z.array(z.unknown()).length(6) }),
+    }) }) }).parse(z.toJSONSchema(descriptionSchema, { target: "draft-7", io: "input" }));
+  });
   it("requires evidence structurally for each provider attribute before canonical normalization", () => {
     const evidence = {
       source: "visual_inference",

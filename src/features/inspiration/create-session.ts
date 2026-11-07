@@ -25,6 +25,7 @@ import { startOperationRequest } from "@/features/operations/client";
 type ProvisionalPiece = z.infer<typeof garmentSchema> & { id: string };
 type SessionState = {
   ready: boolean;
+  prefilling: boolean;
   draft: CreateDraft | null;
   look: CreateLook | null;
   preferences: PreferencesDraft;
@@ -40,10 +41,11 @@ type SessionState = {
   selectedDirection: "closest" | "from_wardrobe" | "fresh_alternative";
   hasEditorDraft: boolean;
   contextSaving: boolean;
-  inventoryMode: "live" | "sample";
+  inventoryMode: "live" | "sample" | "combined";
 };
 const initial: SessionState = {
   ready: false,
+  prefilling: false,
   draft: null,
   look: null,
   preferences: {},
@@ -59,7 +61,7 @@ const initial: SessionState = {
   selectedDirection: "closest",
   hasEditorDraft: false,
   contextSaving: false,
-  inventoryMode: "live",
+  inventoryMode: "combined",
 };
 const recoverySchema = z.object({
   draftId: z.uuid().nullable(),
@@ -68,7 +70,7 @@ const recoverySchema = z.object({
     .enum(["closest", "from_wardrobe", "fresh_alternative"])
     .default("closest"),
   selectedOptionId: z.uuid().nullable().optional(),
-  inventoryMode: z.enum(["live", "sample"]).optional(),
+  inventoryMode: z.enum(["live", "sample", "combined"]).optional(),
   editor: z
     .object({
       pieceId: z.uuid().nullable(),
@@ -94,6 +96,8 @@ export class CreateSession {
   private draftQueue: Promise<unknown> = Promise.resolve();
   private executions = new Map<string, Promise<void>>();
   private observing = new Set<string>();
+  private terminalReplays = new Set<string>();
+  private provisionalSource: string | null = null;
   private starting = new Map<string, Promise<void>>();
   private prepared = new Set<string>();
   private cursors: Record<string, number> = {};
@@ -104,6 +108,87 @@ export class CreateSession {
   private contextIntent = 0;
   private regenerationAllocations = new Set<string>();
   private modeSelected = false;
+  private samplePreparation: Promise<string> | null = null;
+  prepareSample() {
+    if (this.samplePreparation) return this.samplePreparation;
+    this.samplePreparation = (async () => {
+      if (!this.writesEnabled)
+        throw new Error("Changes are disabled for this workspace.");
+      if (this.hydration) await this.hydration;
+      await this.draftQueue.catch(() => undefined);
+      const pendingKey = `${this.key()}:sample-pending`;
+      let pending: string | null = null;
+      try {
+        const value = z.uuid().safeParse(localStorage.getItem(pendingKey));
+        if (value.success) pending = value.data;
+      } catch {
+        /* Server draft still survives without browser recovery. */
+      }
+      if (pending) await this.hydrate(pending);
+      else {
+        this.remember();
+        this.generation++;
+        this.editor = null;
+        this.cursors = {};
+        this.modeSelected = false;
+        this.update({
+          ...initial,
+          ready: true,
+          prefilling: true,
+          preferences: this.state.preferences,
+          preferenceFingerprint: this.state.preferenceFingerprint,
+        });
+      }
+      const generation = this.generation;
+      const draft = await this.ensureDraft();
+      try {
+        localStorage.setItem(pendingKey, draft.id);
+      } catch {
+        /* The URL will retain the draft after preparation. */
+      }
+      if (this.state.look) return draft.id;
+      this.update({ prefilling: true });
+      try {
+        const response = await fetch("/design/images/inspiration-sample.webp");
+        if (!response.ok)
+          throw new Error("The sample photo could not load. Try again.");
+        const photo = new File([await response.blob()], "sample-outfit.webp", {
+          type: "image/webp",
+        });
+        if (generation !== this.generation)
+          throw new Error(
+            "The active draft changed. The previous sample draft is retained.",
+          );
+        const upload = this.upload(photo);
+        const uploadGeneration = this.generation;
+        await upload;
+        if (uploadGeneration !== this.generation)
+          throw new Error("The active draft changed.");
+        return draft.id;
+      } finally {
+        if (this.state.draft?.id === draft.id)
+          this.update({ prefilling: false });
+      }
+    })().catch((error) => {
+      this.samplePreparation = null;
+      this.update({ prefilling: false });
+      this.report(error);
+      throw error;
+    });
+    return this.samplePreparation;
+  }
+  finishSamplePreparation() {
+    if (this.samplePreparation && this.state.prefilling) {
+      this.generation++;
+      this.update({ prefilling: false });
+    }
+    this.samplePreparation = null;
+    try {
+      localStorage.removeItem(`${this.key()}:sample-pending`);
+    } catch {
+      /* URL recovery remains available. */
+    }
+  }
   constructor(readonly scope: string) {}
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -126,7 +211,7 @@ export class CreateSession {
         draftId: this.state.draft?.id ?? null,
         lookId: this.state.look?.id ?? null,
         selectedDirection: this.state.selectedDirection,
-        inventoryMode: this.state.inventoryMode,
+        inventoryMode: "combined",
         selectedOptionId:
           this.state.look?.outfitOptions.find(
             (option) =>
@@ -199,7 +284,7 @@ export class CreateSession {
           (!lookId || lookId === recovery?.lookId);
         if (sameRecovery && recovery?.inventoryMode) {
           this.modeSelected = true;
-          this.update({ inventoryMode: recovery.inventoryMode });
+          this.update({ inventoryMode: "combined" });
         }
         this.cursors = sameRecovery ? (recovery?.cursors ?? {}) : {};
         this.editor = sameRecovery ? (recovery?.editor ?? null) : null;
@@ -286,7 +371,7 @@ export class CreateSession {
               this.update({
                 selectedDirection: stored.data.selectedDirection,
                 ...(stored.data.inventoryMode
-                  ? { inventoryMode: stored.data.inventoryMode }
+                  ? { inventoryMode: "combined" }
                   : {}),
                 hasEditorDraft: Boolean(this.editor),
               });
@@ -350,7 +435,7 @@ export class CreateSession {
     this.update({
       look,
       ...(!this.modeSelected && look.inventoryMode
-        ? { inventoryMode: look.inventoryMode }
+        ? { inventoryMode: "combined" }
         : {}),
       operations: look.operations,
       uploadStatus: "verified",
@@ -371,7 +456,17 @@ export class CreateSession {
             this.prepared.delete(key);
     }
     this.remember();
-    for (const operation of look.operations.filter(active)) {
+    for (const operation of look.operations.filter(
+      (op) =>
+        op.inputRevision === look.revision &&
+        op.assetId === look.inspirationImage?.assetId &&
+        op.runtimeVersion === op.currentRuntimeVersion &&
+        (active(op) ||
+          (op.kind === "inspiration_description" &&
+            op.status === "failed" &&
+            !look.pieces.length &&
+            !this.terminalReplays.has(`${this.generation}:${op.id}`))),
+    )) {
       if (
         ![
           "inspiration_description",
@@ -382,7 +477,8 @@ export class CreateSession {
         ].includes(operation.kind)
       )
         continue;
-      this.execute(operation.id);
+      if (active(operation)) this.execute(operation.id);
+      else this.terminalReplays.add(`${this.generation}:${operation.id}`);
       this.observe(operation.id);
     }
   }
@@ -562,10 +658,6 @@ export class CreateSession {
       await this.reloadLook(verified.lookId, true);
       await retainPendingFile(this.scope, null);
       this.remember();
-      await Promise.allSettled([
-        this.start("inspiration_description"),
-        this.start("inspiration_confidence"),
-      ]);
     } catch (error) {
       if (generation === this.generation) {
         this.update({ uploadStatus: "failed" });
@@ -618,7 +710,7 @@ export class CreateSession {
   }
   start(kind: string, force = false) {
     if (!this.writesEnabled) return Promise.resolve();
-    const mode = this.state.inventoryMode;
+    const mode = "combined";
     const key = `${this.state.look?.id}:${this.state.look?.revision}:${this.state.preferenceFingerprint}:${mode}:${kind}`;
     const existing = this.starting.get(key);
     if (existing) return existing;
@@ -661,6 +753,10 @@ export class CreateSession {
     return request;
   }
   private mergeOperation(operation: CreateOperation) {
+    if (operation.kind === "inspiration_description" && active(operation) && operation.id !== this.provisionalSource) {
+      this.provisionalSource = operation.id;
+      this.update({provisional:[]});
+    }
     this.update({
       operations: [
         operation,
@@ -736,7 +832,14 @@ export class CreateSession {
                 const value = z
                   .object({ piece: garmentSchema.safeExtend({ id: z.uuid() }) })
                   .safeParse(event.payload);
-                if (value.success)
+                if (
+                  value.success &&
+                  this.currentOperation("inspiration_description")?.id === id
+                ) {
+                  if (this.provisionalSource !== id) {
+                    this.provisionalSource = id;
+                    this.update({ provisional: [] });
+                  }
                   this.update({
                     provisional: [
                       ...this.state.provisional.filter(
@@ -745,6 +848,7 @@ export class CreateSession {
                       value.data.piece,
                     ],
                   });
+                }
               } else if (event.type === "confidence_completed") {
                 const value = z
                   .object({ review: confidenceSchema })
@@ -766,7 +870,10 @@ export class CreateSession {
             this.mergeOperation(operation);
             failures = 0;
             if (!active(operation)) {
-              if (operation.kind === "inspiration_description")
+              if (
+                operation.kind === "inspiration_description" &&
+                operation.status !== "failed"
+              )
                 this.update({ provisional: [] });
               if (operation.kind === "inspiration_confidence")
                 this.update({ provisionalConfidence: null });
@@ -789,6 +896,15 @@ export class CreateSession {
   }
   async retry(operation: CreateOperation) {
     if (!this.writesEnabled) return;
+    if (!operation.canRetry) {
+      if (operation.canRestart) return this.start(operation.kind, true);
+      this.report(
+        new Error(
+          "This analysis cannot be retried with the same inputs. Review the photo or add pieces manually.",
+        ),
+      );
+      return;
+    }
     const generation = this.generation;
     try {
       const task = (async () => {
@@ -858,7 +974,7 @@ export class CreateSession {
           body: JSON.stringify({
             expectedRevision: look.revision,
             expectedOptionId: option.id,
-            inventoryMode: this.state.inventoryMode,
+            inventoryMode: "combined",
             intentId,
             execute: false,
           }),
@@ -879,7 +995,7 @@ export class CreateSession {
     this.update({ selectedDirection: direction });
     this.remember();
   }
-  setInventoryMode(inventoryMode: "live" | "sample") {
+  setInventoryMode(inventoryMode: "live" | "sample" | "combined") {
     if (
       !this.writesEnabled ||
       [...this.starting.keys()].some((key) =>
@@ -943,7 +1059,12 @@ export class CreateSession {
     return this.saveDraft({ payload });
   }
   async savePieces(
-    pieces: Array<z.input<typeof garmentSchema> & { id?: string }>,
+    pieces: Array<
+      z.input<typeof garmentSchema> & {
+        id?: string;
+        adoptedFromPieceId?: string;
+      }
+    >,
   ) {
     const generation = this.generation;
     const retainedEditor = this.editor;
@@ -951,6 +1072,9 @@ export class CreateSession {
     if (!look) throw new Error("Load the inspiration before editing pieces.");
     const payload = pieces.map((piece) => ({
       ...(piece.id ? { id: piece.id } : {}),
+      ...(piece.adoptedFromPieceId
+        ? { adoptedFromPieceId: piece.adoptedFromPieceId }
+        : {}),
       name: piece.name,
       category: piece.category,
       subcategory: piece.subcategory,
@@ -1026,7 +1150,10 @@ export class CreateSession {
     return this.state.operations.find(
       (op) =>
         op.kind === kind &&
+        op.runtimeVersion === op.currentRuntimeVersion &&
         op.inputRevision === this.state.look?.revision &&
+        (!op.assetId ||
+          op.assetId === this.state.look?.inspirationImage?.assetId) &&
         (!["wardrobe_match", "outfit_options"].includes(kind) ||
           op.inventoryMode === this.state.inventoryMode),
     );
@@ -1051,7 +1178,7 @@ export function useCreateSession(scope: string) {
   return { session, state };
 }
 export function canonicalEdit(
-  piece: CanonicalPiece | undefined,
+  piece: ProvisionalPiece | undefined,
   values: PieceEditValues,
 ) {
   const attributes: CanonicalPiece["attributes"] =

@@ -74,6 +74,7 @@ export const draftPayloadSchema = z.strictObject({
 });
 export const saveDraftSchema = z.strictObject({
   expectedRevision: revisionSchema,
+  occasion: z.string().trim().max(120).optional(),
   proposals: z.array(proposalSchema.omit({ original: true })).max(24),
 });
 export const uploadSchema = z.strictObject({

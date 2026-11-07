@@ -7,7 +7,14 @@ export type WardrobeMatch = {
   id: string;
   outcome: "owned_match" | "wardrobe_alternative" | "missing";
   inspiration: { name: string; category?: string; summary?: string };
-  wardrobeItem?: { id: string; name: string; imageUrl?: string | null } | null;
+  wardrobeItem?: {
+    id: string;
+    name: string;
+    imageUrl?: string | null;
+    sourceType?: string;
+    inventoryStatus?: string;
+    archivedAt?: string | null;
+  } | null;
   sharedAttributes?: string[];
   differences?: string[];
   explanation?: string | null;
@@ -76,7 +83,7 @@ export function MatchSummary({ matches }: { matches: WardrobeMatch[] }) {
           <span className={styles.summaryIcon}>
             <Icon name="swap" className="size-5" />
           </span>
-          Alternative in your wardrobe
+          Alternative item
         </span>
         <strong className="block font-serif text-3xl font-normal leading-none sm:order-2">
           {counts.wardrobe_alternative}
@@ -166,6 +173,13 @@ export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
             <Badge tone={outcomeTone[match.outcome]}>
               {outcomeLabel[match.outcome]}
             </Badge>
+            {match.wardrobeItem?.sourceType === "sample" && (
+              <Badge>Example item</Badge>
+            )}
+            {match.wardrobeItem?.archivedAt && <Badge>Archived</Badge>}
+            {match.wardrobeItem?.inventoryStatus === "saved_candidate" && (
+              <Badge>Saved candidate · not owned</Badge>
+            )}
           </div>
           {match.sharedAttributes?.length ? (
             <div className="mt-2 hidden flex-wrap gap-1 sm:flex">

@@ -21,7 +21,17 @@ export type WardrobeProposal = {
 
 export type WardrobeIntakeProps = {
   open: boolean;
-  status: "empty" | "uploading" | "analyzing" | "ready" | "error" | "added";
+  status:
+    | "empty"
+    | "uploading"
+    | "photo_ready"
+    | "analyzing"
+    | "ready"
+    | "error"
+    | "added";
+  imageUrl?: string | null;
+  occasion?: string;
+  onOccasionChange?: (value: string) => void;
   proposals: WardrobeProposal[];
   selectedProposalId?: string;
   errorMessage?: string;
@@ -51,6 +61,9 @@ export type WardrobeIntakeProps = {
 export function WardrobeIntake({
   open,
   status,
+  imageUrl,
+  occasion = "",
+  onOccasionChange,
   proposals,
   selectedProposalId,
   errorMessage,
@@ -142,6 +155,28 @@ export function WardrobeIntake({
           {inlineError}
         </p>
       )}
+      {imageUrl &&
+        (status === "photo_ready" || status === "error") &&
+        onOccasionChange && (
+          <label className={styles.occasionField}>
+            <span>
+              Occasion{" "}
+              <span className="text-secondary">(required for analysis)</span>
+            </span>
+            <input
+              value={occasion}
+              required
+              maxLength={120}
+              disabled={busy}
+              placeholder="For example, work or a weekend outing"
+              onChange={(event) => onOccasionChange(event.target.value)}
+            />
+            <small>
+              Descriptions start automatically after your verified photo and
+              occasion are saved.
+            </small>
+          </label>
+        )}
 
       {status === "empty" ? (
         <div className={styles.uploadPrompt}>
@@ -166,10 +201,47 @@ export function WardrobeIntake({
             wardrobe workspace.
           </small>
         </div>
+      ) : status === "photo_ready" ? (
+        <div className={styles.uploadPrompt}>
+          <div className={styles.readyPhoto}>
+            <WardrobePreviewImage
+              fallbackUrl={imageUrl}
+              alt="Uploaded wardrobe photo"
+              retryable
+            />
+          </div>
+          <h3>Your photo is ready</h3>
+          <p>
+            {occasion.trim()
+              ? "Your occasion is being saved before descriptions start."
+              : "Add an occasion to start garment descriptions, or enter the details yourself."}
+          </p>
+          <div className={styles.errorActions}>
+            <Button variant="secondary" onClick={chooseFile} disabled={busy}>
+              Replace photo
+            </Button>
+            {onManualEntry && (
+              <Button
+                variant="secondary"
+                onClick={onManualEntry}
+                disabled={busy}
+              >
+                Enter details manually
+              </Button>
+            )}
+          </div>
+        </div>
       ) : status === "uploading" || status === "analyzing" ? (
         <div className={styles.progress} role="status" aria-live="polite">
           <div className={styles.progressImage}>
-            <Icon name="image" size={32} />
+            {imageUrl ? (
+              <WardrobePreviewImage
+                fallbackUrl={imageUrl}
+                alt="Uploaded wardrobe photo"
+              />
+            ) : (
+              <Icon name="image" size={32} />
+            )}
           </div>
           <span className={styles.progressIcon}>
             <Icon name="sparkle" size={18} />
