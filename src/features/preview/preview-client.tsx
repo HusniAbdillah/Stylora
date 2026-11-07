@@ -110,7 +110,9 @@ export function PreviewClient({
       if (
         !draft.current.draftId ||
         !initial.writesEnabled ||
-        openingPreferences.current
+        openingPreferences.current ||
+        (mode === "resume" &&
+          latestSelection.current !== persistedSelection.current)
       )
         return;
       const launchKey = `${draft.current.draftId}:${draft.current.revision}:${preferenceRevision.current}:${mode}`;
@@ -189,6 +191,8 @@ export function PreviewClient({
         pendingRender.current = undefined;
         setOperationId(result.operationId);
         setJob(result.job);
+        if (result.preferenceRevision !== preferenceRevision.current)
+          refreshPreferences.current = true;
         preferenceRevision.current = result.preferenceRevision;
         setImageOutdated(result.imageOutdated);
         setStaleNotice(result.staleNotice);
@@ -224,6 +228,7 @@ export function PreviewClient({
       !initial.writesEnabled ||
       !Object.keys(initial.selection).length ||
       !initial.selectionValid ||
+      persistedSelection.current !== latestSelection.current ||
       initial.job.status === "unavailable" ||
       initial.job.status === "succeeded" ||
       initial.job.status === "failed" ||
