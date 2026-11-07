@@ -25,22 +25,24 @@ selection rather than separate single and combination modes.
 
 ## Documentation map
 
-| Document                                                                                   | Purpose                                                              |
-| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| [PRD.md](PRD.md)                                                                           | Product requirements and acceptance IDs                              |
-| [TDD.md](TDD.md)                                                                           | Routes, contracts, data model, background execution and verification |
-| [DESIGN.md](DESIGN.md)                                                                     | Brand, palette, layout, interaction, motion and responsive behavior  |
-| [FASHION-STRUCTURE.md](FASHION-STRUCTURE.md)                                               | Canonical item taxonomy, attributes, provenance and explanations     |
-| [FASHION-PROMPT.md](FASHION-PROMPT.md)                                                     | Runtime fashion instruction for every fashion AI task                |
-| [FASHION.md](FASHION.md)                                                                   | Fashion reasoning handbook and prompt-budget research                |
-| [TASK.md](TASK.md)                                                                         | Four-owner assignments and checkpoints                               |
-| [WORKFLOW.md](WORKFLOW.md)                                                                 | Environments, Git rhythm, Figma handoff and detailed TODO            |
-| [REVISION-FLOW.md](REVISION-FLOW.md)                                                       | Team design decisions traced to requirements and Figma frames        |
-| [PROGRESS-NEW.md](PROGRESS-NEW.md)                                                         | Progress and evidence template                                       |
-| [RULES.md](RULES.md)                                                                       | Product, engineering and integrity rules                             |
-| [AGENTS.md](../AGENTS.md)                                                                     | Instructions for coding agents                                       |
-| [DATABASE.md](DATABASE.md) | Owner 3 backend brief                                                |
-| `../assets/` | Logo SVGs and app icons                                              |
+| Document                                     | Purpose                                                              |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| [PRD.md](PRD.md)                             | Product requirements and acceptance IDs                              |
+| [TDD.md](TDD.md)                             | Routes, contracts, data model, background execution and verification |
+| [DESIGN.md](DESIGN.md)                       | Brand, palette, layout, interaction, motion and responsive behavior  |
+| [FASHION-STRUCTURE.md](FASHION-STRUCTURE.md) | Canonical item taxonomy, attributes, provenance and explanations     |
+| [FASHION-PROMPT.md](FASHION-PROMPT.md)       | Runtime fashion instruction for every fashion AI task                |
+| [FASHION.md](FASHION.md)                     | Fashion reasoning handbook and prompt-budget research                |
+| [TASK.md](TASK.md)                           | Four-owner assignments and checkpoints                               |
+| [WORKFLOW.md](WORKFLOW.md)                   | Environments, Git rhythm, Figma handoff and detailed TODO            |
+| [REVISION-FLOW.md](REVISION-FLOW.md)         | Team design decisions traced to requirements and Figma frames        |
+| [PROGRESS-NEW.md](PROGRESS-NEW.md)           | Progress and evidence template                                       |
+| [RULES.md](RULES.md)                         | Product, engineering and integrity rules                             |
+| [AGENTS.md](../AGENTS.md)                    | Instructions for coding agents                                       |
+| [AGENT-PLAYBOOK.md](AGENT-PLAYBOOK.md)       | Running four parallel Codex sessions, skills and merge rhythm        |
+| [DATABASE.md](DATABASE.md)                   | Owner 3 backend brief                                                |
+| `../assets/`                                 | Logo SVGs and app icons                                              |
+| `../.agents/skills/`                         | Project skills for Codex                                             |
 
 The visual source is the
 [Stylora Design System](https://www.figma.com/design/ta9JYu4Q7fLWeuu0PJgWhp/Stylora-Design-System)

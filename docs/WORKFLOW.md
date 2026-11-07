@@ -314,7 +314,9 @@ exact checks run and anything not run.
 
 This section lets a coding agent deliver its own assigned task through git with
 self-evaluation and without waiting at every step, while keeping `main`
-deployable. [AGENTS.md](../AGENTS.md) holds the binding summary. An explicit
+deployable. [AGENTS.md](../AGENTS.md) holds the binding summary and
+[AGENT-PLAYBOOK.md](AGENT-PLAYBOOK.md) explains how four parallel sessions use
+it, with the project skills in `.agents/skills/`. An explicit
 instruction in the current task, for example "do not commit" or "skip tests",
 overrides this section.
 
@@ -329,9 +331,9 @@ overrides this section.
 
 ### 10.2 Commits
 
-- Commit as soon as one logical slice works, roughly every 15 to 30 minutes and
-  at most about 150 changed lines. Do not batch a whole feature into one commit
-  and do not commit broken code.
+- Commit as soon as one logical slice works, roughly every 15 to 30 minutes. Do
+  not batch a whole feature into one commit. A commit may be mid-feature; the
+  pull request is squash-merged, so no check runs per commit.
 - Format `type(scope): imperative subject`, subject at most 72 characters, no
   trailing period. Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`,
   `perf`, `style`. Scope is the feature folder, for example
@@ -341,37 +343,38 @@ overrides this section.
   each commit. Never `git add -A` or `git add .`.
 - Keep migrations, generated types and the code that uses them in separate
   commits so a revert stays clean. Only Owner 1 commits `supabase/**`.
-- Run the fast gate (`make fast`) before every commit. Never use `--no-verify`.
-  Do not amend or rewrite commits that were already pushed.
+- Never use `--no-verify`. If a repository hook runs, let it finish. Do not
+  amend or rewrite commits that were already pushed.
 
 ### 10.3 Pull request
 
-Open the pull request when the task slice is complete and Tier 1 below has
-passed. Use `.github/pull_request_template.md`.
+Open the pull request as soon as the task slice works and `make fast` passed
+once. Use `.github/pull_request_template.md`, filled briefly.
 
 - Title in the same Conventional Commits form. Target `main`.
-- Body: summary, task and requirement IDs, Figma frame IDs, lane (A or B),
-  checks run and not run, screenshot or preview link for UI, limits, and the
-  PROGRESS-NEW.md row.
+- Body: two-line summary, task and Figma frame IDs, lane (A or B), checks run
+  and not run, limits. Skip long prose.
 - Keep it under roughly 400 changed lines. If it grows, split it.
-- Rebase on `origin/main` right before opening it and again before merging.
+- Rebase only when GitHub reports a conflict or the branch is behind in a way
+  that matters. CI on a pull request already tests the merge with current `main`.
 
 ### 10.4 Test budget for a seven-hour build
 
-Run the cheapest check that can catch the risk. The goal is a trustworthy
-`main`, not full coverage.
+Speed first. CI is the real gate: it runs `pnpm check` and `pnpm build` on every
+pull request, so local checks only need to catch obvious mistakes before the
+push. Do not duplicate CI locally.
 
 | Tier | When                          | Command                                | Target time |
 | ---- | ----------------------------- | -------------------------------------- | ----------- |
-| 0    | Before every commit           | `make fast` (lint and typecheck)       | under 1 min |
-| 1    | Once before opening the PR    | `make check` (adds unit tests)         | under 3 min |
-| 2    | Only if the diff can break it | `make build`                           | CI runs it  |
+| 0    | Per commit                    | Nothing                                | 0           |
+| 1    | Once before opening the PR    | `make fast` (lint and typecheck)       | under 1 min |
+| 2    | CI on the pull request        | `pnpm check` and `pnpm build`          | automatic   |
 | 3    | UI changes, one pass          | Click the changed flow once on preview | 2 to 5 min  |
 
-- Run a local `make build` only when the diff touches `package.json`, the
-  lockfile, `next.config.ts`, route segments, layouts, `loading.tsx`, env or
-  config code, or a server-only boundary. Otherwise CI's build on the pull
-  request is enough.
+- Run `make test` before the PR only when the diff touches code that already has
+  a test file, for example config, schemas, scoping or matching gates.
+- Run a local `make build` only to debug a CI build failure, or when you change
+  `package.json`, the lockfile or `next.config.ts` and want an early signal.
 - Docs-only changes need no tests; run the formatter on the changed Markdown.
 - Write new tests only where a defect is costly and cheap to catch: workspace
   scoping and parent membership, Zod contracts and provider-output validation,
@@ -387,22 +390,21 @@ Run the cheapest check that can catch the risk. The goal is a trustworthy
 - Provider or database checks that spend quota or touch shared data are not part
   of this lane. They follow the budget in section 1 and need task authorization.
 
-### 10.5 Self-review before opening and before merging
+### 10.5 Self-review, one quick pass before the pull request
 
-Read the whole `git diff origin/main...HEAD` once and confirm:
+Skim `git diff origin/main...HEAD` once. Five questions, no more:
 
-- [ ] Only files for this task changed; no unrelated, generated or local files.
-- [ ] No secrets, signed URLs, personal payloads or raw provider output in code,
-      logs or fixtures.
-- [ ] Every read, write and child lookup is scoped to server-side
-      `STYLORA_WORKSPACE_ID`; no client workspace ID is accepted.
-- [ ] Inputs, actions and provider output are validated with Zod.
+- [ ] Only files for this task changed, nothing local or unrelated.
+- [ ] No secrets, signed URLs, personal payloads or raw provider output.
+- [ ] Reads and writes scoped to server-side `STYLORA_WORKSPACE_ID`; inputs and
+      provider output validated with Zod.
 - [ ] No invented IDs, scores or model output; failures show an unavailable
-      state, samples are labeled.
-- [ ] Tokens and shared primitives are used; no raw hex; loading, empty, error
-      and retry states exist.
-- [ ] No leftover `console.log`, commented-out code or TODO without a task ID.
-- [ ] The PROGRESS-NEW.md row states the checks actually run and those not run.
+      state; samples are labeled.
+- [ ] No leftover `console.log` or commented-out code, and the PROGRESS-NEW.md
+      row says which checks ran and which did not.
+
+The design checks (tokens, states, accessibility) are covered by the Figma
+comparison in section 4 and the definition of done, not repeated here.
 
 ### 10.6 Merge lanes
 
@@ -416,25 +418,29 @@ Lane B; split it when practical.
 
 Lane A merge conditions, all required:
 
-1. Self-review in 10.5 is done and the diff matches Lane A.
-2. The required CI check is green on the latest pushed commit.
-3. GitHub reports the pull request mergeable and no review comment or requested
-   change is unresolved.
-4. The branch is rebased on the current `origin/main`, and Tier 0 passed after
-   the rebase.
-5. The time is before the 05:15 last feature merge. Between 05:15 and 06:00 only
+1. The quick self-review in 10.5 is done and the diff matches Lane A.
+2. The time is before the 05:15 last feature merge. Between 05:15 and 06:00 only
    a blocker fix with a reason in the pull request body; after 06:00 do not
    merge without a human.
-6. The merge uses `gh pr merge --squash --delete-branch`, without `--admin` and
-   without bypassing branch protection. If protection requires an approval the
+3. The merge is gated by CI, not by the agent waiting for it. Run
+   `gh pr merge --squash --auto --delete-branch` right after opening the pull
+   request. GitHub merges it when the required check is green and the pull
+   request is mergeable, then the agent moves to the next task. Never use
+   `--admin` or bypass branch protection.
+4. If auto-merge is not enabled on the repository, run
+   `gh pr checks --watch` once with a 10 minute limit, then
+   `gh pr merge --squash --delete-branch`. If protection requires an approval the
    agent cannot supply, leave the pull request open and report it.
+5. If CI turns red, fix and push, at most two attempts, then stop and report.
+   Auto-merge cancels itself when new commits fail the check.
 
-After merging: `git switch main`, `git pull --ff-only`, delete the local branch,
-confirm the Vercel preview or production deploy for `main` is healthy when
-visible, and report the pull request link.
+After the pull request merges: `git switch main`, `git pull --ff-only`, delete
+the local branch, and report the pull request link. Look at the deploy only if
+something looks wrong.
 
-Team setting to decide at the start: for Lane A to work, branch protection on
-`main` must not require a human approval, only the green `Check` workflow. If the
+Team settings to decide at the start: enable "Allow auto-merge" on the
+repository, and for Lane A to work, branch protection on `main` must not require
+a human approval, only the green `Check` workflow. If the
 team keeps one required approval, Lane A agents stop after opening the pull
 request and the rotation in section 3 merges it. Lane B always keeps the
 reviewer rotation.
