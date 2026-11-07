@@ -91,6 +91,26 @@
   min-width: 0;
   gap: 0.375rem;
 }
+.links a {
+  position: relative;
+}
+.navigationPending {
+  margin-left: auto;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.navigationPending > span:first-child {
+  opacity: 0;
+}
+.navigationPending[data-pending="true"] > span:first-child {
+  opacity: 1;
+}
+[data-rail="true"] .navigationPending {
+  position: absolute;
+  inset-inline-end: 2px;
+  bottom: 2px;
+}
 .links a,
 .unavailable,
 .resume,

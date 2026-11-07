@@ -172,7 +172,7 @@ export function presentPreferences(
 
 export function presentMatches(
   look: CreateLook,
-  mode?: "live" | "sample",
+  mode?: "live" | "sample" | "combined",
 ): WardrobeMatch[] {
   return look.matches
     .filter((match) => !match.stale && (!mode || match.inventoryMode === mode))
@@ -180,6 +180,8 @@ export function presentMatches(
       id: match.id,
       outcome: match.outcome,
       inspiration: {
+        category: look.pieces.find((piece) => piece.id === match.pieceId)
+          ?.category,
         name:
           look.pieces.find((piece) => piece.id === match.pieceId)?.name ??
           "Reviewed piece",
@@ -188,6 +190,9 @@ export function presentMatches(
         ? {
             id: match.wardrobeItem.id,
             name: match.wardrobeItem.name,
+            sourceType: match.wardrobeItem.sourceType,
+            inventoryStatus: match.wardrobeItem.inventoryStatus,
+            archivedAt: match.wardrobeItem.archivedAt,
             imageUrl: match.wardrobeItem.image?.url ?? null,
           }
         : null,
@@ -245,7 +250,7 @@ export function presentMatches(
 export function presentIdeas(
   look: CreateLook,
   operations: CreateOperation[],
-  mode?: "live" | "sample",
+  mode?: "live" | "sample" | "combined",
 ): OutfitIdea[] {
   return look.outfitOptions
     .filter(

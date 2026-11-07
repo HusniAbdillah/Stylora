@@ -10,5 +10,13 @@ export default async function InspirationPage({
   const query = await searchParams;
   const parsed = z.uuid().optional().safeParse(query.draft);
   if (!parsed.success) notFound();
-  return <CreatePage key={parsed.data ?? "new"} draftId={parsed.data} />;
+  const sample = z.literal("1").optional().safeParse(query.sample);
+  if (!sample.success || (sample.data && parsed.data)) notFound();
+  return (
+    <CreatePage
+      key={parsed.data ?? (sample.data ? "sample" : "new")}
+      draftId={parsed.data}
+      samplePhoto={Boolean(sample.data)}
+    />
+  );
 }

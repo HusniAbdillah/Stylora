@@ -31,28 +31,32 @@ export function WorkspaceTopBar({
   const feedback = draftStatus && draftFeedback[draftStatus];
   return (
     <header className="hidden min-h-11 items-center justify-between gap-4 text-control md:flex">
-      <nav aria-label="Breadcrumb">
-        <ol className="flex flex-wrap items-center gap-2 text-muted">
-          {breadcrumbs.map(({ label, href }, i) => (
-            <li key={href ?? label} className="flex items-center gap-2">
-              {i > 0 && <span aria-hidden="true">›</span>}
-              {href && i < breadcrumbs.length - 1 ? (
-                <Link href={href} className="hover:underline">
-                  {label}
-                </Link>
-              ) : (
-                <span
-                  aria-current={
-                    i === breadcrumbs.length - 1 ? "page" : undefined
-                  }
-                >
-                  {label}
-                </span>
-              )}
-            </li>
-          ))}
-        </ol>
-      </nav>
+      {breadcrumbs.length > 1 ? (
+        <nav aria-label="Breadcrumb">
+          <ol className="flex flex-wrap items-center gap-2 text-muted">
+            {breadcrumbs.map(({ label, href }, i) => (
+              <li key={href ?? label} className="flex items-center gap-2">
+                {i > 0 && <span aria-hidden="true">›</span>}
+                {href && i < breadcrumbs.length - 1 ? (
+                  <Link href={href} className="hover:underline">
+                    {label}
+                  </Link>
+                ) : (
+                  <span
+                    aria-current={
+                      i === breadcrumbs.length - 1 ? "page" : undefined
+                    }
+                  >
+                    {label}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ol>
+        </nav>
+      ) : (
+        <span aria-hidden="true" />
+      )}
       <div className="flex shrink-0 items-center gap-4">
         {contextLabel && (
           <span className="text-metadata text-muted">{contextLabel}</span>

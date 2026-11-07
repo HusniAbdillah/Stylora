@@ -62,13 +62,12 @@ export function WardrobeGrid({
     <section className={styles.wardrobe} aria-labelledby="wardrobe-title">
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Your wardrobe</p>
           <h1 className={styles.title} id="wardrobe-title">
-            Everything you <em>own.</em>
+            Wardrobe
           </h1>
           <p className={styles.intro}>
-            Only owned pieces are used for matches, outfit ideas and capsules.
-            Saved shopping candidates stay labeled until you mark them owned.
+            Manage owned pieces and saved shopping candidates. Matches and
+            capsules use owned pieces only.
           </p>
         </div>
         <div className={styles.headerAction}>

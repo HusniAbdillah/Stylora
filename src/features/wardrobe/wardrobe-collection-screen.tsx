@@ -123,7 +123,9 @@ export function WardrobeCollectionScreen({
   );
   const [error, setError] = useState(initialError);
   const [ready, setReady] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   async function refresh() {
+    setRefreshing(true);
     try {
       const result = await wardrobeRequest<{ items: CanonicalWardrobeItem[] }>(
         "",
@@ -138,6 +140,7 @@ export function WardrobeCollectionScreen({
       );
     } finally {
       setReady(true);
+      setRefreshing(false);
     }
   }
   useEffect(() => {
@@ -211,14 +214,6 @@ export function WardrobeCollectionScreen({
 
   return (
     <>
-      {error && (
-        <div className={styles.messageCard} role="alert">
-          <p>{error}</p>
-          <Button variant="secondary" onClick={() => void refresh()}>
-            Retry wardrobe
-          </Button>
-        </div>
-      )}
       {!writesEnabled && (
         <p role="status">
           This workspace is read only. Saved pieces are available to browse.
@@ -242,6 +237,16 @@ export function WardrobeCollectionScreen({
         onAddItem={() => updateView({ add: "1" })}
         onOpenItem={openItem}
       />
+
+      <Button
+        variant="quiet"
+        disabled={refreshing}
+        onClick={() => void refresh()}
+        className="mt-4"
+      >
+        <Icon name="refresh" size={16} />
+        {refreshing ? "Refreshing wardrobe" : "Refresh wardrobe"}
+      </Button>
 
       {records.some((item) => item.isSample) && (
         <p className={styles.sampleCaption}>

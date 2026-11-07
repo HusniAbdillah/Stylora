@@ -23,43 +23,50 @@ const labels = {
 } as const;
 
 export function LandingDemo({ sample }: { sample?: LandingSample }) {
-  const [stage, setStage] = useState(1);
+  const [stage, setStage] = useState(0);
   const [paused, setPaused] = useState(false);
   const [visible, setVisible] = useState(true);
+  const [pageVisible, setPageVisible] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReducedMotion(media.matches);
+    const updateVisibility = () =>
+      setPageVisible(document.visibilityState === "visible");
     update();
+    updateVisibility();
     media.addEventListener("change", update);
+    document.addEventListener("visibilitychange", updateVisibility);
     const observer = new IntersectionObserver(([entry]) =>
       setVisible(entry.isIntersecting),
     );
     if (containerRef.current) observer.observe(containerRef.current);
     return () => {
       media.removeEventListener("change", update);
+      document.removeEventListener("visibilitychange", updateVisibility);
       observer.disconnect();
     };
   }, []);
 
   useEffect(() => {
-    if (paused || reducedMotion || !visible || !sample) return;
+    if (paused || reducedMotion || !visible || !pageVisible || !sample) return;
     const timer = window.setInterval(
       () => setStage((current) => (current + 1) % stages.length),
       1500,
     );
     return () => window.clearInterval(timer);
-  }, [paused, reducedMotion, visible, sample]);
+  }, [paused, reducedMotion, visible, pageVisible, sample]);
 
-  const frame = reducedMotion ? 2 : stage;
+  const frame = stage;
   return (
     <div
       ref={containerRef}
       className={styles.demo}
-      aria-label="Illustrative Stylora demonstration"
+      aria-label="Stylora process preview"
       data-stage={frame}
+      data-paused={paused || !visible || !pageVisible || reducedMotion}
     >
       <div className={styles.demoCircle} />
       <Image
@@ -71,9 +78,7 @@ export function LandingDemo({ sample }: { sample?: LandingSample }) {
         alt="Sample outfit inspiration"
         className={styles.demoPhoto}
       />
-      <span className={styles.demoLabel}>
-        {sample ? "Illustrative sample, no live AI" : "Sample unavailable"}
-      </span>
+      {!sample && <span className={styles.demoLabel}>Sample unavailable</span>}
       {sample && (
         <>
           <div className={styles.scan} aria-hidden="true" />

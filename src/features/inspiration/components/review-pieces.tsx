@@ -20,6 +20,8 @@ export type ReviewPiecesProps = {
   onEditPiece?: (piece: DetectedPiece) => void;
   onRemovePiece?: (piece: DetectedPiece) => void;
   onRetryDescription?: () => void;
+  retryDescriptionLabel?: string;
+  provisional?: boolean;
   onRetryConfidence?: () => void;
 };
 
@@ -315,6 +317,8 @@ export function ReviewPieces({
   onEditPiece,
   onRemovePiece,
   onRetryDescription,
+  retryDescriptionLabel = "Retry descriptions",
+  provisional = false,
   onRetryConfidence,
 }: ReviewPiecesProps) {
   const remaining = Math.max(
@@ -356,7 +360,9 @@ export function ReviewPieces({
               type="button"
               variant="primary"
               onClick={onMatch}
-              disabled={pieces.length === 0 || descriptionPending}
+              disabled={
+                pieces.length === 0 || descriptionPending || provisional
+              }
             >
               Match wardrobe
             </Button>
@@ -365,7 +371,11 @@ export function ReviewPieces({
                 ? "Matching is ready for this version"
                 : matchStatus === "running"
                   ? "Matching is in progress"
-                  : "Matches use reviewed pieces"}
+                  : provisional
+                    ? "Apply a provisional piece or complete analysis before matching"
+                    : pieces.length === 0
+                      ? "Complete analysis or add a piece before matching"
+                      : "Matches use reviewed pieces"}
             </p>
           </div>
         )}
@@ -438,6 +448,17 @@ export function ReviewPieces({
               </Button>
             )}
           </div>
+          {provisional && (
+            <p role="status" className="mb-3 text-sm text-secondary">
+              Provisional pieces are not saved yet. Review and apply a piece in
+              the editor before matching.
+            </p>
+          )}
+          {!pieces.length && !descriptionPending && (
+            <p className="mb-3 text-sm text-secondary">
+              Complete analysis or add a piece before matching your wardrobe.
+            </p>
+          )}
           <div className="space-y-3">
             {pieces.map((piece, index) => (
               <DetectedPieceCard
@@ -495,7 +516,7 @@ export function ReviewPieces({
                     onClick={onRetryDescription}
                     className="mt-3"
                   >
-                    Retry descriptions
+                    {retryDescriptionLabel}
                   </Button>
                 )}
               </div>
@@ -531,7 +552,9 @@ export function ReviewPieces({
               type="button"
               variant="primary"
               onClick={onMatch}
-              disabled={pieces.length === 0 || descriptionPending}
+              disabled={
+                pieces.length === 0 || descriptionPending || provisional
+              }
             >
               Match wardrobe
             </Button>

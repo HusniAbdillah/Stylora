@@ -31,13 +31,21 @@ export function WardrobeIntakeFlow({
   const current = useRef(draft);
   const [selectedId, setSelectedId] = useState<string>();
   const [stage, setStage] = useState<
-    "empty" | "uploading" | "analyzing" | "ready" | "error" | "added"
+    | "empty"
+    | "uploading"
+    | "photo_ready"
+    | "analyzing"
+    | "ready"
+    | "error"
+    | "added"
   >("empty");
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [provisionalCount, setProvisionalCount] = useState(0);
   const [watchingDraft, setWatchingDraft] = useState<string>();
   const [fieldText, setFieldText] = useState<Record<string, string>>({});
+  const [occasion, setOccasion] = useState("");
+  const occasionVersion = useRef(0);
   const [confirmation, setConfirmation] = useState<
     "discard" | "replace" | null
   >(null);
@@ -45,19 +53,91 @@ export function WardrobeIntakeFlow({
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const dirty = useRef(false);
   const mutationVersion = useRef(0);
+  const runningOperations = useRef(new Map<string, Promise<void>>());
 
   const accept = useCallback((next: WardrobeDraft) => {
     current.current = next;
     setDraft(next);
     draftPointer(pointer, next.id);
   }, []);
-  function report(failure: unknown) {
+  const report = useCallback((failure: unknown) => {
     setError(
       failure instanceof Error
         ? failure.message
         : "The draft could not be saved. Try again.",
     );
-  }
+  }, []);
+  const runExistingAnalysis = useCallback(
+    (operationId: string) => {
+      const existing = runningOperations.current.get(operationId);
+      if (existing) return existing;
+      const task = (async () => {
+        setBusy(true);
+        setStage("analyzing");
+        setProvisionalCount(0);
+        try {
+          const response = await fetch(
+            `/api/wardrobe/operations/${operationId}/run`,
+            { method: "POST" },
+          );
+          if (!response.body)
+            throw new Error(
+              "Photo description could not start. Retry or enter details manually.",
+            );
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let pending = "";
+          let complete = false;
+          while (true) {
+            const { value, done } = await reader.read();
+            pending += decoder.decode(value, { stream: !done });
+            const lines = pending.split("\n");
+            pending = lines.pop() ?? "";
+            for (const line of lines) {
+              if (!line) continue;
+              const message = JSON.parse(line);
+              if (message.type === "piece")
+                setProvisionalCount(message.index + 1);
+              if (message.type === "error")
+                throw new Error(
+                  message.error?.message ??
+                    "Description is unavailable. Retry or enter details manually.",
+                );
+              if (message.type === "complete") {
+                complete = true;
+                accept(message.data.draft);
+                if (message.data.operation.status !== "succeeded")
+                  throw new Error(
+                    "Photo description could not finish. Retry or enter details manually.",
+                  );
+                setSelectedId(message.data.draft.payload.proposals[0]?.id);
+                setStage("ready");
+              }
+            }
+            if (done) break;
+          }
+          if (!complete)
+            throw new Error(
+              "Description was interrupted. Your photo is saved; retry the description.",
+            );
+        } catch (failure) {
+          setError(
+            failure instanceof Error
+              ? failure.message
+              : "Photo description could not finish. Retry or enter details manually.",
+          );
+          setStage("error");
+          throw failure;
+        } finally {
+          runningOperations.current.delete(operationId);
+          setBusy(false);
+        }
+      })();
+      runningOperations.current.set(operationId, task);
+      return task;
+    },
+    [accept],
+  );
   useEffect(() => {
     if (!open || current.current) return;
     let active = true;
@@ -71,6 +151,11 @@ export function WardrobeIntakeFlow({
             return;
           }
           accept(saved);
+          setOccasion(
+            typeof saved.payload.metadata.occasion === "string"
+              ? saved.payload.metadata.occasion
+              : "",
+          );
           setSelectedId(
             saved.payload.proposals.find((p) => !saved.payload.saved[p.id])?.id,
           );
@@ -78,9 +163,13 @@ export function WardrobeIntakeFlow({
             saved.payload.proposals.length
               ? "ready"
               : saved.assetId
-                ? "error"
+                ? "photo_ready"
                 : "empty",
           );
+          if (saved.assetId && !saved.payload.proposals.length) {
+            setBusy(true);
+            setWatchingDraft(saved.id);
+          }
         })
         .catch((failure) => {
           if (active) report(failure);
@@ -89,7 +178,7 @@ export function WardrobeIntakeFlow({
     return () => {
       active = false;
     };
-  }, [open, accept]);
+  }, [open, accept, report]);
 
   useEffect(() => {
     if (!open || !watchingDraft) return;
@@ -98,7 +187,7 @@ export function WardrobeIntakeFlow({
     async function check() {
       try {
         const state = await wardrobeRequest<{
-          operation: { status: string } | null;
+          operation: { id: string; status: string } | null;
           leaseExpired: boolean;
         }>(`/drafts/${watchingDraft}/analyze`);
         if (!active) return;
@@ -113,16 +202,31 @@ export function WardrobeIntakeFlow({
           );
           setStage("ready");
           setWatchingDraft(undefined);
+          setBusy(false);
+        } else if (!state.operation) {
+          setStage("photo_ready");
+          setError(undefined);
+          setWatchingDraft(undefined);
+          setBusy(false);
+        } else if (
+          state.operation.status === "queued" ||
+          (state.leaseExpired &&
+            ["running", "partial"].includes(state.operation.status))
+        ) {
+          setWatchingDraft(undefined);
+          await runExistingAnalysis(state.operation.id);
         } else if (
           state.operation &&
           ["queued", "running", "partial"].includes(state.operation.status) &&
           !state.leaseExpired
         ) {
           setStage("analyzing");
+          setBusy(true);
           timer = window.setTimeout(() => void check(), 1500);
         } else {
           setStage("error");
           setWatchingDraft(undefined);
+          setBusy(false);
           if (state.leaseExpired)
             setError(
               "Description was interrupted. Your photo is saved; retry the description.",
@@ -133,6 +237,7 @@ export function WardrobeIntakeFlow({
           report(failure);
           setStage("error");
           setWatchingDraft(undefined);
+          setBusy(false);
         }
       }
     }
@@ -141,7 +246,7 @@ export function WardrobeIntakeFlow({
       active = false;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [open, watchingDraft, accept]);
+  }, [open, watchingDraft, accept, runExistingAnalysis, report]);
 
   const flush = useCallback(() => {
     const task = saveQueue.current
@@ -180,7 +285,7 @@ export function WardrobeIntakeFlow({
       void flush().catch(report);
     }, 600);
     return () => window.clearTimeout(timer);
-  }, [draft, flush]);
+  }, [draft, flush, report]);
 
   function edit(id: string, update: (values: ItemValues) => ItemValues) {
     if (!current.current || busy || current.current.payload.saved[id]) return;
@@ -198,62 +303,107 @@ export function WardrobeIntakeFlow({
     accept(next);
     setError(undefined);
   }
-  async function analyze(saved: WardrobeDraft) {
-    setStage("analyzing");
-    setProvisionalCount(0);
-    const op = await wardrobeRequest<{ id: string }>(
-      `/drafts/${saved.id}/analyze`,
-      "POST",
-      { expectedRevision: saved.revision },
-    );
-    const response = await fetch(`/api/wardrobe/operations/${op.id}/run`, {
-      method: "POST",
-    });
-    if (!response.body)
-      throw new Error(
-        "Photo description could not start. Retry or enter details manually.",
+  const analyze = useCallback(
+    async (saved: WardrobeDraft) => {
+      setStage("analyzing");
+      setProvisionalCount(0);
+      const op = await wardrobeRequest<{ id: string }>(
+        `/drafts/${saved.id}/analyze`,
+        "POST",
+        { expectedRevision: saved.revision },
       );
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let pending = "";
-    let complete = false;
-    while (true) {
-      const { value, done } = await reader.read();
-      pending += decoder.decode(value, { stream: !done });
-      const lines = pending.split("\n");
-      pending = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line) continue;
-        const message = JSON.parse(line);
-        if (message.type === "piece") setProvisionalCount(message.index + 1);
-        if (message.type === "error")
-          throw new Error(
-            message.error?.message ??
-              "Description is unavailable. Retry or enter details manually.",
+      await runExistingAnalysis(op.id);
+    },
+    [runExistingAnalysis],
+  );
+  const saveOccasion = useCallback(
+    (value: string) => {
+      const task = saveQueue.current
+        .catch(() => undefined)
+        .then(async () => {
+          const snapshot = current.current;
+          if (!snapshot) return null;
+          if ((snapshot.payload.metadata.occasion ?? "") === value)
+            return snapshot;
+          const saved = await wardrobeRequest<WardrobeDraft>(
+            `/drafts/${snapshot.id}`,
+            "PATCH",
+            {
+              expectedRevision: snapshot.revision,
+              proposals: snapshot.payload.proposals.map(({ id, values }) => ({
+                id,
+                values,
+              })),
+              occasion: value,
+            },
           );
-        if (message.type === "complete") {
-          complete = true;
-          accept(message.data.draft);
-          if (message.data.operation.status !== "succeeded")
-            throw new Error(
-              "Photo description could not finish. Retry or enter details manually.",
-            );
-          setSelectedId(message.data.draft.payload.proposals[0]?.id);
-          setStage("ready");
-        }
-      }
-      if (done) break;
-    }
-    if (!complete)
-      throw new Error(
-        "Description was interrupted. Your photo is saved; retry the description.",
+          if (current.current?.id !== snapshot.id) return null;
+          accept(saved);
+          return saved;
+        });
+      saveQueue.current = task.then(
+        () => undefined,
+        () => undefined,
       );
-  }
+      return task;
+    },
+    [accept],
+  );
+  useEffect(() => {
+    if (
+      !open ||
+      stage !== "photo_ready" ||
+      busy ||
+      confirmation ||
+      !draft?.assetId
+    )
+      return;
+    const value = occasion.trim();
+    if (!value && !draft.payload.metadata.occasion) return;
+    const version = occasionVersion.current;
+    const id = draft.id;
+    const timer = window.setTimeout(() => {
+      setBusy(true);
+      void saveOccasion(value)
+        .then(async (saved) => {
+          if (
+            !saved ||
+            current.current?.id !== id ||
+            version !== occasionVersion.current ||
+            !value
+          )
+            return;
+          setWatchingDraft(undefined);
+          setError(undefined);
+          await analyze(saved);
+        })
+        .catch((failure) => {
+          if (current.current?.id === id) {
+            report(failure);
+            setStage("error");
+          }
+        })
+        .finally(() => setBusy(false));
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [
+    open,
+    stage,
+    busy,
+    confirmation,
+    draft,
+    occasion,
+    saveOccasion,
+    analyze,
+    report,
+  ]);
   async function pick(file: File) {
     setWatchingDraft(undefined);
     setBusy(true);
     setError(undefined);
     setStage("uploading");
+    occasionVersion.current++;
+    setOccasion("");
     try {
       await flush();
       const key = await saveWardrobePhoto(file);
@@ -269,7 +419,10 @@ export function WardrobeIntakeFlow({
       accept(saved);
       await deleteWardrobePhoto(key);
       draftPointer(bufferPointer, null);
-      await analyze(saved);
+      setSelectedId(undefined);
+      setProvisionalCount(0);
+      setFieldText({});
+      setStage("photo_ready");
     } catch (failure) {
       report(failure);
       setStage("error");
@@ -294,6 +447,8 @@ export function WardrobeIntakeFlow({
         accept(uploaded);
         await deleteWardrobePhoto(key);
         draftPointer(bufferPointer, null);
+        setStage("photo_ready");
+        return;
       }
       if (!current.current?.assetId)
         throw new Error("Choose a photo before requesting its description.");
@@ -417,10 +572,30 @@ export function WardrobeIntakeFlow({
         hasDraft={Boolean(draft)}
         provisionalCount={provisionalCount}
         errorMessage={error}
+        occasion={occasion}
+        onOccasionChange={(value) => {
+          occasionVersion.current++;
+          setOccasion(value);
+          if (
+            stage === "error" &&
+            draft?.assetId &&
+            !draft.payload.proposals.length
+          ) {
+            setStage("photo_ready");
+            setError(undefined);
+          }
+        }}
         inlineError={stage !== "error" ? error : undefined}
         descriptionSource={draft?.payload.mode === "live" ? "ai" : "manual"}
         onClose={() => {
-          void flush().then(onClose).catch(report);
+          void flush()
+            .then(() =>
+              draft?.assetId && !draft.payload.proposals.length
+                ? saveOccasion(occasion.trim())
+                : null,
+            )
+            .then(onClose)
+            .catch(report);
         }}
         onPickImage={(file) => {
           if (draft?.assetId) {
@@ -445,6 +620,8 @@ export function WardrobeIntakeFlow({
         }
         onConfirm={(id) => void confirm(id)}
         onRetry={() => void retry()}
+        imageUrl={draft?.imageUrl}
+        retryLabel={draft?.assetId ? "Retry description" : "Retry upload"}
         onManualEntry={draft?.assetId ? () => void manual() : undefined}
         onDiscardDraft={() => setConfirmation("discard")}
         onAddAnother={
