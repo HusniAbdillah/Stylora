@@ -1,14 +1,8 @@
 import { Skeleton } from "@/components/ui";
-import { WorkspaceShell } from "@/components/shell";
 
 export default function LoadingPreview() {
   return (
-    <WorkspaceShell
-      activeHref="/preview"
-      displayName="Studio guest"
-      breadcrumbs={[{ label: "Preview" }]}
-      activity={[]}
-    >
+    <>
       <div
         role="status"
         aria-label="Loading preview"
@@ -21,6 +15,6 @@ export default function LoadingPreview() {
           <Skeleton className="h-64" />
         </div>
       </div>
-    </WorkspaceShell>
+    </>
   );
 }

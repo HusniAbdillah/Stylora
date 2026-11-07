@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { WorkspaceShell } from "@/components/shell";
 import { Button, StateNotice } from "@/components/ui";
 import { CapsuleCollection } from "./capsule-results";
 import type { CapsuleResult } from "./capsule-types";
@@ -31,12 +30,7 @@ export function CapsuleCollectionScreen({
       );
   }
   return (
-    <WorkspaceShell
-      activeHref="/capsules"
-      displayName="Studio guest"
-      activity={[]}
-      breadcrumbs={[{ label: "Capsules" }]}
-    >
+    <>
       {message && (
         <StateNotice title="Collection status">{message}</StateNotice>
       )}
@@ -46,13 +40,6 @@ export function CapsuleCollectionScreen({
         onOpen={(id) => router.push(`/capsules/${id}`)}
         onDelete={(id) => void remove(id)}
       />
-      {!capsules.length && (
-        <div className="mt-6">
-          <StateNotice title="Start with a purpose">
-            Choose a template and owned pieces to build your first capsule.
-          </StateNotice>
-        </div>
-      )}
       {draft && (
         <div className="my-6">
           <StateNotice
@@ -71,6 +58,6 @@ export function CapsuleCollectionScreen({
           </StateNotice>
         </div>
       )}
-    </WorkspaceShell>
+    </>
   );
 }

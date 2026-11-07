@@ -413,7 +413,18 @@ function WorkspaceContents({ children }: { children: ReactNode }) {
         ? [{ label }]
         : [
             { label, href: section === "/wardrobe" ? wardrobeHref : section },
-            { label: section === "/wardrobe" ? "Item details" : "Details" },
+            {
+              label:
+                section === "/wardrobe"
+                  ? "Item details"
+                  : section === "/capsules"
+                    ? pathname === "/capsules/new"
+                      ? "New capsule"
+                      : pathname.includes("/outfits/")
+                        ? "Outfit details"
+                        : "Capsule details"
+                    : "Details",
+            },
           ];
   const resume = draft
     ? {
