@@ -15,6 +15,25 @@
   Browser reload persistence, mobile layout and the over-60 case were not
   exercised. No provider call, hosted mutation, dependency or schema change.
 
+## Owner 1 sidebar edge toggle: 7 November 2026
+
+- The user requested a smooth sidebar toggle anchored to its divider. Moved
+  the existing accessible button out of the changing logo row and centered it
+  on the sidebar edge with a fixed vertical offset. The scrolling content sits
+  inside a separate container so it cannot clip the boundary control.
+- Removed the blank-surface pointer toggle. Expanded and collapsed headers use
+  the same height; icons keep the same left padding. Labels stay mounted and
+  fade while width and chevron rotation share a 220 ms transition. Reduced
+  motion sets the duration to zero. Existing persisted state, destination links,
+  profile access and the mobile drawer are preserved.
+- `pnpm exec vitest run src/components/shell/navigation.test.tsx` passed both
+  tests. `git diff --check` passed. Local `make fast` passed lint and is finishing
+  typecheck. CI remains the complete suite and build gate.
+- Browser verification was attempted against a separate local Next.js server
+  on port 3133. The browser bridge timed out before loading the page; visual
+  alignment, repeated interaction and viewport checks remain unverified.
+  No database, provider, deployment or environment changes were made.
+
 ## Owner 1 demo data enrichment: 7 November 2026
 
 - The user explicitly authorized richer seed data directly in hosted Supabase.
@@ -366,6 +385,7 @@ below the latest one.
 
 ### Owner 1 workspace frontend · 7 November 2026, Asia/Bangkok
 
+- Add Item review now uses direct editable controls, with per-field source badges and pencil toggles removed. Attribute projection matches Item details, including primary and secondary colors, populated category-specific observations, description and subcategory. Manual defaults follow category and accessory subtype. Three projection regressions passed, including retained independent edits and cleared fields. `pnpm check` passed with 295 tests and two opt-in hosted tests skipped. Isolated Chrome at 1440 and 390 px passed direct edit, blur formatting, reload, multi-proposal retention, jewelry field relevance, unchanged original readings and disabled controls during confirmation. Browser mutations were intercepted and no provider calls were made.
 - Item details visual refinement gives Item name and Category outlined surfaces through the shared SelectField variant. Desktop navigation uses a top-corner chevron, Preview uses the image icon, and Profile uses the user icon. Fixed collapsed rail intrinsic sizing and hidden profile text. Chrome passed sidebar checks at 1440, 850 and 390 px and live field checks at 1440, 390 and 360 px on port 3011, with mutations blocked. `pnpm check` passed 243 tests with two opt-in hosted tests skipped.
 - Wardrobe item details now edit name, category, description, attributes and notes inline, with Save changes and a browser draft that survives reload. Permanent deletion replaces archive and restore. The detail photo replacement control was removed. Fixed editor draft validation by projecting canonical items onto the editable fields before strict parsing.
 - Applied `20261107065738_wardrobe_permanent_delete.sql` to the hosted Stylora project. Four legacy archived items were permanently deleted under the user's explicit instruction. The command validates workspace/revision, invalidates live dependencies and capsule drafts, and preserves saved snapshots and their ready image assets. Rollback SQL passed scoping, stale-revision, dependency, snapshot and deleted-proposal replay assertions. Both hosted Wardrobe integration tests passed and cleaned their temporary fixtures.
