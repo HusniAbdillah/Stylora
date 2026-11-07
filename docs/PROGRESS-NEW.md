@@ -360,19 +360,26 @@ below the latest one.
 ## 7. Owner 4 report
 
 - Owner 4 coordinator, 7 November 2026. Tasks O4.1 through O4.7 and
-  R37 through R44. Integration source `4e5df88` includes the Capsule wizard,
+  R37 through R44. Integration source `4b94bc5` includes the Capsule wizard,
   scoped reasoning and persistence, responsive Preview, automatic stable-input
   execution, immutable Studio saves and saved-avatar execution.
 - Incremental delivery used isolated managed worktrees and independent feature
   branches. OpenAI documentation and runtime changes merged in PRs #8 and #9.
   Capsule increments merged in #11, #16, #17, #18, #23 and #31. Preview increments
   merged in #10, #19, #26, #30, #32 and #36. Runner and client controls merged in
-  #12 and #22. Studio save integration merged in #27. Each merged head passed
+  #12 and #22. Studio save integration merged in #27. Storage retry handling
+  merged in #35 and #37. Saved-image regeneration and execution merged in #39,
+  #40 and #41, with hosted type parity in #43. Each merged head passed
   the GitHub Check workflow, which runs the full check and production build.
 - Owner 1 applied the reviewed operation, Studio, verified-image promotion and
   bag-subcategory migrations under the human's migration approval. Hosted
   generated types remain the database contract. The coordinator did not edit
   generated types or applied migrations.
+- The additive saved-media migration `20261107055411` is hosted. Owner 1
+  verified its stored source hash against the committed SQL, the full media-row
+  return contract, service-only execution and all 25 internal tables retaining
+  RLS with zero direct public CRUD grants. Genuine hosted-generated types
+  preserve all 36 published RPCs.
 - Real hosted smoke passed against the Next.js webpack development server at
   port 3104 on Windows, with process-scoped writes enabled only for
   `dev-owner-4`. Commands used Node 22 and
@@ -418,7 +425,8 @@ below the latest one.
 - Focused prompt, Capsule output and receipt, Preview selection and terminal
   state, operation identity and request-pump tests passed in their respective
   feature worktrees. Local `make fast` passed for the runner, controls, smoke
-  harness and Preview surfaces. One redundant coordinator `make fast` attempt
+  harness and Preview surfaces. The coordinator's final evidence and budget
+  `make pr-ready` also passed lint and typecheck. One earlier `make fast` attempt
   stalled under host contention and was stopped. Its final integrated build
   was validated by CI instead. No check was disabled or weakened.
 - Execution uses WORKFLOW section 5 Option A. Module-level requests survive
@@ -426,11 +434,40 @@ below the latest one.
   requires a later visit and lease recovery. There is no dedicated queue worker.
 - Final audit found the Saved looks retry path allocated work without executing
   it, and the required successful-image regeneration control was disabled.
-  Owner 1 and Owner 4 are completing versioned media allocation, execution and
-  previous-image retention in follow-up PRs. These follow-ups use synthetic
-  regression fixtures and no additional paid image calls. Production inference,
-  general Wardrobe intake and Profile frontend persistence were not exercised
-  by this Owner 4 smoke.
+  Merged PR #40 now executes saved-image retries and recovers pending work on
+  detail and collection visits. Explicit regeneration creates an idempotent
+  new media version, uses `reuse:false`, preserves the previous ready image and
+  keeps published share approvals pinned to their original media IDs.
+- Regeneration validation used the rolled-back service-role SQL regression,
+  eight intent and operation tests, eight saved-media contract tests and final
+  TypeScript validation. The first bridge CI failed on concurrent Wardrobe JSON
+  nullability changes. Owner 1's genuine hosted types and JSON boundary fixes
+  in #43 and #42 resolved that integration. Exact bridge head `33fffb7` passed
+  full check and build in GitHub run `42346350208`. These follow-ups made no
+  additional paid image calls. New-image regeneration was not exercised against
+  the provider after the two-image smoke budget was used.
+- The required read-only budget command is
+  `node --experimental-strip-types --env-file=.env.local scripts/provider-budget.mjs`.
+  Node syntax, targeted ESLint and a hosted read-only run passed. It reports
+  retained operations and attempts by developer workspace and task kind against
+  the workflow caps. Cache hits and deleted history mean these counters differ
+  from provider billing totals. The smoke's actual one-text and two-image usage
+  remains recorded above after cleanup removed its operation rows.
+- Production readiness was checked through `https://stylora.ai.id/api/health`.
+  HTTP 200 reported database and model configuration present, with
+  `writesEnabled=false`. Vercel commit status reported
+  "Deployment rate limited — retry in 24 hours" on the later PRs. GitHub's
+  full check and build passed before regular squash merges. No admin merge,
+  branch-protection bypass, paid upgrade or production setting change occurred.
+  Current production release and write enablement remain external delivery
+  gates.
+- Owner 1's real Wardrobe intake and inventory UI merged in #34 during final
+  integration. This Owner 4 smoke predates that intake, so its live evidence
+  uses the explicit dataset fixtures described above. Profile and Preferences
+  pages still use browser preview stores at this checkpoint, while Owner 4
+  reasoning reads hosted preferences. Completing that frontend persistence
+  belongs to its assigned owner. Production inference and selected-swatch or
+  body-profile fidelity remain outside this run's verification evidence.
 
 ### Owner 4 saved-avatar regeneration intent, 7 November 2026
 
@@ -468,6 +505,23 @@ below the latest one.
 - Covered concurrent active claims, request deduplication, queued resubmission, healthy lease polling without another execution request, completed output reaching commit, failure RPC fences, stable fingerprints, status projection and read-only RPC readiness.
 - Not run. Hosted migrations, database or Storage commands, paid provider calls, browser end-to-end journeys and local build. CI remains the full build and suite gate.
 - Limits. The app must be open for the bounded client pump. Server crashes need a later visit and lease recovery. Provider availability, Storage and end-to-end image completion still require the coordinator’s approved integration smoke. No cloud data was changed.
+
+### Owner 4 saved image recovery and regeneration, 7 November 2026
+
+- Task O4.7 and R44. Branch `o4/saved-media-bridge` connects saved detail's
+  regeneration command and executes returned avatar operations. Failed retries
+  and queued or running operations on collection and detail visits use the shared
+  bounded request store; only one collection image is resumed at a time.
+- Responses retain the latest generation identity and status separately from the
+  last ready image. Cancelled work stays cancelled, prior images remain visible,
+  and existing approved share media are not modified. Regeneration uses the
+  latest media ID and a UUID retained across transport retries.
+- Verification: `pnpm exec vitest run src/features/decisions/decisions.test.ts`
+  passed eight tests in 2.10 seconds with synthetic in-memory fixtures.
+  `git diff --check` passed. `make fast` awaits Owner 1's generated RPC types.
+  Hosted persistence, Storage, provider calls, browser journeys and local build
+  were not run. Owner 1's additive RPC and generated types are a prerequisite;
+  CI supplies the full suite and build gate.
 
 ### Owner 4 guarded smoke preparation, 7 November 2026
 
