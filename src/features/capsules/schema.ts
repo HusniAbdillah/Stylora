@@ -1,13 +1,6 @@
 import { z } from "zod";
 
-export const categorySchema = z.enum([
-  "top",
-  "bottom",
-  "dress",
-  "outerwear",
-  "shoes",
-  "accessory",
-]);
+export { categorySchema } from "@/lib/ai/fashion-schema";
 const ids = z
   .array(z.uuid())
   .max(60)
@@ -59,8 +52,13 @@ export const draftInputSchema = z
     brief: capsuleBriefSchema,
     step: z.number().int().min(0).max(3),
     visited: z.number().int().min(0).max(3),
+    capsuleId: z.uuid().optional(),
+    capsuleRevision: z.number().int().positive().optional(),
   })
-  .refine((draft) => draft.step <= draft.visited);
+  .refine((draft) => draft.step <= draft.visited)
+  .refine(
+    (draft) => Boolean(draft.capsuleId) === Boolean(draft.capsuleRevision),
+  );
 
 export type CapsuleDraftState = {
   id: string;
@@ -68,4 +66,6 @@ export type CapsuleDraftState = {
   brief: z.infer<typeof capsuleBriefSchema>;
   step: 0 | 1 | 2 | 3;
   visited: number;
+  capsuleId?: string;
+  capsuleRevision?: number;
 };

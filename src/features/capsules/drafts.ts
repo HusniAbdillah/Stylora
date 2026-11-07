@@ -19,7 +19,7 @@ export async function getCapsuleDraft(
   const { client, workspaceId } = getWorkspaceDatabase();
   let query = client
     .from("workflow_drafts")
-    .select("id,revision,payload,current_step,visited_steps")
+    .select("id,revision,payload,current_step,visited_steps,capsule_id")
     .eq("workspace_id", workspaceId)
     .eq("feature_kind", "capsules")
     .eq("status", "active");
@@ -36,10 +36,20 @@ export async function getCapsuleDraft(
     .min(0)
     .max(3)
     .parse(data.current_step ?? 0) as 0 | 1 | 2 | 3;
+  const stored = z
+    .object({
+      brief: capsuleBriefSchema,
+      capsuleRevision: z.number().int().positive().optional(),
+    })
+    .safeParse(data.payload);
   return {
     id: data.id,
     revision: data.revision,
-    brief: capsuleBriefSchema.parse(data.payload),
+    brief: stored.success
+      ? stored.data.brief
+      : capsuleBriefSchema.parse(data.payload),
+    capsuleId: data.capsule_id ?? undefined,
+    capsuleRevision: stored.success ? stored.data.capsuleRevision : undefined,
     step,
     visited: Math.max(
       step,
@@ -52,7 +62,7 @@ export async function getCapsuleInventory(): Promise<CapsuleItem[]> {
   const { client, workspaceId } = getWorkspaceDatabase();
   const { data, error } = await client
     .from("active_owned_wardrobe")
-    .select("id,name,category,asset_id")
+    .select("id,name,category,asset_id,revision")
     .eq("workspace_id", workspaceId)
     .order("name")
     .limit(200);
@@ -64,6 +74,7 @@ export async function getCapsuleInventory(): Promise<CapsuleItem[]> {
         name: z.string(),
         category: categorySchema,
         asset_id: z.uuid().nullable(),
+        revision: z.number().int().positive(),
       }),
     )
     .parse(data);
@@ -82,6 +93,7 @@ export async function getCapsuleInventory(): Promise<CapsuleItem[]> {
         }
         return {
           id: row.id,
+          revision: row.revision,
           name: row.name,
           category: row.category,
           inventoryStatus: "owned" as const,
@@ -99,6 +111,24 @@ export async function saveCapsuleDraft(id: string, input: unknown) {
   requireWorkspaceWrites(context);
   const draftId = z.uuid().parse(id);
   const draft = draftInputSchema.parse(input);
+  if (draft.expectedRevision > 0) {
+    const existing = await getCapsuleDraft(draftId);
+    if (
+      existing?.capsuleId !== draft.capsuleId ||
+      existing?.capsuleRevision !== draft.capsuleRevision
+    )
+      return { ok: false as const, code: "draft_conflict" };
+  }
+  if (draft.capsuleId) {
+    const { data, error } = await context.client
+      .from("capsules")
+      .select("id,revision")
+      .eq("workspace_id", context.workspaceId)
+      .eq("id", draft.capsuleId)
+      .maybeSingle();
+    if (error || !data || data.revision !== draft.capsuleRevision)
+      return { ok: false as const, code: "draft_conflict" };
+  }
   const selectedIds = [
     ...draft.brief.includedItemIds,
     ...draft.brief.excludedItemIds,
@@ -113,7 +143,12 @@ export async function saveCapsuleDraft(id: string, input: unknown) {
       return { ok: false as const, code: "capsule_items_changed" };
   }
   const values = {
-    payload: draft.brief,
+    payload: {
+      brief: draft.brief,
+      ...(draft.capsuleRevision
+        ? { capsuleRevision: draft.capsuleRevision }
+        : {}),
+    },
     current_step: String(draft.step),
     visited_steps: Array.from(
       { length: draft.visited + 1 },
@@ -128,6 +163,7 @@ export async function saveCapsuleDraft(id: string, input: unknown) {
           id: draftId,
           workspace_id: context.workspaceId,
           feature_kind: "capsules",
+          capsule_id: draft.capsuleId ?? null,
         })
       : context.client
           .from("workflow_drafts")
