@@ -6,7 +6,10 @@ export const FASHION_SCHEMA_VERSION = "fashion-item.v1";
 export const FASHION_KNOWLEDGE_VERSION =
   getFashionVersions().knowledgeSourceHash;
 export const FASHION_PROMPT_VERSION = `stylora-fashion-v1.openai-2.${FASHION_KNOWLEDGE_VERSION}`;
-export const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL?.trim() || "gpt-5-mini";
+export const TEXT_MODEL =
+  process.env.OPENAI_TEXT_MODEL?.trim() ||
+  process.env.OPENAI_MODEL?.trim() ||
+  "gpt-5-mini";
 export const IMAGE_MODEL =
   process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1.5";
 

@@ -26,6 +26,7 @@ export async function saveStudioLook(input: z.input<typeof saveInput>) {
     return { ok: false as const, code: "WORKSPACE_WRITES_DISABLED" };
   const request = parsed.data;
   try {
+    // The generated UUID argument type omits PostgreSQL's nullable parent contract.
     const response = await fetch(`${config.url}/rest/v1/rpc/save_studio_look`, {
       method: "POST",
       headers: {
