@@ -1726,6 +1726,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      append_wardrobe_piece: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_payload: Json
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       append_workflow_operation_event: {
         Args: {
           p_attempt_count: number
@@ -2117,6 +2126,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      finish_wardrobe_description: {
+        Args: {
+          p_attempt: number
+          p_fingerprint: string
+          p_operation_id: string
+          p_payload: Json
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       finish_workflow_operation: {
         Args: {
           p_attempt_count: number
@@ -2185,6 +2204,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      reserve_wardrobe_provider_call: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       retry_saved_look_media: {
         Args: { p_saved_look_id: string; p_workspace_id: string }
         Returns: {
@@ -2204,6 +2231,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      retry_wardrobe_description: {
+        Args: { p_operation_id: string; p_workspace_id: string }
+        Returns: undefined
       }
       retry_workflow_operation: {
         Args: { p_operation_id: string; p_workspace_id: string }
@@ -2470,6 +2501,56 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: number
+      }
+      wardrobe_draft_command: {
+        Args: {
+          p_action: string
+          p_draft_id: string
+          p_expected_revision: number
+          p_payload?: Json
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      wardrobe_item_command: {
+        Args: {
+          p_action: string
+          p_expected_revision: number
+          p_item_id: string
+          p_payload?: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          archived_at: string | null
+          asset_id: string | null
+          attributes: Json
+          category: string
+          color: string
+          confidence: number | null
+          corrections: Json
+          created_at: string
+          description: string
+          id: string
+          import_idempotency_key: string | null
+          inferred_attributes: Json
+          inventory_status: string
+          name: string
+          notes: string
+          provenance: Json
+          revision: number
+          source_product_id: string | null
+          source_type: string
+          subcategory: string | null
+          uncertainty: Json
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "wardrobe_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {

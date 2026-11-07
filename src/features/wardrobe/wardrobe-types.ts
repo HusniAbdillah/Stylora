@@ -20,6 +20,7 @@ export type WardrobeField = {
   value: string;
   source?: "user" | "visual_inference" | "catalog" | "derived" | "sample";
   editable?: boolean;
+  group?: string;
 };
 
 export const wardrobeCategories: ReadonlyArray<{
