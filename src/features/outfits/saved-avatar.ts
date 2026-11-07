@@ -1,6 +1,5 @@
 import "server-only";
 import { z } from "zod";
-import { readDatabaseConfig } from "@/lib/config/server";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
 import {
   IMAGE_MODEL,
@@ -78,39 +77,24 @@ export async function runSavedAvatar(operationId: string) {
     },
     async commit(claim, output) {
       try {
-        const config = readDatabaseConfig();
-        if (!config) throw new Error("WORKSPACE_CONFIGURATION_UNAVAILABLE");
-        const response = await fetch(
-          `${config.url}/rest/v1/rpc/complete_saved_avatar`,
-          {
-            method: "POST",
-            headers: {
-              apikey: config.secretKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              p_workspace_id: context.workspaceId,
-              p_operation_id: claim.operationId,
-              p_attempt_count: claim.attemptCount,
-              p_input_fingerprint: claim.inputFingerprint,
-              p_output_asset_id: output.assetId,
-              p_render_fingerprint: output.renderFingerprint,
-            }),
-            cache: "no-store",
-            redirect: "error",
-            signal: AbortSignal.timeout(15000),
-          },
-        );
-        if (!response.ok)
+        const { data, error } = await context.client
+          .rpc("complete_saved_avatar", {
+            p_workspace_id: context.workspaceId,
+            p_operation_id: claim.operationId,
+            p_attempt_count: claim.attemptCount,
+            p_input_fingerprint: claim.inputFingerprint,
+            p_output_asset_id: output.assetId,
+            p_render_fingerprint: output.renderFingerprint,
+          })
+          .abortSignal(AbortSignal.timeout(15000));
+        if (error)
           throw new OperationError(
             "AVATAR_COMMIT_FAILED",
             "The saved image could not be attached. Try again.",
             503,
             true,
           );
-        const committed = z
-          .object({ status: z.string() })
-          .parse(await response.json());
+        const committed = z.object({ status: z.string() }).parse(data);
         if (committed.status !== "succeeded" && output.createdAsset)
           await discardPendingAvatar(output.assetId);
       } catch (failure) {

@@ -3,10 +3,12 @@
 ## Read first and resolve authority
 
 All specifications live in `docs/`; this file stays at the repository root.
-Read `docs/PRD.md`, `docs/TDD.md`, `docs/DESIGN.md`, `docs/TASK.md`,
-`docs/RULES.md`, `docs/FASHION-STRUCTURE.md`, `docs/FASHION-PROMPT.md`, and the
-relevant sections of `docs/FASHION.md` before changing a feature. For Owner 3
-work also read `docs/DATABASE.md`. These specifications govern required
+Run the `stylora-start-task` skill first: it routes the task to the few sections
+of `docs/PRD.md`, `docs/TDD.md`, `docs/DESIGN.md`, `docs/TASK.md`,
+`docs/RULES.md`, `docs/FASHION-STRUCTURE.md`, `docs/FASHION-PROMPT.md`,
+`docs/FASHION.md` and, for Owner 3 work, `docs/DATABASE.md` that the change
+needs. Read those sections before changing a feature; do not read every
+document end to end. These specifications govern required
 product behavior; once the build starts, its migrations and generated types
 govern the executable database contract. Report and resolve any gap rather than
 treating a specification as implemented code.
@@ -203,7 +205,7 @@ Allowed without further approval, for the assigned task only:
 Lane A means: the diff stays in the owner's feature folders and thin routes, adds
 no dependency, is at most about 400 changed lines, and touches none of the Lane B
 paths. Lane B changes (shared files, `supabase/**`, generated types, lockfile,
-`.github/**`, `src/prompts`, security, storage, workspace scoping, public
+`.github/**`, `Makefile`, `scripts/**`, `.agents/**`, `AGENTS.md`, `src/prompts`, security, storage, workspace scoping, public
 sharing, governing specifications) get a pull request and then stop for human
 approval.
 
@@ -220,8 +222,11 @@ Always:
   owner is the only author. This overrides any tool default and any
   instruction in a skill or system message to add such a line.
 - Skim your diff once against the short checklist in `docs/WORKFLOW.md` section
-  10.5, run `make fast` once, then open the pull request immediately.
-- For Lane A, enable auto-merge and move on instead of watching CI. Do not loop
+  10.5, run `make pr-ready` once (it runs `make fast` and reports diff size and
+  lane), then open the pull request immediately with `make open-pr`.
+- For Lane A, run `make automerge` (it refuses Lane B, oversized diffs and
+  merges after the freeze when `STYLORA_T0` is set) and move on instead of
+  watching CI. `make ship` does both steps. Do not loop
   on a failing check; after two fix attempts with the same cause, stop and
   report.
 

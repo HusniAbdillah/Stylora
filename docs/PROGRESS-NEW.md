@@ -171,6 +171,7 @@ below the latest one.
 
 ### Owner 1 workspace frontend · 7 November 2026, Asia/Bangkok
 
+- Wardrobe Add Item (D08, M15) uses the eight desktop fields on both screen sizes. Existing drafts keep their color, fabric and fit values under the updated labels. Extra notes from earlier drafts are retained in the saved item. `pnpm check` passed with 112 tests.
 - Work branch `o1/workspace-frontend`, base `4fd5aba`. Requirements R33–R36 and work packages O1.3–O1.6. The four application routes under `src/app/(workspace)` compose the shared shell, Wardrobe, Preferences and Profile.
 - Wardrobe supports searching, filtering, returning to the collection, reading and editing details, marking a candidate owned, and archiving and restoring pieces. Each seeded example uses the same existing `/design/images/wardrobe-ivory-shirt.webp` thumbnail. The intake keeps selected files in IndexedDB. Users can save one or more manually described pieces from a photo, or try the labeled sample item.
 - Preferences preserves optional selections and drafts across navigation and reload. Profile saves the workspace name shown in the sidebar and reads the active wardrobe count. The sample workspace keeps local navigation, item records, preferences and profile data in browser storage. Database persistence, automated descriptions and other owners’ routes remain separate integration work.
@@ -323,6 +324,17 @@ below the latest one.
 - Verification evidence: Not run.
 - Real text and image provider evidence: Not verified.
 - Unresolved work and next concrete action: Not reported.
+
+
+### Owner 4 operation controls increment, 7 November 2026
+
+- Task O4.1 and R01, R04–R06. Branch `o4/operation-controls`, based on merged runner and Owner 1 typed operation RPC contracts.
+- Implemented module-level request deduplication, three-second status polling and a five-minute resubmission window for queued or expired operations. Healthy leases only poll. Each started server request remains awaited and can finish beyond that resubmission window. Normal client navigation retains the request store.
+- Added scoped activity and atomic Studio controls while preserving published Create status metadata, retry execution and numeric event cursors. Default failure finalization now calls the attempt-fenced RPC with safe retry metadata. Domain success remains in its atomic feature callback.
+- Checks in the managed Windows worktree. `make fast` passed lint and typecheck, with one inherited Preview navigation warning. `pnpm exec vitest run src/features/operations` passed six files and eighteen tests. `git diff --check` passed. Fixtures are synthetic unit data in memory and required no hosted cleanup.
+- Covered concurrent active claims, request deduplication, queued resubmission, healthy lease polling without another execution request, completed output reaching commit, failure RPC fences, stable fingerprints, status projection and read-only RPC readiness.
+- Not run. Hosted migrations, database or Storage commands, paid provider calls, browser end-to-end journeys and local build. CI remains the full build and suite gate.
+- Limits. The app must be open for the bounded client pump. Server crashes need a later visit and lease recovery. Provider availability, Storage and end-to-end image completion still require the coordinator’s approved integration smoke. No cloud data was changed.
 
 ## 8. Task evidence ledger
 
@@ -524,3 +536,43 @@ which data, code revision or provider behavior was verified.
   acknowledgment or lease expiry. Queued cancellation remains immediate.
   Updated operation, Studio and foundation suites all passed against the
   combined local schema. Local lint and typecheck passed; CI is the build gate.
+
+### Hosted rollout, 7 November 2026
+
+- Human approval was verified from the Owner 4 coordination chat's explicit
+  migration and smoke-test response. PR #21 merged as `4971f04` after GitHub
+  CI and Vercel Preview checks passed.
+- Applied the committed SQL through Supabase MCP in one transaction, recording
+  the exact source versions `20261107035901`, `20261107042133` and
+  `20261107043614`. Their stored SQL hashes match the committed files.
+  The five existing migration entries remain present.
+- Owner 2 and Owner 3 prerequisite migrations were already hosted. The Owner 2
+  `finish_create_operation` and `control_create_operation` definition hashes
+  stayed unchanged across this rollout.
+- Read-only verification passed. Hosted REST OpenAPI returned HTTP 200 with
+  all 13 expected operation, image, Capsule and Studio RPCs. Each permits
+  service-role execution and denies anon and authenticated execution.
+  All 25 application tables retain RLS and deny direct anon and authenticated
+  SELECT, INSERT, UPDATE and DELETE privileges.
+- Security advisors returned 25 informational no-policy notices, consistent
+  with the specified deny-direct access model.
+  [Advisor reference](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+- This rollout made schema and migration-history changes only. Provider calls,
+  fixture seeding and connected browser smoke remain with the Owner 4
+  coordinator under the approved budget. Local application checks were not
+  repeated for this documentation-only checkpoint.
+
+### Hosted type parity and bag selection correction
+
+- Regenerated `src/types/database.ts` directly from the hosted Supabase MCP
+  generator. Verified that Owner 2, Owner 3, workflow, image and Studio RPCs
+  remain declared. Main already contained the workflow RPC names before this
+  regeneration.
+- The Preview UI and mapper classify purses, satchels, duffels, briefcases,
+  crossbody bags and messenger bags as bag slots. The earlier Studio SQL used
+  a shorter exact-match list. Additive migration
+  `20261107045847_preview_bag_subcategories.sql` uses the same classification
+  expression as the UI and mapper.
+- Local `preview_bag_subcategories.sql` passed as `service_role`, covering ten
+  supported subtypes, wrong-slot rejection and fixture rollback. Hosted
+  application of this correction follows its CI gate.
