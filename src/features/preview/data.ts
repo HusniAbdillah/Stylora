@@ -4,7 +4,6 @@ import { getWorkspaceDatabase } from "@/lib/supabase/server";
 import { createWorkspaceSignedRead } from "@/lib/supabase/storage";
 import { previewSelectionSchema, slotForPreviewItem } from "./schema";
 import { previewImageStatus } from "./generation";
-import { FASHION_PROMPT_VERSION, IMAGE_MODEL } from "@/features/ai/openai";
 import type { PreviewItem, PreviewSelection } from "./preview-studio";
 
 export async function readPreviewItems(
@@ -91,44 +90,8 @@ export async function readPreview(source?: PreviewSource, draftId?: string) {
     draftResult.data && !source
       ? await previewImageStatus(draftResult.data.id)
       : { job: { status: "idle" as const }, operationId: null };
-  let staleNotice: string | undefined;
-  if (image.job.status === "succeeded" && image.operationId) {
-    const { data: operation, error } = await client
-      .from("workflow_operations")
-      .select("input,prompt_version,model")
-      .eq("workspace_id", workspaceId)
-      .eq("id", image.operationId)
-      .eq("kind", "preview_image")
-      .maybeSingle();
-    if (error || !operation) throw new Error("PREVIEW_STATUS_READ_FAILED");
-    const snapshot = z
-      .object({
-        items: z.array(
-          z.object({ id: z.uuid(), revision: z.number().int().positive() }),
-        ),
-        preferences: z.object({ revision: z.number().int().positive() }),
-      })
-      .parse(operation.input);
-    if (
-      operation.prompt_version !== FASHION_PROMPT_VERSION ||
-      operation.model !== IMAGE_MODEL ||
-      snapshot.preferences.revision !== preferences?.revision ||
-      snapshot.items.some(
-        (item) =>
-          !items.some(
-            (current) =>
-              current.id === item.id && current.revision === item.revision,
-          ),
-      )
-    ) {
-      image.job = { status: "idle" };
-      image.operationId = null;
-      staleNotice =
-        "Your wardrobe or preferences changed. Review the current selection.";
-    }
-  }
   if (!process.env.OPENAI_API_KEY?.trim() && !process.env.MODEL_API_KEY?.trim())
-    image.job = { status: "unavailable" };
+    image.job = { ...image.job, status: "unavailable" };
   let selection = (payload.selection ?? {}) as PreviewSelection;
   let seedNotice: string | undefined;
   let proposedNames: string[] = [];
@@ -256,7 +219,12 @@ export async function readPreview(source?: PreviewSource, draftId?: string) {
     ),
     seed: !!source,
     seedNotice,
-    staleNotice,
+    staleNotice: "staleNotice" in image ? image.staleNotice : undefined,
+    imageOutdated: "imageOutdated" in image ? image.imageOutdated : false,
+    preferenceRevision:
+      "preferenceRevision" in image
+        ? image.preferenceRevision
+        : (preferences?.revision ?? 0),
     proposedNames,
     extraPiecesLabel:
       source && "savedLookId" in source

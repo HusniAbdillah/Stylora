@@ -23,10 +23,13 @@ import {
   avatarRenderFingerprint,
   renderAndStoreAvatar,
   discardPendingAvatar,
+  getAvatarRenderSettings,
 } from "./image";
+import { imageRenderSettingsSchema } from "@/features/ai/image-settings";
+import { buildAvatarVisualDirection } from "./visual-direction";
 import { previewSelectionSchema, slotForPreviewItem } from "./schema";
 import type { PreviewJob } from "./preview-studio";
-import { previewJobStatus } from "./job-status";
+import { isCurrentPreviewContext, previewJobStatus } from "./job-status";
 
 const generationInput = z.strictObject({
   draftId: z.uuid(),
@@ -93,8 +96,19 @@ export async function readPreviewImageInputs(draftId: string) {
       409,
     );
   const snapshot = z.json().parse(preferences.data);
-  const renderFingerprint = avatarRenderFingerprint(items, snapshot);
-  return { draft, items, preferences: snapshot, renderFingerprint };
+  const renderSettings = getAvatarRenderSettings();
+  const renderFingerprint = avatarRenderFingerprint(
+    items,
+    snapshot,
+    renderSettings,
+  );
+  return {
+    draft,
+    items,
+    preferences: snapshot,
+    renderFingerprint,
+    renderSettings,
+  };
 }
 
 export async function previewImageStatus(draftId: string) {
@@ -113,24 +127,78 @@ export async function previewImageStatus(draftId: string) {
       "This preview is unavailable.",
       404,
     );
-  const { data: operation, error } = await client
-    .from("workflow_operations")
-    .select("id,status,result_ref,created_at,completed_at,safe_error_code")
-    .eq("workspace_id", workspaceId)
-    .eq("subject_type", "draft")
-    .eq("subject_id", draft.id)
-    .eq("kind", "preview_image")
-    .eq("input_revision", draft.revision)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error)
+  const [latest, ready, inputs] = await Promise.all([
+    client
+      .from("workflow_operations")
+      .select(
+        "id,status,input,prompt_version,model,result_ref,created_at,completed_at,safe_error_code",
+      )
+      .eq("workspace_id", workspaceId)
+      .eq("subject_type", "draft")
+      .eq("subject_id", draft.id)
+      .eq("kind", "preview_image")
+      .eq("input_revision", draft.revision)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    client
+      .from("workflow_operations")
+      .select("result_ref")
+      .eq("workspace_id", workspaceId)
+      .eq("subject_type", "draft")
+      .eq("subject_id", draft.id)
+      .eq("kind", "preview_image")
+      .eq("status", "succeeded")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    readPreviewImageInputs(draft.id).catch((error: unknown) => {
+      if (
+        error instanceof ApiError &&
+        ["empty_selection", "selection_unavailable"].includes(error.code)
+      )
+        return null;
+      throw error;
+    }),
+  ]);
+  if (latest.error || ready.error)
     throw new ApiError(
       "preview_status_failed",
       "Image status could not be loaded.",
       503,
       true,
     );
+  const operation = latest.data;
+  let preferenceRevision: number;
+  if (inputs) {
+    preferenceRevision = z
+      .object({ revision: z.number().int().nonnegative() })
+      .parse(inputs.preferences).revision;
+  } else {
+    const preferences = await client
+      .from("user_preferences")
+      .select("revision")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (preferences.error)
+      throw new ApiError(
+        "preview_status_failed",
+        "Preferences could not be loaded. Try again.",
+        503,
+        true,
+      );
+    preferenceRevision = preferences.data?.revision ?? 0;
+  }
+  const outdated =
+    !!operation &&
+    (!inputs ||
+      !isCurrentPreviewContext(operation, {
+        renderFingerprint: inputs.renderFingerprint,
+        promptVersion: FASHION_PROMPT_VERSION,
+        model: IMAGE_MODEL,
+      }));
   let job: PreviewJob = { status: "idle" };
   let operationId = operation?.id ?? null;
   if (operation) {
@@ -166,6 +234,24 @@ export async function previewImageStatus(draftId: string) {
       }
     }
   }
+  if (outdated) {
+    job = { status: "idle", superseded: true, imageUrl: job.imageUrl };
+    operationId = null;
+  }
+  if (!job.imageUrl && ready.data) {
+    const result = z.object({ assetId: z.uuid() }).parse(ready.data.result_ref);
+    try {
+      job.imageUrl = (
+        await createWorkspaceSignedRead(result.assetId)
+      ).signedUrl;
+    } catch {
+      job.errorMessage ??=
+        "The previous image is unavailable. Generate an image from your selection.";
+    }
+  }
+  if (!operation && job.imageUrl && inputs) job.superseded = true;
+  const imageOutdated =
+    !!job.imageUrl && (outdated || job.status !== "succeeded");
   const payload = z
     .object({ renderRequestId: z.uuid().optional() })
     .parse(draft.payload);
@@ -175,6 +261,12 @@ export async function previewImageStatus(draftId: string) {
     operationId,
     job,
     renderRequestId: payload.renderRequestId,
+    preferenceRevision,
+    imageOutdated,
+    staleNotice: outdated
+      ? "Your wardrobe or preferences changed. The previous image is shown."
+      : undefined,
+    renderSettings: inputs?.renderSettings ?? getAvatarRenderSettings(),
   };
 }
 
@@ -237,6 +329,11 @@ export async function generatePreviewImage(input: unknown) {
       items: current.items,
       preferences: current.preferences,
       renderFingerprint: current.renderFingerprint,
+      renderSettings: current.renderSettings,
+      visualDirection: buildAvatarVisualDirection(
+        current.preferences,
+        current.items,
+      ),
       knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
     }),
     promptVersion: FASHION_PROMPT_VERSION,
@@ -246,8 +343,11 @@ export async function generatePreviewImage(input: unknown) {
   await runOperation(operation.id, {
     execute: async (claim) =>
       renderAndStoreAvatar({
-        items: current.items,
-        preferences: current.preferences,
+        items: z.array(z.unknown()).parse(claim.input.items),
+        preferences: claim.input.preferences,
+        renderSettings: imageRenderSettingsSchema.parse(
+          claim.input.renderSettings,
+        ),
         reuse: !parsed.renderRequestId,
         signal: claim.signal,
       }),
