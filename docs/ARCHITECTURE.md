@@ -17,14 +17,14 @@ reused UI, the canonical fashion contract and infrastructure. Keep components
 and schemas flat inside a feature until their size makes subfolders useful.
 [Next.js project structure](https://nextjs.org/docs/app/getting-started/project-structure).
 
-| Location | Responsibility |
-| --- | --- |
-| `src/app` | URLs, layouts, loading and error boundaries, HTTP and Server Action entry points. Put workspace pages in `(workspace)` and public shares outside that layout. |
-| `src/features/<slice>` | Components, Zod schemas, scoped queries, mutations and domain rules. Create folders such as `components` or `queries` once the slice needs them. |
-| `src/components/ui`, `src/components/shell` | Accessible reusable primitives and workspace navigation from the design system. |
-| `src/lib/config`, `src/lib/supabase` | Lazy server configuration and the privileged client paired with the configured workspace. Provider and storage adapters belong here when implemented. |
-| `src/prompts`, `src/types` | Versioned server prompt build inputs and generated database types. Domain DTOs remain with their slices. |
-| `supabase/migrations`, `supabase/tests` | Reviewed schema changes and policy tests. Owner 1 manages both. |
+| Location                                    | Responsibility                                                                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app`                                   | URLs, layouts, loading and error boundaries, HTTP and Server Action entry points. Put workspace pages in `(workspace)` and public shares outside that layout. |
+| `src/features/<slice>`                      | Components, Zod schemas, scoped queries, mutations and domain rules. Create folders such as `components` or `queries` once the slice needs them.              |
+| `src/components/ui`, `src/components/shell` | Accessible reusable primitives and workspace navigation from the design system.                                                                               |
+| `src/lib/config`, `src/lib/supabase`        | Lazy server configuration and the privileged client paired with the configured workspace. Provider and storage adapters belong here when implemented.         |
+| `src/prompts`, `src/types`                  | Versioned server prompt build inputs and generated database types. Domain DTOs remain with their slices.                                                      |
+| `supabase/migrations`, `supabase/tests`     | Reviewed schema changes and policy tests. Owner 1 manages both.                                                                                               |
 
 Pages are Server Components by default and call feature queries directly.
 Interactive islands handle file picking, draft fields, stepper controls, events
@@ -42,13 +42,13 @@ reads with `server-only`.
 
 These are target routes. The scaffold currently exposes `/` and `/api/health`.
 
-| Owner | Slice | Target entry points and boundaries |
-| --- | --- | --- |
-| 1 | Wardrobe, preferences, profile | `/wardrobe`, `/wardrobe/[itemId]`, `/preferences`, `/profile`. Publish active owned inventory, canonical item conversion and a versioned preference snapshot. |
-| 2 | Inspiration, matching, inspiration outfits | `/`, `/create`, `/looks/[lookId]?step=review\|matches\|ideas`. Inspiration owns corrections and progress. Matching owns deterministic eligibility. Outfit generation owns the three option types and per-direction regeneration. |
-| 3 | Products, decisions, sharing | `/looks/[lookId]?option_id=…`, `/saved-looks`, `/saved-looks/[savedLookId]`, its share review, and `/shared/[shareToken]`. Products owns search and scoring. Decisions owns selections and saves. Sharing owns the public projection. |
-| 4 | Capsules, preview | `/capsules`, `/capsules/new`, `/capsules/[capsuleId]`, its outfit detail, and `/preview`. Capsules owns combination and reuse rules. Preview owns interactive selection and saved-avatar execution. |
-| 2 and 4 | Operations | Draft and operation endpoints. Owner 2 publishes the protocol. Owner 4 implements runner integration. Each slice owns its own task handler and domain commit. |
+| Owner   | Slice                                      | Target entry points and boundaries                                                                                                                                                                                                    |
+| ------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1       | Wardrobe, preferences, profile             | `/wardrobe`, `/wardrobe/[itemId]`, `/preferences`, `/profile`. Publish active owned inventory, canonical item conversion and a versioned preference snapshot.                                                                         |
+| 2       | Inspiration, matching, inspiration outfits | `/`, `/create`, `/looks/[lookId]?step=review\|matches\|ideas`. Inspiration owns corrections and progress. Matching owns deterministic eligibility. Outfit generation owns the three option types and per-direction regeneration.      |
+| 3       | Products, decisions, sharing               | `/looks/[lookId]?option_id=…`, `/saved-looks`, `/saved-looks/[savedLookId]`, its share review, and `/shared/[shareToken]`. Products owns search and scoring. Decisions owns selections and saves. Sharing owns the public projection. |
+| 4       | Capsules, preview                          | `/capsules`, `/capsules/new`, `/capsules/[capsuleId]`, its outfit detail, and `/preview`. Capsules owns combination and reuse rules. Preview owns interactive selection and saved-avatar execution.                                   |
+| 2 and 4 | Operations                                 | Draft and operation endpoints. Owner 2 publishes the protocol. Owner 4 implements runner integration. Each slice owns its own task handler and domain commit.                                                                         |
 
 Use one thin `/looks/[lookId]` page to dispatch validated views. Resolve a
 detail option against that look and workspace. Accept either a step or an
@@ -103,12 +103,12 @@ page, and Preview gets its own navigation entry.
 
 ### Resolve before freezing the schema
 
-| Gap in the specs | Proposed resolution |
-| --- | --- |
-| PRD R28 requires selection restoration per option, while `DATABASE.md` describes one selection per look. | Keep the active option on the look or draft. Scope saved slot choices by workspace, look, option and slot, and enforce option and slot parent membership. A regenerated option revision invalidates only its dependent selection and search state. |
-| The TDD describes `workspace_id` on all tables and also names `workspaces` as the workspace root. | Use `workspaces.id` as the root identifier. Dependent tables carry `workspace_id`; scoped composite keys prevent cross-workspace references. Confirm each compound parent relationship in the migration review. |
-| The PRD needs persisted jobs and execution. Option A in the TDD resumes abandoned work when a client returns. | Implement the documented Option A flow with awaited handlers and lease recovery. Record the observed navigation and restart limits. Autonomous execution after browser or server interruption requires Option B with a deployed consumer. |
-| The TDD models canonical JSON and the Owner 3 brief offers only selected product attributes. | Review product persistence against the canonical item contract and keep provider offer fields separate. Use one mapping and a schema-supported missing-brief representation across outfits and capsules. |
+| Gap in the specs                                                                                              | Proposed resolution                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PRD R28 requires selection restoration per option, while `DATABASE.md` describes one selection per look.      | Keep the active option on the look or draft. Scope saved slot choices by workspace, look, option and slot, and enforce option and slot parent membership. A regenerated option revision invalidates only its dependent selection and search state. |
+| The TDD describes `workspace_id` on all tables and also names `workspaces` as the workspace root.             | Use `workspaces.id` as the root identifier. Dependent tables carry `workspace_id`; scoped composite keys prevent cross-workspace references. Confirm each compound parent relationship in the migration review.                                    |
+| The PRD needs persisted jobs and execution. Option A in the TDD resumes abandoned work when a client returns. | Implement the documented Option A flow with awaited handlers and lease recovery. Record the observed navigation and restart limits. Autonomous execution after browser or server interruption requires Option B with a deployed consumer.          |
+| The TDD models canonical JSON and the Owner 3 brief offers only selected product attributes.                  | Review product persistence against the canonical item contract and keep provider offer fields separate. Use one mapping and a schema-supported missing-brief representation across outfits and capsules.                                           |
 
 ## Provider execution and recovery
 
@@ -127,7 +127,7 @@ in each fingerprint, such as preference and owned-inventory revisions,
 provider and prompt versions, or shopping region. Use stable event sequence
 numbers and a bounded replay or polling path. Emit only complete validated
 pieces and treat them as provisional until final validation. Verify strict
-streaming with the exact Muse endpoint, then use the TDD's manifest and
+streaming with the configured OpenAI endpoint, then use the TDD's manifest and
 per-piece fallback if needed.
 
 Keep the provider transport server-side. Assemble the canonical

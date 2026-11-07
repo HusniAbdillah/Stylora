@@ -325,10 +325,10 @@ preference values.
 ## 10. Operational and data requirements
 
 Use Next.js App Router with server-only Supabase access, online Supabase
-PostgreSQL and private Storage, Muse for the configured AI path, and SerpAPI for
-shopping. The OpenAI-compatible SDK does not imply OpenAI-hosted inference. An
-OpenAI vision adapter for wardrobe reading is an explicit provider decision if
-required, not an automatic switch from MODEL_API_KEY.
+PostgreSQL and private Storage, OpenAI for text, vision and image generation,
+and SerpAPI for shopping. Use `gpt-5-mini` and `gpt-image-1.5` by default.
+`OPENAI_API_KEY` is the server credential. `MODEL_API_KEY` remains a legacy
+OpenAI credential alias for existing environment files.
 
 All writes validate input, use the server workspace, and preserve revision
 consistency across parents and children. Uploads enforce MIME, byte size, random

@@ -349,10 +349,11 @@ model page lists GPT-5.2 with a 400,000-token context and 128,000 maximum output
 tokens. This is an example, not a reason to change Stylora's provider.
 [OpenAI GPT-5.2 model documentation](https://developers.openai.com/api/docs/models/gpt-5.2).
 
-The Meta model catalog lists Muse Spark with a 1,048,576-token context.
-Stylora plans to use `muse-spark-1.3` and `muse-image-1.0`;
-account access, image limits, streaming behavior, and deployment duration still
-need separate verification. [Meta models](https://dev.meta.ai/docs/models).
+Stylora uses OpenAI `gpt-5-mini` for text and vision and `gpt-image-1.5`
+for garment-reference images. Verify account access, image limits, streaming
+and request duration in the assigned environment.
+[OpenAI GPT-5 mini](https://developers.openai.com/api/docs/models/gpt-5-mini),
+[OpenAI GPT Image 1.5](https://developers.openai.com/api/docs/models/gpt-image-1.5).
 
 Use a core runtime prompt target of roughly 3,000–5,000 tokens, with a
 6,000-token ceiling for the core document. Add only the relevant handbook
