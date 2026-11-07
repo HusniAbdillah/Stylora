@@ -1,4 +1,3 @@
-import { WorkspaceShell } from "@/components/shell";
 import { readPreview } from "@/features/preview/data";
 import { PreviewClient } from "@/features/preview/preview-client";
 import { z } from "zod";
@@ -39,18 +38,17 @@ export default async function PreviewPage({
   const draftId = params.draftId ? z.uuid().parse(params.draftId) : undefined;
   const initial = await readPreview(source, draftId);
   return (
-    <WorkspaceShell
-      activeHref="/preview"
-      displayName={initial.displayName}
-      breadcrumbs={[{ label: "Preview" }]}
-      activity={[]}
-      draftStatus={initial.draftId ? "saved" : undefined}
-    >
+    <>
+      {initial.draftId && (
+        <p role="status" className="text-metadata text-muted">
+          Draft saved
+        </p>
+      )}
       <PreviewClient
         key={`${initial.draftId ?? JSON.stringify(source) ?? "new"}:${initial.revision}`}
         initial={initial}
         category={category}
       />
-    </WorkspaceShell>
+    </>
   );
 }

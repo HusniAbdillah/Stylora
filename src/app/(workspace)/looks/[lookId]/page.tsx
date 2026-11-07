@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
-import { LiveWorkspace } from "@/components/shell/live-workspace";
 import { getOutfitPage } from "@/features/products/page-data";
 import { OutfitPage } from "@/features/products/outfit-page";
 import { ApiError } from "@/lib/http";
@@ -73,13 +72,13 @@ export default async function LookPage({
     );
   if (parsed.data.draftId && !draft) notFound();
   return (
-    <LiveWorkspace>
+    <>
       <OutfitPage
         key={data.lookId}
         data={data}
         createDraftId={draft?.id}
         writesEnabled={writesEnabled}
       />
-    </LiveWorkspace>
+    </>
   );
 }
