@@ -1,0 +1,105 @@
+.field {
+  position: relative;
+  display: block;
+  min-width: 0;
+  width: 100%;
+  border-radius: var(--radius-field);
+}
+
+.field select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 40px 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: inherit;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-control);
+  line-height: var(--text-control--line-height);
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.field[data-inset-label] {
+  border-radius: var(--radius-button);
+}
+
+.field[data-inset-label] select {
+  min-height: 56px;
+  padding-top: 23px;
+  padding-bottom: 7px;
+  background: var(--color-canvas);
+  border-color: transparent;
+}
+
+.label,
+.chevron {
+  position: absolute;
+  z-index: 1;
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.label {
+  inset: 7px 40px auto 13px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.chevron {
+  inset-inline-end: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.field select:enabled:not([aria-invalid="true"]):is(:hover, :focus) {
+  border-color: var(--color-muted);
+}
+
+.field select[aria-invalid="true"] {
+  border-color: var(--color-missing);
+}
+
+.field select:disabled {
+  color: var(--color-muted);
+  background: var(--color-canvas);
+  cursor: not-allowed;
+}
+
+@supports (appearance: base-select) {
+  @media (hover: hover) and (pointer: fine) {
+    .field select,
+    .field select::picker(select) {
+      appearance: base-select;
+    }
+    .field select::picker-icon {
+      display: none;
+    }
+    .field select::picker(select) {
+      margin-block: 4px;
+      padding: 4px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-button);
+      background: var(--color-surface);
+      color: var(--color-text);
+      box-shadow: var(--shadow-overlay);
+    }
+    .field option {
+      min-height: 40px;
+      padding: 8px 12px;
+      border-radius: var(--radius-field);
+      font-size: var(--text-control);
+    }
+    .field option:checked {
+      color: var(--color-action);
+      background: var(--color-selected);
+    }
+    .field option:is(:hover, :focus-visible) {
+      background: var(--color-canvas);
+      outline-offset: -2px;
+    }
+  }
+}

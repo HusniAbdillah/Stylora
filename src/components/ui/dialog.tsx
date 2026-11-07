@@ -1,17 +1,35 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { Button, Icon } from "./primitives";
 import styles from "./ui.module.css";
 
 type DialogProps = {
   open: boolean;
-  title: string;
+  title: ReactNode;
   description?: ReactNode;
   children?: ReactNode;
   onClose: () => void;
 };
+
+function isBackdrop(event: MouseEvent<HTMLDialogElement>) {
+  if (event.target !== event.currentTarget) return false;
+  const { top, right, bottom, left } =
+    event.currentTarget.getBoundingClientRect();
+  return (
+    event.clientX < left ||
+    event.clientX >= right ||
+    event.clientY < top ||
+    event.clientY >= bottom
+  );
+}
 
 export function ConfirmDialog({
   open,
@@ -29,54 +47,68 @@ export function ConfirmDialog({
   busy?: boolean;
   onConfirm: () => void;
 }) {
+  const id = useId();
+  const ref = useRef<HTMLDialogElement>(null);
   const safe = useRef<HTMLButtonElement>(null);
-  const opener = useRef<HTMLElement | null>(null);
+  const pressedBackdrop = useRef(false);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!open || !dialog) return;
+    const opener = document.activeElement;
+    dialog.showModal();
+    safe.current?.focus({ preventScroll: true });
+    return () => {
+      dialog.close();
+      if (opener instanceof HTMLElement && opener.isConnected) {
+        opener.focus({ preventScroll: true });
+      }
+    };
+  }, [open]);
+
+  if (!open) return null;
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(next) => {
-        if (!next && !busy) onClose();
+    <dialog
+      ref={ref}
+      className={styles.dialog}
+      aria-labelledby={`${id}-title`}
+      aria-describedby={description ? `${id}-description` : undefined}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!busy) onClose();
+      }}
+      onPointerDown={(event) => {
+        pressedBackdrop.current = event.button === 0 && isBackdrop(event);
+      }}
+      onClick={(event) => {
+        if (!busy && pressedBackdrop.current && isBackdrop(event)) onClose();
+        pressedBackdrop.current = false;
       }}
     >
-      <Dialog.Portal>
-        <Dialog.Overlay className={styles.overlay} />
-        <Dialog.Content
-          className={styles.dialog}
-          {...(!description ? { "aria-describedby": undefined } : {})}
-          onOpenAutoFocus={(event) => {
-            event.preventDefault();
-            opener.current = document.activeElement as HTMLElement | null;
-            safe.current?.focus();
-          }}
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            opener.current?.focus();
-          }}
+      <h2 id={`${id}-title`} className={styles.dialogTitle}>
+        {title}
+      </h2>
+      {description && (
+        <div id={`${id}-description`} className={styles.noticeText}>
+          {description}
+        </div>
+      )}
+      {children}
+      <div className={styles.dialogActions}>
+        <button
+          ref={safe}
+          type="button"
+          className={`${styles.button} ${styles.secondary} ${styles.medium}`}
+          onClick={onClose}
+          disabled={busy}
         >
-          <Dialog.Title className={styles.dialogTitle}>{title}</Dialog.Title>
-          {description && (
-            <Dialog.Description asChild>
-              <div className={styles.noticeText}>{description}</div>
-            </Dialog.Description>
-          )}
-          {children}
-          <div className={styles.dialogActions}>
-            <button
-              ref={safe}
-              type="button"
-              className={`${styles.button} ${styles.secondary} ${styles.medium}`}
-              onClick={onClose}
-              disabled={busy}
-            >
-              {cancelLabel}
-            </button>
-            <Button onClick={onConfirm} disabled={busy} aria-busy={busy}>
-              {confirmLabel}
-            </Button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+          {cancelLabel}
+        </button>
+        <Button onClick={onConfirm} disabled={busy} aria-busy={busy}>
+          {confirmLabel}
+        </Button>
+      </div>
+    </dialog>
   );
 }
 

@@ -18,6 +18,35 @@
   width: 5rem;
   align-items: center;
 }
+.sidebarToggle {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  cursor: w-resize;
+}
+[data-rail="true"] .sidebarToggle {
+  cursor: e-resize;
+}
+.sidebarToggle:focus-visible {
+  outline-offset: -4px;
+}
+.sidebarToggle > span {
+  opacity: 0;
+}
+.sidebarToggle:focus-visible > span {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.25rem;
+  border-radius: var(--radius-button);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: 0.75rem;
+  opacity: 1;
+}
+.sidebar a,
+.sidebar .unavailable {
+  position: relative;
+}
 .brandRow,
 .mobileBar,
 .links a,
@@ -32,7 +61,6 @@
 .mobileBar {
   justify-content: space-between;
 }
-.brandRow button,
 .mobileBar button,
 .bell {
   width: 44px;
@@ -44,10 +72,6 @@
 .brandRow {
   padding: 0.5rem;
   min-height: 3.5rem;
-}
-[data-rail="true"] .brandRow {
-  flex-direction: column;
-  gap: 0.5rem;
 }
 .links {
   display: grid;
@@ -75,7 +99,6 @@
   color: var(--color-action);
 }
 .links a:hover,
-.brandRow button:hover,
 .mobileBar button:hover {
   background: var(--color-porcelain);
 }

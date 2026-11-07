@@ -10,6 +10,7 @@ export {
   iconNames,
 } from "./primitives";
 export type { ButtonProps, IconName } from "./primitives";
+export { SelectField } from "./select-field";
 export { Drawer, ConfirmDialog } from "./dialog";
 export { Stepper, createSteps } from "./stepper";
 export { LoadingLayout, RecoveryPanel } from "./feedback";

@@ -187,11 +187,17 @@
   .dialog {
     width: min(31rem, calc(100% - 2rem));
     max-height: 90dvh;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    inset: 0;
+    margin: auto;
+    border: 0;
     padding: 1.75rem;
     border-radius: var(--radius-panel);
+  }
+  .dialog::backdrop {
+    background: var(--color-scrim);
+  }
+  :global(html):has(.dialog:modal) {
+    overflow: hidden;
   }
   .dialogTitle {
     font: 400 1.8rem/1.15 var(--font-display);
@@ -329,7 +335,9 @@
     .chip {
       min-height: 44px;
     }
-    .dialog,
+    .dialog {
+      padding: 1.25rem;
+    }
     .drawer[data-side="right"] {
       top: auto;
       right: 0;

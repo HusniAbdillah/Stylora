@@ -3,6 +3,7 @@
 import { useId, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { Button, Drawer, Icon, Logo } from "@/components/ui";
+import { createPreviewStore } from "@/lib/preview/store";
 import styles from "./shell.module.css";
 
 export const workspaceLinks = [
@@ -13,6 +14,15 @@ export const workspaceLinks = [
   { href: "/saved-looks", label: "Saved looks", icon: "bookmark" },
   { href: "/preferences", label: "Preferences", icon: "sliders" },
 ] as const;
+
+const availableDestinations = workspaceLinks
+  .filter(({ href }) => href !== "/create")
+  .map(({ href }) => href);
+const railPreference = createPreviewStore<boolean | null>(
+  "navigation.rail",
+  null,
+  (value) => value === null || typeof value === "boolean",
+);
 
 type NavigationProps = {
   activeHref: string;
@@ -29,7 +39,7 @@ function Destinations({
   activeHref,
   rail = false,
   onNavigate,
-  availableHrefs,
+  availableHrefs = availableDestinations,
   destinationHrefs,
 }: Pick<
   NavigationProps,
@@ -41,14 +51,14 @@ function Destinations({
   return (
     <nav aria-label="Workspace destinations" className={styles.links}>
       {workspaceLinks.map((link) =>
-        availableHrefs && !availableHrefs.includes(link.href) ? (
+        !availableHrefs.includes(link.href) ? (
           <span
             key={link.href}
             className={styles.unavailable}
             role="link"
             aria-disabled="true"
-            aria-label={link.label + ", unavailable in this preview"}
-            title={link.label + " is unavailable in this preview"}
+            aria-label={link.label + ", unavailable"}
+            title={link.label + " is unavailable"}
           >
             <Icon name={link.icon} />
             {!rail && link.label}
@@ -97,29 +107,38 @@ export function WorkspaceSidebar({
     () => window.matchMedia(tabletMedia).matches,
     () => false,
   );
-  const [local, setLocal] = useState<boolean>();
-  const rail = collapsed ?? local ?? tablet;
+  const savedRail = railPreference.useValue();
+  const [fallbackRail, setFallbackRail] = useState<boolean>();
+  const rail = collapsed ?? fallbackRail ?? savedRail ?? tablet;
   const toggle = () => {
-    setLocal(!rail);
-    onCollapsedChange?.(!rail);
+    const next = !rail;
+    try {
+      railPreference.set(next);
+      setFallbackRail(undefined);
+    } catch {
+      setFallbackRail(next);
+    }
+    onCollapsedChange?.(next);
   };
   const navId = useId();
+  const toggleLabel = rail ? "Expand navigation" : "Collapse navigation";
   return (
     <aside className={styles.sidebar} data-rail={rail}>
+      <button
+        type="button"
+        className={styles.sidebarToggle}
+        title={toggleLabel}
+        aria-label={toggleLabel}
+        aria-controls={navId}
+        aria-expanded={!rail}
+        onClick={toggle}
+      >
+        <span>{toggleLabel}</span>
+      </button>
       <div className={styles.brandRow}>
         <Link href="/" aria-label="Stylora home">
           <Logo markOnly={rail} />
         </Link>
-        <button
-          type="button"
-          title={rail ? "Expand navigation" : "Collapse navigation"}
-          aria-label={rail ? "Expand navigation" : "Collapse navigation"}
-          aria-controls={navId}
-          aria-expanded={!rail}
-          onClick={toggle}
-        >
-          <Icon name="menu" size={18} />
-        </button>
       </div>
       <div id={navId}>
         <Destinations
