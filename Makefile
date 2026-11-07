@@ -8,7 +8,7 @@ PNPM ?= pnpm
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install env dev build start lint typecheck test fast check format format-write ci pre-pr wt wt-rm db-new db-push db-types
+.PHONY: help install env dev build start lint typecheck test fast check format format-write ci pre-pr pr-check pr-ready open-pr automerge ship wt wt-rm db-new db-push db-types
 
 help:
 	@echo Stylora make targets
@@ -30,6 +30,12 @@ help:
 	@echo   make format-write  Prettier write
 	@echo   make ci            Same steps as .github/workflows/check.yml
 	@echo   make pre-pr        check then build, run after rebasing on origin/main
+	@echo [Delivery lane]
+	@echo   make pr-check      Diff size, lane and time window, read only
+	@echo   make pr-ready      make fast, then pr-check
+	@echo   make open-pr       pr-ready, push the branch, open the pull request
+	@echo   make automerge     Lane A only: enable auto-merge after CI
+	@echo   make ship          open-pr then automerge, stops for Lane B
 	@echo [Parallel work]
 	@echo   make wt name=o2/review-stream     New worktree and branch from origin/main
 	@echo   make wt-rm name=o2/review-stream  Remove that worktree after merge
@@ -77,6 +83,29 @@ format-write:
 ci: install check build
 
 pre-pr: check build
+
+# Delivery lane, docs/WORKFLOW.md section 10. None of these push to main, bypass
+# protection or touch the database. Set STYLORA_T0 (ISO time of the build start)
+# to enforce the 05:15 and 06:00 merge limits.
+#   pr-check   diff size, Lane A or B and time window, read only
+#   pr-ready   make fast, then pr-check
+#   open-pr    pr-ready, push the branch, open the pull request
+#   automerge  Lane A only: enable auto-merge, GitHub merges when CI is green
+#   ship       open-pr then automerge; stops after opening for Lane B
+pr-check:
+	node scripts/pr-check.mjs
+
+pr-ready: fast pr-check
+
+open-pr: pr-ready
+	git push -u origin HEAD
+	gh pr create --fill --base main
+
+automerge:
+	node scripts/pr-check.mjs --require-lane-a
+	gh pr merge --squash --auto --delete-branch
+
+ship: open-pr automerge
 
 # One worktree per task so parallel sessions never share a working tree. The
 # folder is created next to the repo, for example ../Stylora-o2-review-stream.
