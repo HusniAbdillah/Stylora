@@ -370,6 +370,9 @@ which data, code revision or provider behavior was verified.
   contains owned sample rows and no uploaded Storage objects. Runtime writes are
   enabled only in the local dev process; the ignored env file is unchanged.
   No text/image model or additional SerpAPI call is part of this frontend check.
+- The local server was stopped after the unsuccessful browser attempts. Scoped
+  fixture cleanup completed through MCP; fixture looks remaining: zero. No
+  saved look or Storage upload was created by this frontend verification.
 - Owner 2's earlier Create screens and Owner 4's generation, preview and capsule
   source adapters remain separate integration work. Their unavailable states are
   explicit; these features are not reported as implemented by this frontend.

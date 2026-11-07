@@ -447,12 +447,11 @@ export function OutfitPage({
     };
   }, [activeId, revision, writesEnabled, data.lookId, updateOption]);
 
+  const hasRunningSearch = Boolean(
+    active?.shopping.searches.some((search) => search.status === "running"),
+  );
   useEffect(() => {
-    if (
-      !activeId ||
-      !active?.shopping.searches.some((search) => search.status === "running")
-    )
-      return;
+    if (!activeId || !hasRunningSearch) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     let count = 0;
@@ -525,7 +524,7 @@ export function OutfitPage({
     };
   }, [
     activeId,
-    active?.shopping.searches.some((search) => search.status === "running"),
+    hasRunningSearch,
     data.lookId,
     updateOption,
   ]);
