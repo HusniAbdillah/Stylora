@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Badge, Button, Icon } from "@/components/ui";
+import { useEffect, useId, useRef, useState } from "react";
+import { Badge, Button, Icon, SelectField } from "@/components/ui";
 import { WardrobePreviewImage } from "./wardrobe-intake-storage";
 import {
   type WardrobeCategory,
@@ -80,6 +80,7 @@ export function WardrobeIntake({
   const fileRef = useRef<HTMLInputElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
+  const fieldPrefix = useId();
   const selected =
     proposals.find((item) => item.id === selectedProposalId) ?? proposals[0];
 
@@ -317,7 +318,7 @@ export function WardrobeIntake({
                     ? "Manual details"
                     : "Photo read"}
               </Badge>
-              <label className={styles.nameLabel}>
+              <label className={styles.nameLabel} data-field-surface="">
                 <span className={styles.srOnly}>Item name</span>
                 <input
                   value={selected.name}
@@ -339,26 +340,24 @@ export function WardrobeIntake({
             </div>
           </div>
           <div className={styles.fields}>
-            <label className={styles.categoryField}>
-              <span>Category</span>
-              <select
-                value={selected.category}
-                onChange={(event) =>
-                  onCategoryChange(
-                    selected.id,
-                    event.target.value as WardrobeCategory,
-                  )
-                }
-              >
-                {wardrobeCategories
-                  .filter((option) => option.id !== "all")
-                  .map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-              </select>
-            </label>
+            <SelectField
+              label="Category"
+              value={selected.category}
+              onChange={(event) =>
+                onCategoryChange(
+                  selected.id,
+                  event.target.value as WardrobeCategory,
+                )
+              }
+            >
+              {wardrobeCategories
+                .filter((option) => option.id !== "all")
+                .map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+            </SelectField>
             {Array.from(
               selected.fields.reduce((groups, field) => {
                 const group = field.group ?? field.label;
@@ -373,57 +372,73 @@ export function WardrobeIntake({
                 key={group}
                 role="group"
                 aria-label={group}
+                data-field-surface=""
               >
                 <div className={styles.fieldText}>
-                  <span className={styles.fieldLabel}>{group}</span>
+                  <label
+                    className={styles.groupLabel}
+                    htmlFor={`${fieldPrefix}-${fields[0].key}`}
+                  >
+                    {group}
+                  </label>
                   {fields.map((field) => (
-                    <div key={field.key}>
-                      {fields.length > 1 && (
-                        <span className={styles.fieldLabel}>{field.label}</span>
-                      )}
-                      {descriptionSource === "manual" ||
-                      editingKey === field.key ? (
-                        <input
-                          autoFocus={editingKey === field.key}
-                          value={field.value}
-                          maxLength={500}
-                          aria-label={field.label}
-                          placeholder={`Enter ${field.label.toLowerCase()}`}
-                          onChange={(event) =>
-                            onFieldChange(
-                              selected.id,
-                              field.key,
-                              event.target.value,
-                            )
-                          }
-                          onBlur={() => {
-                            onFieldBlur?.(selected.id, field.key);
-                            if (descriptionSource !== "manual")
-                              setEditingKey(null);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") setEditingKey(null);
-                          }}
-                        />
-                      ) : (
-                        <strong>{field.value || "Unknown"}</strong>
-                      )}
-                      {field.value.trim() && field.source && (
-                        <Badge tone="neutral" className={styles.sourceBadge}>
-                          {field.source === "visual_inference"
-                            ? "AI"
-                            : field.source === "catalog"
-                              ? "Catalog"
-                              : field.source === "user"
-                                ? "You"
-                                : field.source === "sample"
-                                  ? "Sample"
-                                  : "Note"}
-                        </Badge>
-                      )}
+                    <div className={styles.fieldRow} key={field.key}>
+                      <label
+                        className={styles.fieldValue}
+                        htmlFor={`${fieldPrefix}-${field.key}`}
+                      >
+                        {fields.length > 1 && (
+                          <span className={styles.fieldLabel}>
+                            {field.label}
+                          </span>
+                        )}
+                        {descriptionSource === "manual" ||
+                        editingKey === field.key ? (
+                          <input
+                            id={`${fieldPrefix}-${field.key}`}
+                            autoFocus={editingKey === field.key}
+                            value={field.value}
+                            maxLength={500}
+                            aria-label={field.label}
+                            placeholder={`Enter ${field.label.toLowerCase()}`}
+                            onChange={(event) =>
+                              onFieldChange(
+                                selected.id,
+                                field.key,
+                                event.target.value,
+                              )
+                            }
+                            onBlur={() => {
+                              onFieldBlur?.(selected.id, field.key);
+                              if (descriptionSource !== "manual")
+                                setEditingKey(null);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") setEditingKey(null);
+                            }}
+                          />
+                        ) : (
+                          <strong>{field.value || "Unknown"}</strong>
+                        )}
+                        {field.value.trim() && field.source && (
+                          <Badge tone="neutral" className={styles.sourceBadge}>
+                            {field.source === "visual_inference"
+                              ? "AI"
+                              : field.source === "catalog"
+                                ? "Catalog"
+                                : field.source === "user"
+                                  ? "You"
+                                  : field.source === "sample"
+                                    ? "Sample"
+                                    : "Note"}
+                          </Badge>
+                        )}
+                      </label>
                       {descriptionSource !== "manual" &&
+                        editingKey !== field.key &&
                         field.editable !== false && (
                           <button
+                            id={`${fieldPrefix}-${field.key}`}
                             className={styles.editField}
                             type="button"
                             aria-label={`Edit ${field.label}`}

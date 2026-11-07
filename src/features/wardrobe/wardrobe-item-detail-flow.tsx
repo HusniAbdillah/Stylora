@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, ConfirmDialog } from "@/components/ui";
+import { Button, ConfirmDialog, SelectField } from "@/components/ui";
 import {
   WardrobeArchiveDialog,
   WardrobeItemDetail,
@@ -354,7 +354,7 @@ export function WardrobeItemDetailFlow({
               </label>
               <label>
                 Category
-                <select
+                <SelectField
                   value={draft.values.category}
                   onChange={(e) =>
                     update({
@@ -370,7 +370,7 @@ export function WardrobeItemDetailFlow({
                         {c.label}
                       </option>
                     ))}
-                </select>
+                </SelectField>
               </label>
               <label>
                 Subcategory

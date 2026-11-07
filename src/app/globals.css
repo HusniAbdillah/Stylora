@@ -74,6 +74,13 @@
     outline: 2px solid var(--color-action);
     outline-offset: 4px;
   }
+  [data-field-surface]:focus-within {
+    outline: 2px solid var(--color-action);
+    outline-offset: 3px;
+  }
+  [data-field-surface] :is(input, select, textarea):focus {
+    outline: none;
+  }
   button:enabled,
   summary {
     cursor: pointer;

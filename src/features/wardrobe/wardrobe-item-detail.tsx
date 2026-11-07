@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
-import { Badge, Button, Icon } from "@/components/ui";
+import type { ReactNode } from "react";
+import { Badge, Button, ConfirmDialog, Icon } from "@/components/ui";
 import { WardrobePreviewImage } from "./wardrobe-intake-storage";
 import {
   type WardrobeField,
@@ -227,49 +227,30 @@ export function WardrobeArchiveDialog({
   onCancel,
   onConfirm,
 }: WardrobeArchiveDialogProps) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) {
-      restoreFocusRef.current = document.activeElement as HTMLElement | null;
-      dialog.showModal();
-      dialog.querySelector<HTMLButtonElement>("[data-safe-action]")?.focus();
-    } else if (!open && dialog.open) {
-      dialog.close();
-      restoreFocusRef.current?.focus();
-    }
-    return () => {
-      if (dialog.open) dialog.close();
-    };
-  }, [open]);
-
   return (
-    <dialog
-      ref={ref}
-      className={styles.archiveDialog}
-      aria-labelledby="wardrobe-archive-title"
-      aria-describedby="wardrobe-archive-description"
-      onCancel={(event) => {
-        event.preventDefault();
-        onCancel();
-      }}
+    <ConfirmDialog
+      open={open}
+      busy={busy}
+      title={
+        <span className={styles.archiveTitle}>
+          {(itemImageUrl || itemImageKey) && (
+            <span aria-hidden="true">
+              <WardrobePreviewImage
+                imageKey={itemImageKey}
+                fallbackUrl={itemImageUrl}
+                alt=""
+              />
+            </span>
+          )}
+          Archive {itemName}?
+        </span>
+      }
+      description="This item leaves your active wardrobe. You can restore it later."
+      cancelLabel="Keep item"
+      confirmLabel={busy ? "Archiving…" : "Archive item"}
+      onClose={onCancel}
+      onConfirm={onConfirm}
     >
-      <div className={styles.archiveTitle}>
-        {(itemImageUrl || itemImageKey) && (
-          <WardrobePreviewImage
-            imageKey={itemImageKey}
-            fallbackUrl={itemImageUrl}
-            alt=""
-          />
-        )}
-        <h2 id="wardrobe-archive-title">Archive {itemName}?</h2>
-      </div>
-      <p id="wardrobe-archive-description">
-        This item leaves your active wardrobe. You can restore it later.
-      </p>
       <ul className={styles.archiveConsequences}>
         <li>
           <Icon name="check" size={14} /> {savedLookCount} saved{" "}
@@ -285,14 +266,6 @@ export function WardrobeArchiveDialog({
           {errorMessage}
         </p>
       )}
-      <div className={styles.archiveActions}>
-        <Button variant="secondary" data-safe-action onClick={onCancel}>
-          Keep item
-        </Button>
-        <Button variant="primary" disabled={busy} onClick={onConfirm}>
-          {busy ? "Archiving…" : "Archive item"}
-        </Button>
-      </div>
-    </dialog>
+    </ConfirmDialog>
   );
 }
