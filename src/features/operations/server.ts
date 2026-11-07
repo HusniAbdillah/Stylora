@@ -127,7 +127,6 @@ export async function failOperation(
     .string()
     .regex(/^[A-Z][A-Z0-9_]{1,119}$/)
     .parse(failure.code);
-  const now = new Date().toISOString();
   const retrySeconds = z
     .number()
     .int()
@@ -135,14 +134,16 @@ export async function failOperation(
     .max(86400)
     .optional()
     .parse(failure.retryAfterSeconds);
-  const { error } = await context.client
-    .from("workflow_operations")
-    .update({
-      status: "failed",
-      lease_until: null,
-      completed_at: now,
-      safe_error_code: code,
-      result_ref: {
+  const { data, error } = await context.client.rpc(
+    "finish_workflow_operation",
+    {
+      p_workspace_id: context.workspaceId,
+      p_operation_id: claim.operationId,
+      p_attempt_count: claim.attemptCount,
+      p_input_fingerprint: claim.inputFingerprint,
+      p_status: "failed",
+      p_safe_error_code: code,
+      p_result_ref: {
         retryable: failure.retryable && canRetryOperationCode(code),
         ...(retrySeconds === undefined
           ? {}
@@ -152,15 +153,11 @@ export async function failOperation(
               ).toISOString(),
             }),
       },
-    })
-    .eq("workspace_id", context.workspaceId)
-    .eq("id", claim.operationId)
-    .eq("attempt_count", claim.attemptCount)
-    .eq("input_fingerprint", claim.inputFingerprint)
-    .eq("input_revision", claim.inputRevision)
-    .in("status", ["running", "partial"])
-    .gt("lease_until", now);
+    },
+  );
+  if (error?.code === "40001") return;
   if (error) databaseError(error.code);
+  operationRowSchema.parse(data);
 }
 
 export async function runOperation<T>(
@@ -228,7 +225,7 @@ export async function runOperation<T>(
             )
           : new OperationError(
               claim.signal.aborted
-                ? "OPERATION_TIMEOUT"
+                ? "PROVIDER_TIMEOUT"
                 : "OPERATION_EXECUTION_FAILED",
               "The operation could not finish. Try again.",
               503,

@@ -7,7 +7,7 @@ vi.mock("@/lib/supabase/server", () => ({
   requireWorkspaceWrites: database.writes,
 }));
 
-import { runOperation } from "./server";
+import { failOperation, runOperation } from "./server";
 
 const operationId = "d270f645-b0d9-4c6f-8593-a154f31b98c9";
 const workspaceId = "ae781e34-b315-44a5-abfe-0c6c074a49c8";
@@ -48,6 +48,36 @@ function setupRead() {
 }
 
 describe("operation execution claims", () => {
+  it("finishes failures atomically with the attempt fence and safe retry metadata", async () => {
+    const { rpc } = setupRead();
+    rpc.mockResolvedValue({
+      data: { ...operation, status: "failed", lease_until: null },
+      error: null,
+    });
+    await failOperation(
+      {
+        operationId,
+        inputRevision: 1,
+        inputFingerprint: "a".repeat(64),
+        attemptCount: 1,
+        input: {},
+        signal: AbortSignal.abort(),
+      },
+      { code: "PROVIDER_TIMEOUT", retryable: true, retryAfterSeconds: 10 },
+    );
+    expect(rpc).toHaveBeenCalledWith(
+      "finish_workflow_operation",
+      expect.objectContaining({
+        p_workspace_id: workspaceId,
+        p_operation_id: operationId,
+        p_attempt_count: 1,
+        p_status: "failed",
+        p_safe_error_code: "PROVIDER_TIMEOUT",
+        p_result_ref: expect.objectContaining({ retryable: true }),
+      }),
+    );
+  });
+
   it("returns an already-claimed operation without a second provider execution", async () => {
     const { rpc, query } = setupRead();
     rpc.mockResolvedValue({ data: null, error: { code: "55P03" } });
