@@ -675,7 +675,7 @@ export class CreateSession {
         id: feedbackId,
         label: "Inspiration photo verified",
         state: "complete",
-        detail: "Photo is ready. Start analysis when your inputs are ready.",
+        detail: "Photo uploaded and verified.",
       });
     } catch (error) {
       if (generation === this.generation) {

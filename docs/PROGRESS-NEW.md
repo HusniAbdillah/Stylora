@@ -1,5 +1,11 @@
 # Stylora shared progress reporting
 
+## PR 75 conflict resolution, 7 November 2026
+
+- Rebased `o1/progress-feedback` onto main `a2bf348`. Preserved both owners' progress records, the PWA installation provider and service worker, capsule saving skeleton and duplicate-submit guard, and studio save and image preparation indicators.
+- Upload notifications now confirm verified bytes without restoring the obsolete unconditional description and confidence starts. Current main retains ownership of the occasion readiness gate.
+- Focused operation and feedback tests passed 10 across three files after conflict resolution. No browser, provider, hosted mutation or deployment checks were run for this resolution. CI remains the complete check and build gate.
+
 ## Owner 4 capsule bulk selection, 7 November 2026
 
 - O4.2, R38; branch `o4/capsule-select-all` from `47b1659`. Added Select all
