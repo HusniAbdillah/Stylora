@@ -24,7 +24,11 @@ import {
 } from "@/features/operations/server";
 import { getCapsuleDraft } from "./drafts";
 import { getCapsule } from "./queries";
-import { capsuleBriefSchema, categorySchema } from "./schema";
+import {
+  capsuleBriefReady,
+  capsuleBriefSchema,
+  categorySchema,
+} from "./schema";
 import { CAPSULE_TEMPLATES } from "./capsule-types";
 import {
   capsuleGenerationSchema,
@@ -39,10 +43,24 @@ export async function prepareCapsule(input: unknown) {
     .strictObject({
       draftId: z.uuid(),
       expectedRevision: z.number().int().positive(),
+      brief: capsuleBriefSchema.optional(),
     })
     .parse(input);
   const draft = await getCapsuleDraft(parsed.draftId);
-  if (!draft || draft.revision !== parsed.expectedRevision)
+  const sameBrief =
+    draft &&
+    (!parsed.brief ||
+      JSON.stringify(parsed.brief) === JSON.stringify(draft.brief));
+  const acknowledgedLink =
+    draft &&
+    parsed.brief &&
+    draft.capsuleId &&
+    draft.revision === parsed.expectedRevision + 1;
+  if (
+    !draft ||
+    !sameBrief ||
+    (draft.revision !== parsed.expectedRevision && !acknowledgedLink)
+  )
     throw new ApiError(
       "draft_conflict",
       "Your draft changed. Reopen it before building a capsule.",
@@ -50,13 +68,7 @@ export async function prepareCapsule(input: unknown) {
     );
   const brief = draft.brief;
   const capsuleId = draft.capsuleId ?? draft.id;
-  if (
-    !brief.weather ||
-    !brief.palette ||
-    !brief.dressCode ||
-    !brief.activities.length ||
-    !brief.includedItemIds.length
-  )
+  if (!capsuleBriefReady(brief))
     throw new ApiError(
       "capsule_not_ready",
       "Complete the capsule brief and select owned pieces first.",
@@ -80,7 +92,12 @@ export async function prepareCapsule(input: unknown) {
     JSON.stringify(capsuleBriefSchema.parse(existing.brief)) ===
       JSON.stringify(brief),
   );
-  if (existing && !unchanged && existing.revision !== draft.capsuleRevision)
+  if (
+    existing &&
+    (draft.capsuleId
+      ? existing.revision !== draft.capsuleRevision
+      : !unchanged || existing.revision !== 1)
+  )
     throw new ApiError(
       "capsule_revision_conflict",
       "This capsule changed in another session. Your draft is kept.",
@@ -109,6 +126,12 @@ export async function prepareCapsule(input: unknown) {
       .object({ id: z.uuid(), revision: z.number().int().positive() })
       .parse(data).revision;
   }
+  if (
+    draft.capsuleId === capsuleId &&
+    draft.capsuleRevision === capsuleRevision
+  ) {
+    return { capsuleId, capsuleRevision, draftRevision: draft.revision };
+  }
   const { data: linked, error: linkError } = await context.client
     .from("workflow_drafts")
     .update({
@@ -120,7 +143,7 @@ export async function prepareCapsule(input: unknown) {
     .eq("id", draft.id)
     .eq("feature_kind", "capsules")
     .eq("revision", draft.revision)
-    .select("id")
+    .select("id,revision")
     .maybeSingle();
   if (linkError || !linked)
     throw new ApiError(
@@ -129,7 +152,7 @@ export async function prepareCapsule(input: unknown) {
       503,
       true,
     );
-  return { capsuleId };
+  return { capsuleId, capsuleRevision, draftRevision: linked.revision };
 }
 
 async function capsuleContext(id: string) {

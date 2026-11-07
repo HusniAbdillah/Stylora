@@ -69,3 +69,20 @@ export type CapsuleDraftState = {
   capsuleId?: string;
   capsuleRevision?: number;
 };
+
+export const preparedCapsuleSchema = z.strictObject({
+  capsuleId: z.uuid(),
+  capsuleRevision: z.number().int().positive(),
+  draftRevision: z.number().int().positive(),
+});
+export type PreparedCapsule = z.infer<typeof preparedCapsuleSchema>;
+
+export function capsuleBriefReady(brief: CapsuleDraftState["brief"]) {
+  return Boolean(
+    brief.weather &&
+    brief.palette &&
+    brief.dressCode &&
+    brief.activities.length &&
+    brief.includedItemIds.length,
+  );
+}
