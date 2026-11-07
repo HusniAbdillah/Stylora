@@ -8,7 +8,7 @@ PNPM ?= pnpm
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install env dev build start lint typecheck test check format format-write ci pre-pr db-new db-push db-types
+.PHONY: help install env dev build start lint typecheck test fast check format format-write ci pre-pr db-new db-push db-types
 
 help:
 	@echo Stylora make targets
@@ -24,6 +24,7 @@ help:
 	@echo   make lint          ESLint
 	@echo   make typecheck     next typegen and tsc
 	@echo   make test          Vitest, single run
+	@echo   make fast          lint and typecheck, run before every commit
 	@echo   make check         lint, typecheck and test, same as pnpm check
 	@echo   make format        Prettier check
 	@echo   make format-write  Prettier write
@@ -57,6 +58,9 @@ typecheck:
 
 test:
 	$(PNPM) test
+
+# Fast gate for every commit: lint and typecheck, no tests.
+fast: lint typecheck
 
 check:
 	$(PNPM) check

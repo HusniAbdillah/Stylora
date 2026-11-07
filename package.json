@@ -14,8 +14,9 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
-    "format:check": "prettier --check src scripts package.json tsconfig.json '*.config.*'",
-    "db:types": "node scripts/generate-database-types.mjs"
+    "format:check": "prettier --check src scripts package.json tsconfig.json eslint.config.mjs next.config.ts postcss.config.mjs",
+    "db:types": "node scripts/generate-database-types.mjs",
+    "db:test": "supabase test db supabase/tests"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",

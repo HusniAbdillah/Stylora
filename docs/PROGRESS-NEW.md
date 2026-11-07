@@ -25,7 +25,9 @@ assignments in [TASK.md](TASK.md), and contracts in [TDD.md](TDD.md).
 7. Preserve secrets: no keys, signed URLs, personal payloads or full sensitive
    provider logs.
 8. Include cleanup and remaining work. Do not commit, push, deploy or modify
-   hosted data merely to make a progress row look complete.
+   hosted data merely to make a progress row look complete. Git delivery
+   follows the lanes in [WORKFLOW.md](WORKFLOW.md) section 10; deployment and
+   hosted data changes need separate authorization.
 
 ## 2. Status vocabulary
 
@@ -58,7 +60,7 @@ below the latest one.
 | Active requirement and task IDs           | Not reported                                                            |
 | Working-tree changes outside this task    | Not assessed                                                            |
 | Environment                               | Local app, hosted Supabase, disposable test database, or other; specify |
-| Commit, push and deployment authorization | Not granted by this template                                            |
+| Git lane and deployment authorization     | Lane A or B per WORKFLOW section 10; deployment not granted             |
 | Check restrictions                        | Record user instructions before running anything                        |
 | Current shared integration blocker        | Not assessed                                                            |
 | Next checkpoint                           | Not scheduled                                                           |

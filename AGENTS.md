@@ -142,8 +142,9 @@ A skill never authorizes unrelated product or cloud changes.
 
 ## Verification and delivery
 
-For authorized implementation tasks, run relevant `pnpm check` and `pnpm build`
-checks. Database changes require reviewed migration validation, generated types
+For authorized implementation tasks, run the proportionate checks in
+`docs/WORKFLOW.md` section 10.4: no checks per commit, one `make fast` before
+opening a pull request, and CI as the full gate (it runs check and build). Database changes require reviewed migration validation, generated types
 and policy tests in an approved environment. Check foreign workspace rejection
 and denied direct table access. Online tests and seeding may call providers or
 change shared data; check what they do before running and stay within
@@ -153,7 +154,56 @@ Record actual commands, environment, result, fixture source, cleanup,
 limitations and integration evidence in docs/PROGRESS-NEW.md. A route, unit test or
 build does not prove an end-to-end feature. Do not label unrun checks passed.
 
-Do not commit, push, deploy, provision paid services or modify the remote
-database merely because checks pass. Obtain authorization from the task. Keep
-unrelated changes and secrets out of commits. End with the concrete changes,
-evidence, remaining work and limits.
+## Autonomous git delivery
+
+The team grants agents a standing, bounded authorization to deliver their own
+assigned task through git without asking at each step. The full procedure,
+lanes and stop conditions are in `docs/WORKFLOW.md` section 10; this section is
+the binding summary.
+
+Allowed without further approval, for the assigned task only:
+
+- Create a branch `oN/<slug>` from a fresh `origin/main`, commit in small
+  logical steps, and push that branch.
+- Open a pull request to `main` and, in the Lane A conditions only, squash-merge
+  it once required checks are green and GitHub reports it mergeable.
+- Revert your own merged change with a revert pull request if it breaks `main`.
+
+Lane A means: the diff stays in the owner's feature folders and thin routes, adds
+no dependency, is at most about 400 changed lines, and touches none of the Lane B
+paths. Lane B changes (shared files, `supabase/**`, generated types, lockfile,
+`.github/**`, `src/prompts`, security, storage, workspace scoping, public
+sharing, governing specifications) get a pull request and then stop for human
+approval.
+
+Always:
+
+- Stage explicit paths. Never `git add -A` or `git add .`; leave unrelated local
+  files, images and caches unstaged.
+- Commit with Conventional Commits, one logical change per commit. Do not run
+  checks per commit; speed matters more than a green history on a branch that is
+  squash-merged.
+- Skim your diff once against the short checklist in `docs/WORKFLOW.md` section
+  10.5, run `make fast` once, then open the pull request immediately.
+- For Lane A, enable auto-merge and move on instead of watching CI. Do not loop
+  on a failing check; after two fix attempts with the same cause, stop and
+  report.
+
+Never, even when checks pass:
+
+- Push to `main`, force push (except `--force-with-lease` on your own open
+  pull-request branch after a rebase), bypass branch protection or use admin
+  merge, skip hooks with `--no-verify`, or rewrite published history.
+- Deploy, provision paid services, run `make db-push` or any hosted database
+  change, seed shared data, or run provider calls beyond the stated budget.
+  These still need explicit task authorization.
+- Merge after the 06:00 feature freeze, or after 05:30 without a blocker
+  reason, without a human present.
+- Disable, skip or weaken a test, lint rule or type check to get green.
+- Commit secrets, signed URLs, personal payloads or credentials. If one was
+  pushed, stop, report it and let a human decide how to rotate and clean up.
+
+An explicit instruction from the user in the current task, such as skipping
+tests or not committing, overrides this section. Keep unrelated changes and
+secrets out of commits. End with the concrete changes, commits, pull request
+link, checks run and not run, merge state, remaining work and limits.

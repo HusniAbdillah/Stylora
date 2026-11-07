@@ -65,7 +65,8 @@ Rules:
 ## 3. Git, pull requests and merge rhythm
 
 - `main` is always deployable and auto-deploys to Vercel production. Protect
-  it: pull requests only, CI green, one approval.
+  it: pull requests only and CI green. Approval requirements and the agent
+  merge lane are in section 10.6.
 - Branch names: `o1/wardrobe-grid`, `o2/review-stream`, `o3/marketplace`,
   `o4/capsule-wizard`. A branch lives at most 90 minutes; split bigger work.
 - Each PR stays under roughly 400 changed lines, includes the Figma frame ID it
@@ -308,3 +309,159 @@ has loading, empty, error and retry states; keeps state across navigation;
 confirms destructive actions with the custom dialog; passes `pnpm check`;
 merged through a reviewed PR; evidence row added to PROGRESS-NEW.md with the
 exact checks run and anything not run.
+
+## 10. Agent delivery lane: commit, pull request and merge
+
+This section lets a coding agent deliver its own assigned task through git with
+self-evaluation and without waiting at every step, while keeping `main`
+deployable. [AGENTS.md](../AGENTS.md) holds the binding summary. An explicit
+instruction in the current task, for example "do not commit" or "skip tests",
+overrides this section.
+
+### 10.1 Branch
+
+1. `git fetch origin`, then create `oN/<slug>` from `origin/main` (for example
+   `o2/review-stream`). Check `git status` first and note any unrelated local
+   changes; they stay unstaged and untouched.
+2. One branch per task ID. A branch lives at most 90 minutes; split bigger work
+   into a stack of small pull requests merged in order.
+3. Rebase, never merge `main` into the branch. History stays linear.
+
+### 10.2 Commits
+
+- Commit as soon as one logical slice works, roughly every 15 to 30 minutes and
+  at most about 150 changed lines. Do not batch a whole feature into one commit
+  and do not commit broken code.
+- Format `type(scope): imperative subject`, subject at most 72 characters, no
+  trailing period. Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`,
+  `perf`, `style`. Scope is the feature folder, for example
+  `feat(inspiration): stream complete garment pieces`. Add a body only to explain
+  why, and reference the task ID (for example `O2.4`) and the Figma frame.
+- Stage explicit paths with `git add <path>`; review `git diff --staged` before
+  each commit. Never `git add -A` or `git add .`.
+- Keep migrations, generated types and the code that uses them in separate
+  commits so a revert stays clean. Only Owner 1 commits `supabase/**`.
+- Run the fast gate (`make fast`) before every commit. Never use `--no-verify`.
+  Do not amend or rewrite commits that were already pushed.
+
+### 10.3 Pull request
+
+Open the pull request when the task slice is complete and Tier 1 below has
+passed. Use `.github/pull_request_template.md`.
+
+- Title in the same Conventional Commits form. Target `main`.
+- Body: summary, task and requirement IDs, Figma frame IDs, lane (A or B),
+  checks run and not run, screenshot or preview link for UI, limits, and the
+  PROGRESS-NEW.md row.
+- Keep it under roughly 400 changed lines. If it grows, split it.
+- Rebase on `origin/main` right before opening it and again before merging.
+
+### 10.4 Test budget for a seven-hour build
+
+Run the cheapest check that can catch the risk. The goal is a trustworthy
+`main`, not full coverage.
+
+| Tier | When                          | Command                                | Target time |
+| ---- | ----------------------------- | -------------------------------------- | ----------- |
+| 0    | Before every commit           | `make fast` (lint and typecheck)       | under 1 min |
+| 1    | Once before opening the PR    | `make check` (adds unit tests)         | under 3 min |
+| 2    | Only if the diff can break it | `make build`                           | CI runs it  |
+| 3    | UI changes, one pass          | Click the changed flow once on preview | 2 to 5 min  |
+
+- Run a local `make build` only when the diff touches `package.json`, the
+  lockfile, `next.config.ts`, route segments, layouts, `loading.tsx`, env or
+  config code, or a server-only boundary. Otherwise CI's build on the pull
+  request is enough.
+- Docs-only changes need no tests; run the formatter on the changed Markdown.
+- Write new tests only where a defect is costly and cheap to catch: workspace
+  scoping and parent membership, Zod contracts and provider-output validation,
+  functional matching gates, idempotency and stale-result rejection, URL, MIME
+  and size restrictions, and score or price math. Each test file should run in
+  seconds.
+- Do not write snapshot tests, tests of purely presentational components,
+  browser end-to-end suites or mock-provider tests that prove nothing live. Do
+  not run the full suite repeatedly while iterating; run the one affected file.
+- Failing check: read the error, fix, rerun. After two attempts with the same
+  cause, stop and report. Never delete, skip or weaken a test, lint rule or type
+  to get green.
+- Provider or database checks that spend quota or touch shared data are not part
+  of this lane. They follow the budget in section 1 and need task authorization.
+
+### 10.5 Self-review before opening and before merging
+
+Read the whole `git diff origin/main...HEAD` once and confirm:
+
+- [ ] Only files for this task changed; no unrelated, generated or local files.
+- [ ] No secrets, signed URLs, personal payloads or raw provider output in code,
+      logs or fixtures.
+- [ ] Every read, write and child lookup is scoped to server-side
+      `STYLORA_WORKSPACE_ID`; no client workspace ID is accepted.
+- [ ] Inputs, actions and provider output are validated with Zod.
+- [ ] No invented IDs, scores or model output; failures show an unavailable
+      state, samples are labeled.
+- [ ] Tokens and shared primitives are used; no raw hex; loading, empty, error
+      and retry states exist.
+- [ ] No leftover `console.log`, commented-out code or TODO without a task ID.
+- [ ] The PROGRESS-NEW.md row states the checks actually run and those not run.
+
+### 10.6 Merge lanes
+
+| Lane | Scope                                                                                                                                                                                                                                                            | Merge rule                                                                                  |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| A    | The owner's own feature folders and thin routes, tests for them, PROGRESS-NEW.md, TODO.md; no new dependency; about 400 lines or fewer                                                                                                                          | The agent may squash-merge after the Lane A conditions below                                |
+| B    | `src/app/globals.css`, `src/app/layout.tsx`, shell and shared UI primitives, `package.json`, lockfile, `.env.example`, `supabase/**`, generated types, `.github/**`, `Makefile`, `src/prompts`, security, storage and workspace-scoping code, public sharing and media, governing specs (PRD, TDD, DESIGN, TASK, RULES, FASHION*), cross-owner contracts, more than 400 lines | The agent opens the pull request, reports it and stops. A human reviewer approves and merges |
+
+When in doubt, treat the change as Lane B. A pull request that mixes lanes is
+Lane B; split it when practical.
+
+Lane A merge conditions, all required:
+
+1. Self-review in 10.5 is done and the diff matches Lane A.
+2. The required CI check is green on the latest pushed commit.
+3. GitHub reports the pull request mergeable and no review comment or requested
+   change is unresolved.
+4. The branch is rebased on the current `origin/main`, and Tier 0 passed after
+   the rebase.
+5. The time is before the 05:15 last feature merge. Between 05:15 and 06:00 only
+   a blocker fix with a reason in the pull request body; after 06:00 do not
+   merge without a human.
+6. The merge uses `gh pr merge --squash --delete-branch`, without `--admin` and
+   without bypassing branch protection. If protection requires an approval the
+   agent cannot supply, leave the pull request open and report it.
+
+After merging: `git switch main`, `git pull --ff-only`, delete the local branch,
+confirm the Vercel preview or production deploy for `main` is healthy when
+visible, and report the pull request link.
+
+Team setting to decide at the start: for Lane A to work, branch protection on
+`main` must not require a human approval, only the green `Check` workflow. If the
+team keeps one required approval, Lane A agents stop after opening the pull
+request and the rotation in section 3 merges it. Lane B always keeps the
+reviewer rotation.
+
+### 10.7 Stop and escalate
+
+Stop, leave the branch pushed if it is safe, and report instead of pushing on
+when any of these happens:
+
+- CI is red after two fix attempts, or the failure is in code the agent does not
+  own.
+- A rebase conflict touches a file owned by another owner.
+- The work needs a Lane B change, a new dependency, a schema change or a new
+  contract.
+- A secret or personal payload appears in the diff or history.
+- The working tree has unexplained changes in files the task never touched.
+- A provider quota, cost or shared-data action would be needed.
+- `main` is red for a reason unrelated to the change.
+
+### 10.8 Rollback
+
+If a merged change breaks `main` or the preview, open a revert pull request with
+`git revert <squash commit>` and merge it under the Lane A conditions, then
+report the cause. Never use `git reset --hard` or force push `main`.
+
+### 10.9 Final report
+
+End each task with the commits and pull request link, the lane, checks run and
+checks not run, merge state, the PROGRESS-NEW.md row, remaining work and
+limits. Do not call anything verified that was not run.
