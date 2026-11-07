@@ -6,11 +6,16 @@ import {
   imageRenderSettingsSchema,
   type ImageRenderSettings,
 } from "./image-settings";
+import {
+  avatarVisualDirectionSchema,
+  type AvatarVisualDirection,
+} from "@/features/preview/visual-direction";
 
 export const FASHION_SCHEMA_VERSION = "fashion-item.v1";
 export const FASHION_KNOWLEDGE_VERSION =
   getFashionVersions().knowledgeSourceHash;
 export const FASHION_PROMPT_VERSION = `stylora-fashion-v1.openai-2.${FASHION_KNOWLEDGE_VERSION}`;
+export const AVATAR_PROMPT_VERSION = `stylora-fashion-v1.avatar-3.${FASHION_KNOWLEDGE_VERSION}`;
 export const TEXT_MODEL =
   process.env.OPENAI_TEXT_MODEL?.trim() ||
   process.env.OPENAI_MODEL?.trim() ||
@@ -154,8 +159,7 @@ const imageResponse = z.object({
 
 export async function generateFashionImage(input: {
   items: unknown[];
-  preferences: unknown;
-  pose?: string;
+  visualDirection: AvatarVisualDirection;
   allowDescriptionOnly?: boolean;
   renderSettings?: ImageRenderSettings;
   signal?: AbortSignal;
@@ -174,6 +178,9 @@ export async function generateFashionImage(input: {
   const settings = imageRenderSettingsSchema.parse(
     input.renderSettings ?? getImageRenderSettings(),
   );
+  const visualDirection = avatarVisualDirectionSchema.parse(
+    input.visualDirection,
+  );
   const body = new FormData();
   body.set("model", IMAGE_MODEL);
   body.set("size", settings.size);
@@ -185,11 +192,10 @@ export async function generateFashionImage(input: {
     "prompt",
     [
       instructions("avatar"),
-      "Create one faceless illustrative fashion mannequin on a warm porcelain background. Preserve garment details and keep unselected categories plain. Show a natural standing or three-quarter pose with all clothes visible.",
+      "Create one full-length non-identifying fashion mannequin on a warm porcelain studio background with soft diffuse light. Render believable fabric texture, seams, drape and construction from the supplied garment references. Keep the exact selected garment colors, patterns, logos and silhouette; do not invent branding, clothing or accessories. Apply only the supplied visual preferences and outfit pose. Keep garment fronts, hems and selected accessories readable. Skin swatch is an approximate appearance reference under neutral lighting, never an ethnicity. Fit intent affects the illustrative styling without redesigning the garment. Show a neutral mannequin for unspecified human features. Avoid beauty filters, extreme proportions, text labels and impossible anatomy.",
       JSON.stringify({
         items: input.items,
-        preferences: input.preferences,
-        pose: input.pose,
+        visualDirection,
       }),
     ].join("\n\n"),
   );
@@ -236,7 +242,7 @@ export async function generateFashionImage(input: {
     bytes: new Uint8Array(bytes),
     mimeType: "image/png" as const,
     model: IMAGE_MODEL,
-    promptVersion: FASHION_PROMPT_VERSION,
+    promptVersion: AVATAR_PROMPT_VERSION,
     schemaVersion: FASHION_SCHEMA_VERSION,
     knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
     providerRequestId: response.headers.get("x-request-id"),
