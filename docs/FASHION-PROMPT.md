@@ -223,6 +223,14 @@ ethnicity. Use the chosen body illustration and proportion goals without
 exaggeration. If missing, use a neutral mannequin and disclose that
 personalization was not applied.
 
+Use one fixed figure in every render: a smooth, matte, human-proportioned
+mannequin with a featureless oval head. The head has no face, eyes, mouth, hair
+or ears, and carries no headwear unless a hat is a selected item. Neck, arms,
+hands and legs are plain and jointless in one uniform matte tone. The selected
+skin swatch and undertone set that tone; without a swatch use a neutral warm
+stone. Never render a realistic face and never omit the head. Feet stay plain
+mannequin feet unless footwear is selected.
+
 Choose a natural, elegant pose appropriate to the outfit: relaxed standing,
 slight three-quarter turn, or a modest walking stance. Keep limbs and garments
 readable; avoid extreme posing, sexualized framing, impossible layering, text,
