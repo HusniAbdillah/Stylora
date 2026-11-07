@@ -216,7 +216,7 @@ export function Toast({
   action?: ReactNode;
 }) {
   return (
-    <div className={styles.toast}>
+    <div className={styles.toast} data-tone={tone}>
       <Icon
         name={pending ? "refresh" : tone === "owned" ? "check" : "info"}
         className={pending ? styles.toastPending : undefined}

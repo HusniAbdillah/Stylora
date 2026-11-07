@@ -88,7 +88,8 @@ async function retry(row: Row) {
     retrying.delete(row.id);
   }
 }
-export function acceptOperationActivity(rows: Row[], writesEnabled = false) {
+export function acceptOperationActivity(input: unknown, writesEnabled = false) {
+  const rows = z.array(rowSchema).parse(input);
   for (const row of rows) {
     const previous = seen.get(row.id);
     if (previous && Date.parse(row.updatedAt) < Date.parse(previous.updatedAt))

@@ -93,7 +93,12 @@ export function CapsuleResultScreen({
     setMessage("");
     setOperationId(undefined);
     const feedbackId = `capsule-save:${outfit}`;
-    publishFeedback({ id: feedbackId, label: "Save capsule outfit", state: "running", detail: "Saving the outfit snapshot." });
+    publishFeedback({
+      id: feedbackId,
+      label: "Save capsule outfit",
+      state: "running",
+      detail: "Saving the outfit snapshot.",
+    });
     const response = await saveStudioLook({
       source: { kind: "capsule", id: outfit, parentId: result.id },
       expectedRevision: revision,
@@ -103,7 +108,13 @@ export function CapsuleResultScreen({
       idempotencyKey: `studio:capsule:${outfit}:${revision}`,
     }).catch(() => ({ ok: false as const }));
     if (response.ok) {
-      publishFeedback({ id: feedbackId, label: "Capsule outfit saved", state: "complete", detail: "Outfit saved. Avatar image has its own status.", href: `/saved-looks/${response.savedLookId}` });
+      publishFeedback({
+        id: feedbackId,
+        label: "Capsule outfit saved",
+        state: "complete",
+        detail: "Outfit saved. Avatar image has its own status.",
+        href: `/saved-looks/${response.savedLookId}`,
+      });
       void startOperationRequest(
         response.operationId,
         `/api/avatars/${response.operationId}`,
@@ -111,7 +122,12 @@ export function CapsuleResultScreen({
       ).catch(() => {});
       router.push(`/saved-looks/${response.savedLookId}`);
     } else {
-      publishFeedback({ id: feedbackId, label: "Capsule outfit could not be saved", state: "failed", detail: "Your capsule is kept. Retry saving." });
+      publishFeedback({
+        id: feedbackId,
+        label: "Capsule outfit could not be saved",
+        state: "failed",
+        detail: "Your capsule is kept. Retry saving.",
+      });
       savingRequest.current = false;
       setSaving(false);
       setMessage(

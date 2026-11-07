@@ -328,7 +328,7 @@ export function ActivityMenu({
       );
       return {
         ...item,
-        href: original?.href ?? item.href,
+        href: item.href ?? original?.href,
         onRetry: original?.onRetry ?? item.onRetry,
       };
     }),

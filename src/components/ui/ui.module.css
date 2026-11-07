@@ -170,6 +170,12 @@
     color: var(--color-crimson);
     animation: toastSpin 1.2s linear infinite;
   }
+  .toast[data-tone="owned"] > span {
+    color: var(--color-owned);
+  }
+  .toast[data-tone="missing"] > span {
+    color: var(--color-missing);
+  }
   @keyframes toastSpin {
     to {
       transform: rotate(360deg);

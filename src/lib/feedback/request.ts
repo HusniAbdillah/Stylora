@@ -35,8 +35,6 @@ export function requestNotice(url: string, method: string): Notice | undefined {
       success: "Updated occasion saved.",
       quiet: true,
     };
-  if (url.endsWith("/pieces"))
-    return { label: "Reviewed pieces", success: "Piece changes saved." };
   if (url.endsWith("/regenerate"))
     return {
       label: url.includes("/media/")
@@ -133,6 +131,10 @@ export async function feedbackRequest(
       const searchFailed =
         notice.label === "Shopping search" &&
         ["failed", "unavailable"].includes(String(data.status));
+      const searchReady =
+        notice.label === "Shopping search" &&
+        data.status === "succeeded" &&
+        Array.isArray(data.products);
       publishFeedback({
         id,
         label: notice.label,
@@ -141,7 +143,11 @@ export async function feedbackRequest(
           ? "Candidate saved, but its image could not be copied. Retry the image import."
           : searchFailed
             ? "Search could not finish. Open the product group to retry."
-            : notice.success,
+            : searchReady
+              ? (data.products as unknown[]).length
+                ? "Product results are ready to review."
+                : "No products found. Adjust the search and try again."
+              : notice.success,
       });
     }
     return response;
