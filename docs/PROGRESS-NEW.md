@@ -322,7 +322,13 @@ below the latest one.
 - Consumer integration: Owner 1 schema; Owner 2 operation protocol; Owner 3 save
   outbox and media; not assessed.
 - Verification evidence: Not run.
-- Real text and image provider evidence: Not verified.
+- Worker intent verification: `pnpm exec vitest run
+  src/features/operations/schema.test.ts` passed all eight tests in the managed
+  Windows worktree. `make fast` passed lint; typecheck is still running before
+  review. The `o4/saved-avatar-intent` change preserves legacy operation input
+  and bypasses cached image reuse only for explicit regeneration with a UUID.
+- Real text and image provider evidence: No hosted operations or provider calls
+  were run for this worker patch. CI is the full suite and build gate.
 - Unresolved work and next concrete action: Not reported.
 
 
