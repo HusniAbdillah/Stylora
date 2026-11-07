@@ -33,10 +33,12 @@ const statusResponse = z.object({
         "succeeded",
         "failed",
         "unavailable",
+        "cancelled",
       ]),
       imageUrl: z.string().nullable().optional(),
       elapsedSeconds: z.number().optional(),
       errorMessage: z.string().optional(),
+      superseded: z.boolean().optional(),
     }),
   }),
 });
@@ -81,7 +83,9 @@ export function PreviewClient({
   const [reviewing, setReviewing] = useState(false);
 
   const launch = useCallback(
-    async (mode: "resume" | "regenerate" | "retry") => {
+    async function executePreview(
+      mode: "resume" | "regenerate" | "retry",
+    ): Promise<void> {
       if (!draft.current.draftId) return;
       const launchKey = `${draft.current.draftId}:${draft.current.revision}:${mode}`;
       if (pendingLaunches.current.has(launchKey)) return;
@@ -89,6 +93,7 @@ export function PreviewClient({
       setJob({ status: "queued" });
       const current = { ...draft.current };
       const renderSelection = latestSelection.current;
+      let superseded = false;
       try {
         const body = {
           draftId: current.draftId,
@@ -144,6 +149,7 @@ export function PreviewClient({
         pendingRender.current = undefined;
         setOperationId(result.operationId);
         setJob(result.job);
+        superseded = result.job.superseded ?? false;
       } catch {
         if (
           draft.current.draftId === current.draftId &&
@@ -157,6 +163,8 @@ export function PreviewClient({
           });
       } finally {
         pendingLaunches.current.delete(launchKey);
+        if (superseded && latestSelection.current === renderSelection)
+          void executePreview("resume");
       }
     },
     [operationId],
@@ -168,9 +176,11 @@ export function PreviewClient({
       !initial.draftId ||
       !initial.writesEnabled ||
       !Object.keys(initial.selection).length ||
+      !initial.selectionValid ||
       initial.job.status === "unavailable" ||
       initial.job.status === "succeeded" ||
-      initial.job.status === "failed"
+      initial.job.status === "failed" ||
+      initial.job.status === "cancelled"
     )
       return;
     resumed.current = true;
@@ -180,6 +190,7 @@ export function PreviewClient({
     initial.writesEnabled,
     initial.selection,
     initial.job.status,
+    initial.selectionValid,
     launch,
   ]);
 
@@ -204,6 +215,8 @@ export function PreviewClient({
         setSavedSelection(true);
         setJob(result.job);
         setOperationId(result.operationId);
+        if (result.job.superseded && initial.writesEnabled)
+          void launch("resume");
       }
     }
     const interval = setInterval(
@@ -221,7 +234,13 @@ export function PreviewClient({
       clearInterval(interval);
       window.removeEventListener("focus", focus);
     };
-  }, [activeDraftId, job.status, savedSelection]);
+  }, [
+    activeDraftId,
+    job.status,
+    savedSelection,
+    initial.writesEnabled,
+    launch,
+  ]);
 
   const persist = useCallback(
     (selection: PreviewSelection) => {
@@ -370,7 +389,7 @@ export function PreviewClient({
                 void launch(
                   job.status === "failed"
                     ? "retry"
-                    : job.status === "succeeded"
+                    : job.status === "succeeded" || job.status === "cancelled"
                       ? "regenerate"
                       : "resume",
                 );

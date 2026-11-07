@@ -26,6 +26,7 @@ import {
 } from "./image";
 import { previewSelectionSchema, slotForPreviewItem } from "./schema";
 import type { PreviewJob } from "./preview-studio";
+import { previewJobStatus } from "./job-status";
 
 const generationInput = z.strictObject({
   draftId: z.uuid(),
@@ -133,16 +134,10 @@ export async function previewImageStatus(draftId: string) {
   let job: PreviewJob = { status: "idle" };
   let operationId = operation?.id ?? null;
   if (operation) {
-    const running =
-      operation.status === "running" || operation.status === "partial";
+    if (operation.status === "superseded") operationId = null;
     job = {
-      status: running
-        ? "running"
-        : operation.status === "queued"
-          ? "queued"
-          : operation.status === "succeeded"
-            ? "succeeded"
-            : "failed",
+      status: previewJobStatus(operation.status),
+      superseded: operation.status === "superseded",
       elapsedSeconds: operation.completed_at
         ? Math.round(
             (Date.parse(operation.completed_at) -
