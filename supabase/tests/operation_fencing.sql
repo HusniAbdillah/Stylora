@@ -83,6 +83,11 @@ BEGIN
     RAISE EXCEPTION 'Terminal schema failure was retried';
   EXCEPTION WHEN check_violation THEN NULL;
   END;
+  BEGIN
+    PERFORM public.retry_saved_look_media(ws, snapshot);
+    RAISE EXCEPTION 'Saved-media retry bypassed terminal error classification';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
   avatar_op := public.start_workflow_operation(ws, 'saved_avatar', 'saved_look', snapshot, 1, repeat('e',64));
   INSERT INTO public.saved_look_media(workspace_id, saved_look_id, operation_id, preference_snapshot_hash)
     VALUES (ws, snapshot, avatar_op.id, repeat('d',64));
