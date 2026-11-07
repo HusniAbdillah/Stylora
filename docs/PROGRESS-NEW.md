@@ -345,3 +345,12 @@ which data, code revision or provider behavior was verified.
   verified against the SIX ISO 4217 currency list. The focused provider suite
   passed all three tests, including a runtime-independent regression. CI rerun
   remains the final build gate; merge is held at the user's request.
+
+## Owner 4 operation runner increment, 7 November 2026
+
+- Task O4.1. The server runner starts and claims scoped operations, awaits execution, and delegates result commit to an atomic feature callback. Attempt count and input fingerprints fence failure updates. The caller must use a 300-second request duration.
+- Source branch `o4/operation-runner`, core commit `06672fc`. Shared database contracts remain with Owner 1. No migrations or generated types were edited.
+- Checks in the managed Windows worktree. `pnpm install --frozen-lockfile` passed. `make fast` passed lint and typecheck. Focused Vitest passed two files and four tests for stable fingerprints, strict inputs, status projection and in-flight request deduplication.
+- Not run. Hosted database, Storage, provider calls, feature end-to-end journeys and local build. CI is the full build and test gate.
+- Integration pending. Owner 1 atomic completion, workspace image claim quota and retry/cancel contracts. Current failure updates use a scoped attempt and lease compare-and-set. This is request execution with lease recovery on revisit.
+- Client request store and operation HTTP controls are a following increment. No cloud data was changed.
