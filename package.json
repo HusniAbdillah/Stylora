@@ -16,6 +16,7 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "format:check": "prettier --check src scripts package.json tsconfig.json eslint.config.mjs next.config.ts postcss.config.mjs",
     "db:types": "node scripts/generate-database-types.mjs",
+    "db:verify": "node scripts/verify-supabase.mjs",
     "db:test": "supabase test db supabase/tests"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "server-only": "0.0.1",
+    "sharp": "0.35.5",
     "zod": "4.6.7"
   },
   "devDependencies": {

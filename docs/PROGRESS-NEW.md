@@ -51,19 +51,19 @@ check is not automatically a verified hosted flow.
 Copy and fill this block at each checkpoint; retain earlier dated checkpoints
 below the latest one.
 
-| Field                                     | Value                                                                   |
-| ----------------------------------------- | ----------------------------------------------------------------------- |
-| Reported at and timezone                  | Not reported                                                            |
-| Reporter and owner                        | Not assigned                                                            |
-| Branch and inspected HEAD                 | Not reported                                                            |
-| Base main revision                        | Not reported                                                            |
-| Active requirement and task IDs           | Not reported                                                            |
-| Working-tree changes outside this task    | Not assessed                                                            |
-| Environment                               | Local app, hosted Supabase, disposable test database, or other; specify |
-| Git lane and deployment authorization     | Lane A or B per WORKFLOW section 10; deployment not granted             |
-| Check restrictions                        | Record user instructions before running anything                        |
-| Current shared integration blocker        | Not assessed                                                            |
-| Next checkpoint                           | Not scheduled                                                           |
+| Field                                  | Value                                                                   |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| Reported at and timezone               | Not reported                                                            |
+| Reporter and owner                     | Not assigned                                                            |
+| Branch and inspected HEAD              | Not reported                                                            |
+| Base main revision                     | Not reported                                                            |
+| Active requirement and task IDs        | Not reported                                                            |
+| Working-tree changes outside this task | Not assessed                                                            |
+| Environment                            | Local app, hosted Supabase, disposable test database, or other; specify |
+| Git lane and deployment authorization  | Lane A or B per WORKFLOW section 10; deployment not granted             |
+| Check restrictions                     | Record user instructions before running anything                        |
+| Current shared integration blocker     | Not assessed                                                            |
+| Next checkpoint                        | Not scheduled                                                           |
 
 ### Feature status board
 
@@ -233,3 +233,46 @@ Add one row per meaningful task, not one vague row for an entire owner.
 
 A report is complete when another owner can resume from it without guessing
 which data, code revision or provider behavior was verified.
+
+## Foundation checkpoint: 7 November 2026, Asia/Jakarta
+
+- Reporter: Codex coordinator with three authorized subagents (schema, Storage,
+  runtime). Branch: `codex/supabase-foundation`; upstream base: `de6b255`.
+- Task: approved Supabase foundation for all 25 TDD tables and Owner 3
+  dependencies; relevant requirements R01, R07, R28–R32, R44–R45. Business HTTP
+  endpoints and provider execution remain with their feature owners.
+- Authorization: the user explicitly requested one hosted production migration
+  through MCP, workspace bootstrap, and connection verification. No local
+  Supabase stack, CLI login, AI call or shopping call was used.
+- Applied migration: `20261107031037_initial_stylora_foundation` on the existing
+  Stylora project. Exactly one baseline entry; 25 tables with RLS, zero direct
+  anon/authenticated/PUBLIC table grants, three private 10 MiB buckets.
+- Bootstrap: six environment workspaces and empty preference records, separate
+  from the baseline. Runtime uses `demo`; Storage fixtures use `dev-owner-3` in
+  the same hosted project. Local application writes remain disabled by default.
+- Database evidence: `supabase/tests/foundation.sql` executed through MCP;
+  access, foreign parents, candidate exclusion, per-option revision checks,
+  atomic/idempotent snapshot with avatar operation, immutability and operation
+  claims passed. All synthetic SQL fixtures rolled back.
+- Runtime evidence: `corepack pnpm db:verify` passed configured-workspace and
+  bucket checks. With explicit process-only write/workspace overrides,
+  `corepack pnpm db:verify --write-storage` passed image round-trips and MIME
+  rejection in all three buckets, invalid-bucket rejection, and verified cleanup.
+- Unit evidence: one targeted Vitest run, four files and 34 tests passed.
+- Generated types: unmodified MCP output from the applied schema, used by the
+  existing server-only client. No hand-authored substitute types.
+- Security advisor: only the expected informational `rls_enabled_no_policy`
+  finding for 25 intentionally deny-all internal tables. See the
+  [Supabase advisory](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+- Code checks: `corepack pnpm lint`, `corepack pnpm typecheck` and
+  `corepack pnpm build` passed. The initial typecheck found the existing
+  `ProcessEnv`/`NODE_ENV` mismatch; upstream `de6b255` fixed it, and the final
+  checks passed after synchronization. No full suite was repeated.
+- Limits: helpers return verified upload metadata; domain attachment/ready
+  promotion and pending-object reconciliation are future feature operations.
+  Public sharing must recheck tokens and serve approved bytes rather than expose
+  reusable signed URLs. Operations are persistence/claim primitives, not an
+  autonomous executor. No feature-level provider success is claimed.
+- Delivery: Lane B (schema, generated types, storage and shared server code).
+  The user explicitly authorized PR creation and merge after green checks,
+  including resolving conflicts. No branch-protection bypass or deployment.
