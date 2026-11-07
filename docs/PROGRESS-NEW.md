@@ -1194,6 +1194,12 @@ which data, code revision or provider behavior was verified.
   retained both reports. Shared-shell changes merged without conflicts.
   The five focused tests passed again after integration. Temporary servers on
   ports 3127 and 3128 were stopped; no shared fixtures were created.
+- Post-rebase `make fast PNPM="corepack pnpm"` passed lint, then encountered
+  eight obsolete `.next/types/app` route files from the earlier production
+  build. Confirmed each source route had moved under `(workspace)`, removed
+  only those generated files and reran `corepack pnpm typecheck`: passed.
+  GitHub Check on `18d7e23` passed its full check and build. Build and browser
+  evidence below was collected before rebase; CI supplies integration evidence.
 - Task O1.5, R01 and R10. Branch `o1/pwa-icons`, Lane B. Added root app
   metadata, a standalone manifest with task shortcuts, public browser and
   home-screen icons, a browser-supported workspace install action and Safari
