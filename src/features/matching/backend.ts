@@ -11,16 +11,20 @@ import { getWorkspaceDatabase } from "@/lib/supabase/server";
 import { z } from "zod";
 import {
   evaluateCandidate,
+  classifyInventoryMatch,
   resolveEffectiveAttributes,
+  type InventoryMode,
   type MatchItem,
 } from "./gates";
 import { explainedMatchesSchema, type MatchResult } from "./schema";
+import { createEvidenceProjection } from "./evidence";
 
-export type { MatchItem } from "./gates";
+export type { MatchItem, InventoryMode } from "./gates";
 export type MatchContext = {
   preferences: Record<string, string | string[]>;
   occasion: string | null;
   sourceRevision: number;
+  inventoryMode?: InventoryMode;
   onProviderMetadata?: (metadata: unknown) => void;
 };
 
@@ -39,11 +43,11 @@ const inventoryRowSchema = z.object({
   source_type: z.enum(["live", "manual", "sample"]),
   revision: z.number().int().positive(),
   asset_id: z.uuid().nullable(),
-  inventory_status: z.literal("owned"),
-  archived_at: z.null(),
+  inventory_status: z.enum(["owned", "saved_candidate"]),
+  archived_at: z.string().nullable(),
 });
 
-export async function listInventory(mode: "sample" | "live") {
+export async function listInventory(mode: InventoryMode) {
   const { client, workspaceId } = getWorkspaceDatabase();
   const rows: z.infer<typeof inventoryRowSchema>[] = [];
   const pageSize = 500;
@@ -53,13 +57,14 @@ export async function listInventory(mode: "sample" | "live") {
       .select(
         "id,name,description,confidence,uncertainty,category,subcategory,attributes,inferred_attributes,corrections,provenance,source_type,revision,asset_id,inventory_status,archived_at",
       )
-      .eq("workspace_id", workspaceId)
-      .eq("inventory_status", "owned")
-      .is("archived_at", null);
-    query =
-      mode === "sample"
-        ? query.eq("source_type", "sample")
-        : query.neq("source_type", "sample");
+      .eq("workspace_id", workspaceId);
+    if (mode !== "combined") {
+      query = query.eq("inventory_status", "owned").is("archived_at", null);
+      query =
+        mode === "sample"
+          ? query.eq("source_type", "sample")
+          : query.neq("source_type", "sample");
+    }
     const { data, error } = await query
       .order("id")
       .range(offset, offset + pageSize - 1);
@@ -197,11 +202,14 @@ export async function calculateMatches(
           candidate,
           context.occasion,
           context.preferences,
+          context.inventoryMode,
         ),
       }))
       .sort(
         (left, right) =>
           right.comparison.score - left.comparison.score ||
+          Number(right.candidate.inventoryStatus === "owned") -
+            Number(left.candidate.inventoryStatus === "owned") ||
           left.candidate.id.localeCompare(right.candidate.id),
       );
     const chosen = ranked.find((entry) => entry.comparison.eligible);
@@ -211,10 +219,7 @@ export async function calculateMatches(
       pieceId: piece.id,
       wardrobeItemId: chosen?.candidate.id ?? null,
       outcome: chosen
-        ? chosen.comparison.score >= 0.8 &&
-          chosen.comparison.evidenceCoverage >= 0.25
-          ? ("owned_match" as const)
-          : ("wardrobe_alternative" as const)
+        ? classifyInventoryMatch(chosen.candidate, chosen.comparison)
         : ("missing" as const),
       score: chosen?.comparison.score ?? null,
       sharedAttributes: chosen?.comparison.sharedAttributes ?? [],
@@ -232,12 +237,31 @@ export async function calculateMatches(
   const selectedInventory = inventory.filter((item) =>
     planned.some((match) => match.wardrobeItemId === item.id),
   );
+  const evidence = createEvidenceProjection({
+    pieces,
+    inventory: selectedInventory,
+    preferences: context.preferences,
+    occasion: context.occasion,
+    sourceRevision: context.sourceRevision,
+  });
   const response = await requestFashion({
     task: "wardrobe_match",
-    schema: explainedMatchesSchema,
+    schema: explainedMatchesSchema.extend({
+      matches: z
+        .array(
+          explainedMatchesSchema.shape.matches.element.extend({
+            pieceId: z.enum(pieces.map((piece) => piece.id)),
+            explanation: evidence.schema,
+          }),
+        )
+        .min(1)
+        .max(24),
+    }),
     context: {
       instruction:
-        "Explain exactly the fixed outcomes supplied. Do not alter outcomes or select any other wardrobe item. Evidence paths must resolve to supplied values (such as name, subcategory, attributes.primaryColor). Preference and context evidence IDs are null. inputsUsed must use only allowedInputs. Include two to four concrete evidence-backed reasons, differences and uncertainty. Sample wardrobe is explicitly synthetic, while inference is real.",
+        "Explain exactly the fixed outcomes supplied. Do not alter outcomes or select any other wardrobe item. Each whyThis evidence array must contain only evidenceCatalog keys, such as e1. Choose keys whose supplied values support the reason; do not output source, id or path objects and never invent evidence keys. The server expands these keys to canonical references. inputsUsed must use only allowedInputs. Include two to four concrete evidence-backed reasons, differences and uncertainty. Combined inventory deliberately compares all supplied workspace records, including saved candidates, archived rows and sample rows. A saved_candidate is not owned and may only be explained as a potential alternative; never imply it is available in the owned wardrobe. An archived owned item is intentionally included in combined mode, but do not describe it as active. Always identify sample inventory as synthetic. Explain these supplied ownership and archive differences when relevant; functional suitability remains mandatory.",
+      evidenceCatalog: evidence.catalog,
+      inventoryMode: context.inventoryMode ?? "live",
       matches: planned.map(({ piece, chosen, ...match }) => ({
         ...match,
         inspiration: piece,
@@ -246,12 +270,7 @@ export async function calculateMatches(
       preferences: context.preferences,
       occasion: context.occasion,
       sourceRevision: context.sourceRevision,
-      allowedInputs: [
-        "inspiration",
-        ...(selectedInventory.length ? ["wardrobe"] : []),
-        ...(context.occasion ? ["occasion"] : []),
-        ...Object.keys(context.preferences),
-      ],
+      allowedInputs: evidence.allowedInputs,
     },
   });
   context.onProviderMetadata?.(response.metadata);

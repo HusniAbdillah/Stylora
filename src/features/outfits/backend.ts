@@ -5,8 +5,12 @@ import {
   validateExplanation,
   type MatchContext,
 } from "@/features/matching/backend";
-import type { MatchItem } from "@/features/matching/gates";
+import {
+  isOwnedInventoryItem,
+  type MatchItem,
+} from "@/features/matching/gates";
 import type { MatchResult } from "@/features/matching/schema";
+import { createEvidenceProjection } from "@/features/matching/evidence";
 import {
   outfitOptionsSchema,
   validateOptionComposition,
@@ -36,27 +40,36 @@ export async function generateOptions(
       "Complete wardrobe matching before generating outfit ideas.",
       409,
     );
+  const evidence = createEvidenceProjection(input);
   const response = await requestFashion({
     task: input.optionType ? "option_regeneration" : "outfit_options",
-    schema: outfitOptionsSchema,
+    schema: outfitOptionsSchema.extend({
+      options: outfitOptionsSchema.shape.options.element
+        .extend({
+          explanation: evidence.schema,
+        })
+        .array()
+        .min(1)
+        .max(3),
+    }),
     context: {
       instruction:
-        "Generate exactly the requested types. Use distinct wearable compositions, not only different titles. Every ready option needs a dress or top and bottom; include shoes when the reference contains them. Do not combine a one-piece dress and unrelated bottom. Use only allowed inventory IDs; no duplicate physical item. from_wardrobe uses only owned items; if inventory cannot support clothing coverage or required footwear, return that direction unavailable with empty items and an honest explanation. Other types may include structured missing briefs using garment schema plus schemaVersion fashion-item.v1, never invented owned IDs. slotId is a stable lowercase semantic name such as top_1, bottom_1, shoes_1. Missing brief fields describe proposed garments, not observed catalog facts; label derived context. closest preserves defining reference details; fresh_alternative changes palette, silhouette, or style. Preserve explicit practical constraints and supplied preferences. Provide two to four evidence-backed reasons; evidence paths resolve to actual supplied values, with preference/context IDs null. Use only allowedInputs; sourceRevision must match. Wardrobe sourceType sample means the inventory is synthetic and must remain explicit.",
+        "Generate exactly the requested types. Use distinct wearable compositions, not only different titles. Every ready option needs a dress or top and bottom; include shoes when the reference contains them. Do not combine a one-piece dress and unrelated bottom. Owned slots may use only allowedOwnedIds; no duplicate physical item. from_wardrobe uses only those owned items; if they cannot support clothing coverage or required footwear, return that direction unavailable with empty items and an honest explanation. Combined mode intentionally includes archived owned and sample owned rows in allowedOwnedIds. Name archive and sample limitations honestly. Saved candidates remain unowned: use them only as evidence or as inspiration for a structured missing brief, never in an owned slot and never in from_wardrobe. Other types may include structured missing briefs using garment schema plus schemaVersion fashion-item.v1, never invented owned IDs. slotId is a stable lowercase semantic name such as top_1, bottom_1, shoes_1. Missing brief fields describe proposed garments, not observed catalog facts; label derived context. closest preserves defining reference details; fresh_alternative changes palette, silhouette, or style. Preserve explicit practical constraints and supplied preferences. Provide two to four evidence-backed reasons. Each whyThis evidence array must contain only evidenceCatalog keys, such as e1, whose supplied values support the reason. Never invent keys or output source/id/path objects; the server expands keys to canonical references. Use only allowedInputs; sourceRevision must match. Wardrobe sourceType sample means the inventory is synthetic and must remain explicit.",
+      evidenceCatalog: evidence.catalog,
       requestedTypes: input.optionType
         ? [input.optionType]
         : ["closest", "from_wardrobe", "fresh_alternative"],
       pieces: input.pieces,
       matches: input.matches,
       inventory: input.inventory,
+      inventoryMode: input.inventoryMode ?? "live",
+      allowedOwnedIds: input.inventory
+        .filter((item) => isOwnedInventoryItem(item, input.inventoryMode))
+        .map((item) => item.id),
       preferences: input.preferences,
       occasion: input.occasion,
       sourceRevision: input.sourceRevision,
-      allowedInputs: [
-        "inspiration",
-        ...(input.inventory.length ? ["wardrobe"] : []),
-        ...(input.occasion ? ["occasion"] : []),
-        ...Object.keys(input.preferences),
-      ],
+      allowedInputs: evidence.allowedInputs,
     },
   });
   input.onProviderMetadata?.(response.metadata);
@@ -65,7 +78,11 @@ export async function generateOptions(
     input.pieces,
     input.inventory,
     input.optionType,
-    { preferences: input.preferences, occasion: input.occasion },
+    {
+      preferences: input.preferences,
+      occasion: input.occasion,
+      inventoryMode: input.inventoryMode,
+    },
   );
   if (errors.length)
     throw new ApiError(
