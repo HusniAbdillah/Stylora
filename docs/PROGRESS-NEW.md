@@ -883,3 +883,31 @@ which data, code revision or provider behavior was verified.
   No generated declarations were edited manually. Follow-up `make fast` is
   running; CI remains the full gate. No provider calls, shared fixtures or
   production environment settings were changed.
+
+## Owner 3 marketplace and sharing polish, 7 November 2026
+
+- Branch `codex/owner3-marketplace-polish`. Integrated Owner 2 Create navigation
+  from `origin/main` at `10f0dd6` without conflicts. Saved Looks uses the same
+  live workspace layout during collection, detail, loading and recovery states.
+- Saved Looks uses skeletons without temporary zero counts. Read-only hints sit
+  beside unavailable actions; server and client write gates remain enforced.
+- Google Shopping queries use the existing body illustration Men/Women group,
+  fit and selected styles, and append Shopee. Seller, category and explicit
+  gender contradictions are filtered. Cache identity includes used preferences,
+  revision and query; score-weight changes reuse results. Catalog destinations
+  remain labeled as catalog links. No new preference field was introduced.
+- New share links remain active until revoked. Existing finite links retain
+  their expiry. Share review replaces the checklist with an editable public
+  look description from existing public text or saved item names, without an
+  additional model call. Approved media and immutable publication checks remain.
+- Applied additive migration `20261107063306_permanent_share_links.sql` to
+  hosted project `imcqifydmrxotrbwfwme` through Supabase MCP under the user's
+  production authorization. Regenerated complete database types from MCP.
+  Hosted rollback SQL passed permanent/future/expired link counts, revocation,
+  immutable expiry, irreversible revocation, foreign workspace rejection and
+  denied direct anon access. Synthetic fixtures were rolled back.
+- Root `corepack pnpm exec vitest run src/features/products/provider.test.ts
+  src/features/products/search-context.test.ts` passed seven tests. Sharing
+  schema tests, lint and typecheck are in progress; CI remains the full gate.
+  No additional paid provider calls were made for this implementation. Browser
+  verification has not passed; prior local browser attempts timed out.
