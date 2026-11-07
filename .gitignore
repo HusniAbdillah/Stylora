@@ -9,3 +9,5 @@
 *.tsbuildinfo
 *.log
 /docs/TODO.md
+
+/storybook-static/

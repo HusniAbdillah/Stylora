@@ -7,6 +7,7 @@ export default defineConfig([
   ...nextTypeScript,
   globalIgnores([
     ".next/**",
+    "storybook-static/**",
     "next-env.d.ts",
     "coverage/**",
     "src/types/database.ts",

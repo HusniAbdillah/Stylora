@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
@@ -17,9 +17,15 @@
     "format:check": "prettier --check src scripts package.json tsconfig.json eslint.config.mjs next.config.ts postcss.config.mjs",
     "db:types": "node scripts/generate-database-types.mjs",
     "db:verify": "node scripts/verify-supabase.mjs",
-    "db:test": "supabase test db supabase/tests"
+    "db:test": "supabase test db supabase/tests",
+    "storybook": "storybook dev -p 6006 --disable-telemetry",
+    "build:storybook": "storybook build --disable-telemetry"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource/instrument-serif": "5.3.0",
+    "@radix-ui/react-dialog": "1.3.1",
+    "@radix-ui/react-slot": "1.5.0",
     "@supabase/supabase-js": "2.119.0",
     "next": "16.4.5",
     "react": "19.3.1",
@@ -29,6 +35,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@storybook/nextjs-vite": "10.6.6",
     "@tailwindcss/postcss": "4.3.5",
     "@types/node": "22.20.0",
     "@types/react": "19.3.0",
@@ -36,9 +43,11 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.5",
     "prettier": "3.9.10",
+    "storybook": "10.6.6",
     "supabase": "3.0.0",
     "tailwindcss": "4.3.5",
     "typescript": "5.9.3",
+    "vite": "8.3.6",
     "vitest": "5.1.0"
   }
 }
