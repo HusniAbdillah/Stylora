@@ -1045,6 +1045,6 @@ which data, code revision or provider behavior was verified.
   sample assets. Checked desktop and 390 px mobile layouts; mixed-length card
   Share and Manage buttons had matching vertical positions and no mobile
   horizontal overflow. This verifies components, not a live publication.
-- Local lint and typecheck passed before the final Manage revision; the final
-  fast gate is running and CI is the complete build gate. No provider calls,
+- Local `corepack pnpm typecheck` and `corepack pnpm lint` passed after the final
+  Manage revision. CI is the complete build gate. No provider calls,
   database writes, migrations, environment or dependency changes were needed.
