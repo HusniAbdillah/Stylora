@@ -636,3 +636,16 @@ which data, code revision or provider behavior was verified.
 - Local `preview_bag_subcategories.sql` passed as `service_role`, covering ten
   supported subtypes, wrong-slot rejection and fixture rollback. Hosted
   application of this correction follows its CI gate.
+
+## Owner 1 Storage retry metadata, 7 November 2026
+
+- Preserved Supabase transport status on Storage asset read, allocation,
+  signing and download failures. `StorageAssetError.upstreamStatus` is optional,
+  and `retryable` defaults to false. Only status 0, 408, 429, 500, 502, 503 and
+  504 on upstream failures qualify for retry. Validation and missing-resource
+  paths retain their existing terminal behavior.
+- The HTTP boundary now uses the Storage error's retry eligibility instead of
+  marking every Storage failure retryable.
+- `pnpm exec vitest run src/lib/supabase/storage.test.ts` passed all 51 tests
+  using synthetic SDK errors and in-memory image bytes. No hosted fixtures,
+  database changes or provider requests were made. CI is the full build gate.
