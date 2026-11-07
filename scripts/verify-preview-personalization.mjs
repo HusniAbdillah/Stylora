@@ -100,7 +100,8 @@ async function initialize(current) {
   state.personalization = { original: current, lastWritten: null, selection, cases: {} };
   await checkpoint();
   const changed = await data(client.from("workflow_drafts").update({ payload: { selection }, revision: draft.revision + 1 })
-    .eq("workspace_id", config.workspaceId).eq("id", draft.id).eq("revision", draft.revision).select("id").maybeSingle(), "FIXTURE_SELECTION_WRITE_FAILED");
+    .eq("workspace_id", config.workspaceId).eq("id", draft.id).eq("feature_kind", "preview")
+    .eq("status", "active").eq("revision", draft.revision).select("id").maybeSingle(), "FIXTURE_SELECTION_WRITE_FAILED");
   check(changed, "FIXTURE_REVISION_CONFLICT");
 }
 function profile(name) {
@@ -152,6 +153,13 @@ async function runCase(name, output, current) {
   await initialize(current);
   const trial = state.personalization;
   check(!trial.restored && !trial.cases[name], "CASE_ALREADY_RESERVED_OR_RESTORED_NEVER_RESUBMIT");
+  for (const extension of ["png", "json"]) {
+    const existing = await stat(join(output, "preview-" + name + "." + extension)).catch((error) => {
+      if (error.code !== "ENOENT") throw error;
+      return null;
+    });
+    check(!existing, "OUTPUT_FILE_ALREADY_EXISTS");
+  }
   check(name === "a" ? !Object.keys(trial.cases).length : trial.cases[name === "b" ? "a" : "b"]?.status === "succeeded", "CASE_ORDER_A_B_QUALITY_REQUIRED");
   const draft = await fixture();
   check(canonical(draft.payload.selection) === canonical(trial.selection), "FIXTURE_SELECTION_CHANGED");
