@@ -19,15 +19,45 @@ import {
   type ValueWeights,
 } from "./outfit-detail";
 import { scoreOffer } from "./score";
+import { selectionChoices, type Choice } from "./outfit-choice";
 import type { OutfitPageData } from "./page-data";
 
 type Detail = NonNullable<OutfitPageData["detail"]>;
 type Shopping = NonNullable<OutfitPageData["shopping"]>;
 type Search = Shopping["searches"][number];
-type Choice = { slotId: string; optionItemId: string };
 type Draft = { revision?: number; choices?: Choice[]; weights?: ValueWeights };
 type OptionState = { detail: Detail; shopping: Shopping };
 type ImportState = "complete" | "pending" | "importing";
+
+class OutfitStateChanged extends Error {}
+function advanceVersion(versions: Map<string, number>, key: string) {
+  const next = (versions.get(key) ?? 0) + 1;
+  versions.set(key, next);
+  return next;
+}
+function mergeShopping(
+  previous: Shopping | undefined,
+  incoming: Shopping,
+): Shopping {
+  if (!previous || previous.optionRevision !== incoming.optionRevision)
+    return incoming;
+  const searches = new Map<string, Search>(
+    previous.searches.map((search) => [search.slotId, search]),
+  );
+  for (const search of incoming.searches) {
+    const known = searches.get(search.slotId);
+    if (
+      known &&
+      (Date.parse(known.createdAt) > Date.parse(search.createdAt) ||
+        (known.id === search.id &&
+          known.status !== "running" &&
+          search.status === "running"))
+    )
+      continue;
+    searches.set(search.slotId, search);
+  }
+  return { ...incoming, searches: [...searches.values()] };
+}
 
 const inFlightSearches = new Map<string, Promise<Search>>();
 const emptySnapshot = () => "";
@@ -117,27 +147,6 @@ function sentences(value: unknown): string[] {
         : [],
   );
 }
-function selectionChoices(detail: Detail, draft?: Draft): Choice[] {
-  const saved = detail.selection?.choices ?? [];
-  return detail.slots.flatMap((slot) => {
-    const proposed =
-      draft?.revision === detail.option.revision && Array.isArray(draft.choices)
-        ? draft.choices.find((choice) => choice.slotId === slot.slotId)
-            ?.optionItemId
-        : undefined;
-    const previous = saved.find(
-      (choice) => choice.slotId === slot.slotId,
-    )?.optionItemId;
-    const candidate =
-      slot.candidates.find(
-        (item) =>
-          item.optionItemId === (proposed ?? previous) && item.available,
-      ) ?? slot.candidates.find((item) => item.available);
-    return candidate && typeof candidate.optionItemId === "string"
-      ? [{ slotId: slot.slotId, optionItemId: candidate.optionItemId }]
-      : [];
-  });
-}
 function inputLabels(value: unknown): string[] {
   const labels: Record<string, string> = {
     reference: "Reference",
@@ -155,7 +164,14 @@ function inputLabels(value: unknown): string[] {
       typeof entry === "string" && labels[entry] ? [labels[entry]] : [],
     );
   return Object.entries(object(value)).flatMap(([key, entry]) =>
-    labels[key] && entry !== null && entry !== false && entry !== ""
+    labels[key] &&
+    (typeof entry === "string"
+      ? entry.trim().length > 0
+      : typeof entry === "number"
+        ? entry > 0
+        : Array.isArray(entry)
+          ? entry.length > 0
+          : entry === true || Object.keys(object(entry)).length > 0)
       ? [labels[key]]
       : [],
   );
@@ -193,6 +209,10 @@ export function OutfitPage({
       : {},
   );
   const cacheRef = useRef(cache);
+  const activeIdRef = useRef(activeId);
+  const optionEpochs = useRef(new Map<string, number>());
+  const readVersions = useRef(new Map<string, number>());
+  const searchVersions = useRef(new Map<string, number>());
   const [message, setMessage] = useState<string | null>(null);
   const [loadingIds, setLoadingIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -235,6 +255,8 @@ export function OutfitPage({
   }
   const loadOption = useCallback(
     async (id: string) => {
+      const epoch = advanceVersion(optionEpochs.current, id);
+      const version = advanceVersion(readVersions.current, id);
       setLoadingIds((current) => [...new Set([...current, id])]);
       try {
         const [detail, shopping] = await Promise.all([
@@ -243,7 +265,28 @@ export function OutfitPage({
             `/api/looks/${data.lookId}/products?optionId=${id}`,
           ),
         ]);
-        const result = { detail, shopping };
+        const previous = cacheRef.current[id];
+        if (
+          optionEpochs.current.get(id) !== epoch ||
+          readVersions.current.get(id) !== version ||
+          detail.option.id !== id ||
+          shopping.optionId !== id ||
+          detail.option.revision !== shopping.optionRevision ||
+          (previous &&
+            (detail.look.revision < previous.detail.look.revision ||
+              detail.option.revision < previous.detail.option.revision ||
+              (detail.option.revision === previous.detail.option.revision &&
+                (detail.selection?.revision ?? 0) <
+                  (previous.detail.selection?.revision ?? 0))))
+        ) {
+          throw new OutfitStateChanged(
+            "A newer outfit update is available. Your proposed choices are kept; refresh saved results.",
+          );
+        }
+        const result = {
+          detail,
+          shopping: mergeShopping(previous?.shopping, shopping),
+        };
         const next = { ...cacheRef.current, [id]: result };
         cacheRef.current = next;
         setCache(next);
@@ -256,7 +299,8 @@ export function OutfitPage({
         );
         return result;
       } finally {
-        setLoadingIds((current) => current.filter((entry) => entry !== id));
+        if (readVersions.current.get(id) === version)
+          setLoadingIds((current) => current.filter((entry) => entry !== id));
       }
     },
     [data.lookId],
@@ -267,6 +311,7 @@ export function OutfitPage({
       setMessage("Finish the current choice before switching directions.");
       return;
     }
+    activeIdRef.current = id;
     setActiveId(id);
     setMessage(null);
     const url = new URL(window.location.href);
@@ -277,11 +322,12 @@ export function OutfitPage({
       try {
         await loadOption(id);
       } catch (error) {
-        setMessage(
-          error instanceof BrowserApiError
-            ? error.message
-            : "This direction could not be loaded. Try again.",
-        );
+        if (activeIdRef.current === id)
+          setMessage(
+            error instanceof BrowserApiError
+              ? error.message
+              : "This direction could not be loaded. Try again.",
+          );
       }
     }
   }
@@ -289,6 +335,7 @@ export function OutfitPage({
     const restore = () => {
       const id = new URL(window.location.href).searchParams.get("option_id");
       if (id && data.options.some((option) => option.id === id)) {
+        activeIdRef.current = id;
         setActiveId(id);
         if (!cacheRef.current[id])
           loadOption(id).catch(() =>
@@ -313,21 +360,25 @@ export function OutfitPage({
     )
       return;
     let mounted = true;
+    const epoch = optionEpochs.current.get(activeId) ?? 0;
     const missing = state.detail.slots.filter(
       (slot) =>
         slot.candidates.some((candidate) => candidate.kind === "missing") &&
         !state.shopping.searches.some(
-          (search) => search.slotId === slot.slotId,
+          (search) =>
+            search.slotId === slot.slotId && search.optionRevision === revision,
         ),
     );
     let cursor = 0;
     const worker = async () => {
-      while (cursor < missing.length) {
+      while (mounted && cursor < missing.length) {
         const slot = missing[cursor++];
         const candidate = slot.candidates.find(
           (item) => item.kind === "missing",
         );
         const key = `${data.lookId}:${activeId}:${revision}:${slot.slotId}`;
+        const slotKey = `${activeId}:${slot.slotId}`;
+        const slotVersion = advanceVersion(searchVersions.current, slotKey);
         let pending = inFlightSearches.get(key);
         if (!pending) {
           pending = requestData<Search>(
@@ -347,21 +398,29 @@ export function OutfitPage({
         }
         try {
           const search = await pending;
-          if (mounted)
-            updateOption(activeId, (current) => ({
-              ...current,
-              shopping: {
-                ...current.shopping,
-                searches: [
-                  ...current.shopping.searches.filter(
-                    (entry) => entry.slotId !== slot.slotId,
-                  ),
-                  search,
-                ],
-              },
-            }));
+          if (
+            mounted &&
+            (optionEpochs.current.get(activeId) ?? 0) === epoch &&
+            searchVersions.current.get(slotKey) === slotVersion
+          )
+            updateOption(activeId, (current) =>
+              current.detail.option.revision !== revision ||
+              search.optionRevision !== revision
+                ? current
+                : {
+                    ...current,
+                    shopping: mergeShopping(current.shopping, {
+                      ...current.shopping,
+                      searches: [search],
+                    }),
+                  },
+            );
         } catch (error) {
-          if (mounted) {
+          if (
+            mounted &&
+            (optionEpochs.current.get(activeId) ?? 0) === epoch &&
+            searchVersions.current.get(slotKey) === slotVersion
+          ) {
             setSearchStates((current) => ({
               ...current,
               [`${activeId}:${slot.slotId}`]: "error",
@@ -398,12 +457,50 @@ export function OutfitPage({
     let timer: ReturnType<typeof setTimeout>;
     let count = 0;
     const poll = async () => {
+      const epoch = optionEpochs.current.get(activeId) ?? 0;
+      const expectedRevision =
+        cacheRef.current[activeId]?.detail.option.revision;
+      const slotVersions = new Map(searchVersions.current);
       try {
         const shopping = await requestData<Shopping>(
           `/api/looks/${data.lookId}/products?optionId=${activeId}`,
         );
-        if (!cancelled)
-          updateOption(activeId, (current) => ({ ...current, shopping }));
+        if (!cancelled && (optionEpochs.current.get(activeId) ?? 0) === epoch)
+          updateOption(activeId, (current) => {
+            if (
+              current.detail.option.revision !== expectedRevision ||
+              shopping.optionRevision !== expectedRevision
+            )
+              return current;
+            const merged = new Map(
+              current.shopping.searches
+                .filter((search) => search.optionRevision === expectedRevision)
+                .map((search) => [search.slotId, search]),
+            );
+            for (const search of shopping.searches) {
+              const key = `${activeId}:${search.slotId}`;
+              if (
+                (slotVersions.get(key) ?? 0) !==
+                (searchVersions.current.get(key) ?? 0)
+              )
+                continue;
+              const previous = merged.get(search.slotId);
+              if (
+                previous &&
+                (Date.parse(previous.createdAt) >
+                  Date.parse(search.createdAt) ||
+                  (previous.id === search.id &&
+                    previous.status !== "running" &&
+                    search.status === "running"))
+              )
+                continue;
+              merged.set(search.slotId, search);
+            }
+            return {
+              ...current,
+              shopping: { ...shopping, searches: [...merged.values()] },
+            };
+          });
         if (
           !cancelled &&
           shopping.searches.some((search) => search.status === "running")
@@ -438,6 +535,11 @@ export function OutfitPage({
     choices: Choice[],
     detail = cacheRef.current[id].detail,
   ) {
+    if (choices.length !== detail.slots.length)
+      throw new OutfitStateChanged(
+        "A chosen piece is no longer available. Review the outfit and make an explicit choice before saving.",
+      );
+    advanceVersion(optionEpochs.current, id);
     storeDraft(id, { revision: detail.option.revision, choices });
     const selection = await requestData<{
       id: string;
@@ -452,16 +554,26 @@ export function OutfitPage({
         choices,
       }),
     });
-    updateOption(id, (current) => ({
-      ...current,
-      detail: {
-        ...current.detail,
-        selection: { ...selection, isStale: false },
-      },
-    }));
+    updateOption(id, (current) =>
+      current.detail.option.revision !== selection.sourceOptionRevision ||
+      (current.detail.selection?.revision ?? 0) > selection.revision
+        ? current
+        : {
+            ...current,
+            detail: {
+              ...current.detail,
+              selection: { ...selection, isStale: false },
+            },
+          },
+    );
     return selection;
   }
   async function handleConflict(error: unknown, id: string) {
+    if (activeIdRef.current !== id) return;
+    if (error instanceof OutfitStateChanged) {
+      setMessage(error.message);
+      return;
+    }
     if (error instanceof BrowserApiError && error.status === 409) {
       try {
         await loadOption(id);
@@ -570,6 +682,9 @@ export function OutfitPage({
     const lock = `${id}:${slotId}`;
     if (retryLocks.current.has(lock)) return;
     retryLocks.current.add(lock);
+    const epoch = optionEpochs.current.get(id) ?? 0;
+    const expectedRevision = state.detail.option.revision;
+    const slotVersion = advanceVersion(searchVersions.current, lock);
     setSearchStates((current) => ({ ...current, [lock]: "loading" }));
     try {
       const search = await requestData<Search>(
@@ -583,27 +698,44 @@ export function OutfitPage({
           }),
         },
       );
-      updateOption(id, (current) => ({
-        ...current,
-        shopping: {
-          ...current.shopping,
-          searches: [
-            ...current.shopping.searches.filter(
-              (entry) => entry.slotId !== slotId,
-            ),
-            search,
-          ],
-        },
-      }));
+      if (
+        (optionEpochs.current.get(id) ?? 0) !== epoch ||
+        searchVersions.current.get(lock) !== slotVersion
+      )
+        return;
+      updateOption(id, (current) =>
+        current.detail.option.revision !== expectedRevision ||
+        search.optionRevision !== expectedRevision
+          ? current
+          : {
+              ...current,
+              shopping: mergeShopping(current.shopping, {
+                ...current.shopping,
+                searches: [search],
+              }),
+            },
+      );
       setSearchStates((current) => {
         const next = { ...current };
         delete next[lock];
         return next;
       });
     } catch (error) {
+      if (
+        (optionEpochs.current.get(id) ?? 0) !== epoch ||
+        searchVersions.current.get(lock) !== slotVersion
+      )
+        return;
       setSearchStates((current) => ({ ...current, [lock]: "error" }));
       await handleConflict(error, id);
     } finally {
+      if (searchVersions.current.get(lock) === slotVersion)
+        setSearchStates((current) => {
+          if (current[lock] !== "loading") return current;
+          const next = { ...current };
+          delete next[lock];
+          return next;
+        });
       retryLocks.current.delete(lock);
     }
   }
@@ -612,6 +744,15 @@ export function OutfitPage({
     const id = activeId;
     const state = cacheRef.current[id];
     if (!state) return;
+    if (
+      selectionChoices(state.detail, drafts[id]).length !==
+      state.detail.slots.length
+    ) {
+      setMessage(
+        "A chosen piece is no longer available. Review the outfit and make an explicit choice before saving.",
+      );
+      return;
+    }
     if (
       (drafts[id]?.choices &&
         drafts[id].revision !== state.detail.option.revision) ||
@@ -762,7 +903,9 @@ export function OutfitPage({
               )
               .map((slot) => {
                 const search = state.shopping.searches.find(
-                  (entry) => entry.slotId === slot.slotId,
+                  (entry) =>
+                    entry.slotId === slot.slotId &&
+                    entry.optionRevision === detail.option.revision,
                 );
                 const products = search?.products ?? [];
                 const currencies = [

@@ -452,7 +452,13 @@ export function OutfitDetail({
             key={option.id}
             role="tab"
             aria-selected={option.id === active.id}
-            tabIndex={option.id === active.id ? 0 : -1}
+            tabIndex={
+              option.id === active.id ||
+              (active.unavailable &&
+                option.id === options.find((entry) => !entry.unavailable)?.id)
+                ? 0
+                : -1
+            }
             disabled={option.unavailable}
             onKeyDown={(event) => {
               if (

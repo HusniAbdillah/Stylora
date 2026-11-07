@@ -67,7 +67,11 @@ export async function getOutfitPage(
       404,
     );
   const active =
-    directions.find((option) => option.id === preferred) ??
+    directions.find(
+      (option) =>
+        option.id === preferred &&
+        (optionId !== undefined || option.status === "ready"),
+    ) ??
     directions.find(
       (option) => option.type === "closest" && option.status === "ready",
     ) ??
