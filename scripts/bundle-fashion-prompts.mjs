@@ -1,14 +1,9 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir } from "node:fs/promises";
 
-const sources = {};
+await mkdir(new URL("../src/prompts", import.meta.url), { recursive: true });
 for (const name of ["FASHION-PROMPT", "FASHION", "FASHION-STRUCTURE"]) {
-  sources[name] = await readFile(
+  await copyFile(
     new URL(`../docs/${name}.md`, import.meta.url),
-    "utf8",
+    new URL(`../src/prompts/${name}.md`, import.meta.url),
   );
 }
-await mkdir(new URL("../src/prompts", import.meta.url), { recursive: true });
-await writeFile(
-  new URL("../src/prompts/fashion.generated.json", import.meta.url),
-  JSON.stringify(sources, null, 2) + "\n",
-);
