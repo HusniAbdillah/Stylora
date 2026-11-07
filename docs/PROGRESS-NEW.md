@@ -14,6 +14,34 @@ Owner 2 now owns the Profile and Preferences backend by explicit task assignment
 - Not run at this checkpoint: provider inference, Create pipeline E2E, production build, preview UI review. No frontend code changed. No inference success is claimed.
 - Delivery: Lane B; pull request requires human merge review. Create pipeline and explicit sample inventory adapter follow in a dependent branch. Marketplace integration remains pending.
 
+## Owner 1 operation contract, 7 November 2026
+
+- Branch `o1/operation-fencing` adds migration
+  `20261107035901_operation_fencing.sql` and SQL regression tests.
+- Completion checks attempt, fingerprint, active lease and current subject
+  revision. Terminal events commit with state. Discarded drafts and deleted
+  capsules can reach a terminal state. Preview and saved avatars share one
+  workspace image claim. Retry permits the agreed transient provider codes,
+  preserves safe retry metadata and honors the retry delay.
+- Image completion requires a scoped ready PNG asset in the previews bucket.
+  Saved-avatar media attachment and operation completion share one transaction.
+  Byte verification remains the server upload handler's responsibility.
+- Validation used separate local databases in the existing Docker PostgreSQL
+  container. The database's Storage bucket table was a schema fixture, so this
+  validates SQL integrity and grants rather than live Storage behavior.
+- Applied the baseline and additive migration with `psql -v ON_ERROR_STOP=1`.
+  `supabase/tests/foundation.sql` and `supabase/tests/operation_fencing.sql`
+  passed. Synthetic rows were rolled back. Cases include workspace rejection,
+  stale attempts and fingerprints, expired leases, cross-kind image quota,
+  retry delay, terminal errors, discarded and deleted subjects, and atomic
+  avatar attachment.
+- Supabase CLI 3 generates the database types from that isolated local schema.
+  Its output includes computed-field metadata and differs from the earlier
+  hosted generator format. No generated declarations were edited by hand.
+- Hosted migration application, hosted policy tests and real provider image
+  generation remain pending. The Capsule and studio-save transactions are a
+  separate additive contract.
+
 This is the reporting template for four owners and their coding agents. It is
 filled during the build, not a report in itself. Product requirements are in
 [PRD.md](PRD.md),
