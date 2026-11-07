@@ -1198,3 +1198,26 @@ which data, code revision or provider behavior was verified.
   aside a stale generated dev validator from before main's route move. Local
   lint passed. CI is the full build gate. No credentials, environment settings,
   dependencies or database declarations were changed.
+
+## Owner 3 sharing and saved-look UI cleanup, 7 November 2026
+
+- Branch `codex/share-dialog-cleanup`. Separated share review, new-link copy
+  success and read-only link management. Manage has no edit fields; Create new
+  link starts a fresh review. Existing publications remain immutable.
+- Removed the avatar checkbox as requested. The completed avatar appears in
+  review and its exact ID is included on publication, with existing server-side
+  media validation. No completed image still permits sharing the item snapshot.
+- Removed unavailable Add to capsule actions and their explanatory notice.
+  Saved collection card footers align Share and Manage despite different title
+  and description lengths. Narrow cards stack thumbnails above the action.
+- Share loading and Preview save progress use skeletons. Capsule Save as look
+  reserves the destination detail skeleton until navigation, deduplicates an
+  in-flight save and restores retry on failure.
+- Storybook browser smoke passed review, create-to-copy state, Copied feedback,
+  loading skeleton and read-only Manage-to-new-review transitions using labeled
+  sample assets. Checked desktop and 390 px mobile layouts; mixed-length card
+  Share and Manage buttons had matching vertical positions and no mobile
+  horizontal overflow. This verifies components, not a live publication.
+- Local `corepack pnpm typecheck` and `corepack pnpm lint` passed after the final
+  Manage revision. CI is the complete build gate. No provider calls,
+  database writes, migrations, environment or dependency changes were needed.

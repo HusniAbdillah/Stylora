@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, LoadingLayout, StateNotice } from "@/components/ui";
 import {
@@ -8,6 +8,7 @@ import {
   startOperationRequest,
 } from "@/features/operations/client";
 import { saveStudioLook } from "@/features/outfits/studio-save";
+import { SavedLooksLoading } from "@/features/decisions/saved-loading";
 import { CapsuleOutfitDetail, CapsuleResults } from "./capsule-results";
 import type { CapsuleResult } from "./capsule-types";
 
@@ -27,6 +28,8 @@ export function CapsuleResultScreen({
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [operationId, setOperationId] = useState<string>();
+  const savingRequest = useRef(false);
+  const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(
     result.outfits.length === 0 && generationNeeded,
   );
@@ -76,12 +79,16 @@ export function CapsuleResultScreen({
   }, [result.outfits.length, generationNeeded, generate]);
 
   async function save(outfit: string) {
+    if (savingRequest.current) return;
     if (running || generationNeeded) {
       setMessage(
         "Fresh combinations are preparing for the current wardrobe and preferences. Save after they finish.",
       );
       return;
     }
+    savingRequest.current = true;
+    setSaving(true);
+    setMessage("");
     setOperationId(undefined);
     const response = await saveStudioLook({
       source: { kind: "capsule", id: outfit, parentId: result.id },
@@ -90,7 +97,7 @@ export function CapsuleResultScreen({
         result.outfits.find((item) => item.id === outfit)?.title ??
         result.title,
       idempotencyKey: `studio:capsule:${outfit}:${revision}`,
-    });
+    }).catch(() => ({ ok: false as const }));
     if (response.ok) {
       void startOperationRequest(
         response.operationId,
@@ -98,10 +105,13 @@ export function CapsuleResultScreen({
         { method: "POST" },
       ).catch(() => {});
       router.push(`/saved-looks/${response.savedLookId}`);
-    } else
+    } else {
+      savingRequest.current = false;
+      setSaving(false);
       setMessage(
         "This look could not be saved. Your capsule is kept. Retry saving.",
       );
+    }
   }
 
   async function retry() {
@@ -132,78 +142,86 @@ export function CapsuleResultScreen({
   const selected = result.outfits[index];
   return (
     <>
-      {running && result.outfits.length > 0 && (
-        <div className="mb-4">
-          <StateNotice title="Checking your capsule">
-            The saved combinations stay visible while the current input revision
-            is checked.
-          </StateNotice>
-        </div>
-      )}
-      {message && (
-        <div className="mb-4">
-          <StateNotice
-            title="Capsule status"
-            action={
-              !result.outfits.length || operationId ? (
-                <Button
-                  variant="secondary"
-                  disabled={running}
-                  onClick={() => void retry()}
-                >
-                  Retry generation
-                </Button>
-              ) : undefined
-            }
-          >
-            {message}
-          </StateNotice>
-        </div>
-      )}
-      {!result.outfits.length ? (
-        <section>
-          <h1 className="font-serif text-4xl">
-            {running ? "Preparing your outfits" : result.title}
-          </h1>
-          <p className="my-4 text-sm text-secondary">
-            {running || generationNeeded
-              ? "Your capsule brief and selected owned pieces are saved. Complete, validated combinations will appear here."
-              : "No outfits remain in this capsule. Edit the saved brief to prepare fresh combinations."}
-          </p>
-          {running && (
-            <LoadingLayout kind="ideas" label="Preparing capsule outfits" />
-          )}
-          <Button
-            variant="quiet"
-            onClick={() => router.push(`/capsules/new?capsuleId=${result.id}`)}
-          >
-            Edit brief
-          </Button>
-        </section>
-      ) : selected ? (
-        <CapsuleOutfitDetail
-          outfit={selected}
-          index={index + 1}
-          total={result.outfits.length}
-          onSaveAsLook={(id) => void save(id)}
-          onDelete={(id) => void deleteOutfit(id)}
-          onBack={() => router.push(`/capsules/${result.id}`)}
-        />
+      {saving ? (
+        <SavedLooksLoading detail />
       ) : (
-        <CapsuleResults
-          result={result}
-          onSaveCapsule={() => router.push("/capsules")}
-          onEditBrief={() =>
-            router.push(`/capsules/new?capsuleId=${result.id}`)
-          }
-          onOpenOutfit={(id) =>
-            router.push(`/capsules/${result.id}/outfits/${id}`)
-          }
-          onSaveAsLook={(id) => void save(id)}
-          onPreview={(id) =>
-            router.push(`/preview?capsuleId=${result.id}&outfitId=${id}`)
-          }
-        />
+        <>
+          {running && result.outfits.length > 0 && (
+            <div className="mb-4">
+              <StateNotice title="Checking your capsule">
+                The saved combinations stay visible while the current input
+                revision is checked.
+              </StateNotice>
+            </div>
+          )}
+          {message && (
+            <div className="mb-4">
+              <StateNotice
+                title="Capsule status"
+                action={
+                  !result.outfits.length || operationId ? (
+                    <Button
+                      variant="secondary"
+                      disabled={running}
+                      onClick={() => void retry()}
+                    >
+                      Retry generation
+                    </Button>
+                  ) : undefined
+                }
+              >
+                {message}
+              </StateNotice>
+            </div>
+          )}
+          {!result.outfits.length ? (
+            <section>
+              <h1 className="font-serif text-4xl">
+                {running ? "Preparing your outfits" : result.title}
+              </h1>
+              <p className="my-4 text-sm text-secondary">
+                {running || generationNeeded
+                  ? "Your capsule brief and selected owned pieces are saved. Complete, validated combinations will appear here."
+                  : "No outfits remain in this capsule. Edit the saved brief to prepare fresh combinations."}
+              </p>
+              {running && (
+                <LoadingLayout kind="ideas" label="Preparing capsule outfits" />
+              )}
+              <Button
+                variant="quiet"
+                onClick={() =>
+                  router.push(`/capsules/new?capsuleId=${result.id}`)
+                }
+              >
+                Edit brief
+              </Button>
+            </section>
+          ) : selected ? (
+            <CapsuleOutfitDetail
+              outfit={selected}
+              index={index + 1}
+              total={result.outfits.length}
+              onSaveAsLook={(id) => void save(id)}
+              onDelete={(id) => void deleteOutfit(id)}
+              onBack={() => router.push(`/capsules/${result.id}`)}
+            />
+          ) : (
+            <CapsuleResults
+              result={result}
+              onSaveCapsule={() => router.push("/capsules")}
+              onEditBrief={() =>
+                router.push(`/capsules/new?capsuleId=${result.id}`)
+              }
+              onOpenOutfit={(id) =>
+                router.push(`/capsules/${result.id}/outfits/${id}`)
+              }
+              onSaveAsLook={(id) => void save(id)}
+              onPreview={(id) =>
+                router.push(`/preview?capsuleId=${result.id}&outfitId=${id}`)
+              }
+            />
+          )}
+        </>
       )}
     </>
   );
