@@ -33,4 +33,19 @@ describe("catalog normalization", () => {
     expect(supportedCategory("Sneaker cleaning kit")).toBeNull();
     expect(supportedCategory("Shirt dress")).toBe("dress");
   });
+  it("stores IDR minor units independently of runtime display defaults", () => {
+    const formatter = vi.spyOn(Intl, "NumberFormat").mockImplementation(() => {
+      throw new Error("Display formatting is not a persistence contract");
+    });
+    try {
+      expect(
+        normalizeOffer(
+          { ...catalog, currency: "IDR", extracted_price: 10000.5 },
+          "top",
+        ),
+      ).toMatchObject({ priceMinor: 1_000_050, currency: "IDR" });
+    } finally {
+      formatter.mockRestore();
+    }
+  });
 });

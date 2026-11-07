@@ -75,11 +75,14 @@ export function normalizeOffer(raw: unknown, category: Category) {
   let priceMinor: number | null = null;
   if (currency && offer.extracted_price != null) {
     try {
+      // IDR has two ISO minor digits; ICU display defaults vary by runtime.
       const digits =
-        new Intl.NumberFormat("en", {
-          style: "currency",
-          currency,
-        }).resolvedOptions().maximumFractionDigits ?? 2;
+        currency === "IDR"
+          ? 2
+          : (new Intl.NumberFormat("en", {
+              style: "currency",
+              currency,
+            }).resolvedOptions().maximumFractionDigits ?? 2);
       const value = Math.round(offer.extracted_price * 10 ** digits);
       if (Number.isSafeInteger(value)) priceMinor = value;
     } catch {

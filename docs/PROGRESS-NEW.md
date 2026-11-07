@@ -339,3 +339,9 @@ which data, code revision or provider behavior was verified.
 - A second main update, `532a463` (profile, preferences and workflow drafts),
   also merged without conflicts. Its API routes use separate feature modules;
   the combined revision is submitted to the PR CI gate.
+- PR #7 CI first passed lint/typecheck, then reported 67 passing tests and one
+  failing IDR normalization test on Linux. ICU currency display defaults differ
+  from Windows. Persisted IDR conversion now explicitly uses two minor digits,
+  verified against the SIX ISO 4217 currency list. The focused provider suite
+  passed all three tests, including a runtime-independent regression. CI rerun
+  remains the final build gate; merge is held at the user's request.
