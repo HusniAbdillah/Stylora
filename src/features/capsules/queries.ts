@@ -44,7 +44,7 @@ export async function getCapsule(id: string) {
 export async function getCapsuleResult(id: string) {
   const capsule = await getCapsule(id);
   const { client, workspaceId } = getWorkspaceDatabase();
-  const [outfitsResponse, linksResponse, inventory, completed] =
+  const [outfitsResponse, linksResponse, inventory, completed, preferences] =
     await Promise.all([
       client
         .from("capsule_outfits")
@@ -62,13 +62,19 @@ export async function getCapsuleResult(id: string) {
       getCapsuleInventory(),
       client
         .from("workflow_operations")
-        .select("id")
+        .select("id,input")
         .eq("workspace_id", workspaceId)
         .eq("subject_type", "capsule")
         .eq("subject_id", id)
         .eq("kind", "capsule_generation")
         .eq("status", "succeeded")
+        .order("updated_at", { ascending: false })
         .limit(1)
+        .maybeSingle(),
+      client
+        .from("user_preferences")
+        .select("revision")
+        .eq("workspace_id", workspaceId)
         .maybeSingle(),
     ]);
   if (outfitsResponse.error || linksResponse.error)
@@ -146,11 +152,34 @@ export async function getCapsuleResult(id: string) {
       503,
       true,
     );
+  if (preferences.error)
+    throw new ApiError(
+      "capsule_preferences_unavailable",
+      "The capsule preferences could not be loaded. Retry loading.",
+      503,
+      true,
+    );
+  const dependencies = z
+    .object({
+      itemRevisions: z.record(z.uuid(), z.number().int().positive()),
+      preferenceRevision: z.number().int().min(0),
+    })
+    .safeParse(completed.data?.input);
+  const stale =
+    outfits.length > 0 &&
+    (!dependencies.success ||
+      dependencies.data.preferenceRevision !==
+        (preferences.data?.revision ?? 0) ||
+      capsule.brief.includedItemIds.some(
+        (itemId) =>
+          dependencies.data.itemRevisions[itemId] !==
+          owned.get(itemId)?.revision,
+      ));
   return {
     result,
     revision: capsule.revision,
     brief: capsule.brief,
-    generationNeeded: !completed.data,
+    generationNeeded: !completed.data || stale,
   };
 }
 

@@ -50,8 +50,10 @@ export function CapsuleResultScreen({
             "Capsule generation is unavailable. Your brief is saved. Retry or edit your items.",
         );
       setOperationId(payload.data.id);
-      if (payload.data.status === "succeeded") router.refresh();
-      else
+      if (payload.data.status === "succeeded") {
+        router.replace(`/capsules/${result.id}`);
+        router.refresh();
+      } else
         setMessage(
           payload.data.status === "running"
             ? "Your outfits are still preparing. Refresh the saved result in a moment."
@@ -69,12 +71,18 @@ export function CapsuleResultScreen({
   }, [result.id, revision, router]);
 
   useEffect(() => {
-    if (!result.outfits.length && generationNeeded) {
+    if (generationNeeded) {
       void Promise.resolve().then(generate);
     }
   }, [result.outfits.length, generationNeeded, generate]);
 
   async function save(outfit: string) {
+    if (running || generationNeeded) {
+      setMessage(
+        "Fresh combinations are preparing for the current wardrobe and preferences. Save after they finish.",
+      );
+      return;
+    }
     setOperationId(undefined);
     const response = await saveStudioLook({
       source: { kind: "capsule", id: outfit, parentId: result.id },
@@ -134,6 +142,14 @@ export function CapsuleResultScreen({
         ...(selected ? [{ label: selected.title }] : []),
       ]}
     >
+      {running && result.outfits.length > 0 && (
+        <div className="mb-4">
+          <StateNotice title="Checking your capsule">
+            The saved combinations stay visible while the current input revision
+            is checked.
+          </StateNotice>
+        </div>
+      )}
       {message && (
         <div className="mb-4">
           <StateNotice

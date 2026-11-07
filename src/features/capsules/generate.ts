@@ -186,6 +186,7 @@ async function capsuleContext(id: string) {
   ];
   const input = {
     brief: capsule.brief,
+    capsuleRevision: capsule.revision,
     items,
     knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
     itemRevisions: Object.fromEntries(
