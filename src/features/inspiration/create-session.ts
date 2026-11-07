@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { publishFeedback, feedbackError } from "@/lib/feedback/store";
 import { z } from "zod";
 import { garmentSchema, confidenceSchema } from "@/lib/ai/fashion-schema";
 import { readPreferences } from "@/features/preferences/client-contract";
@@ -601,6 +602,13 @@ export class CreateSession {
     )
       throw new Error("Choose a JPEG, PNG or WebP image up to 10 MiB.");
     const generation = ++this.generation;
+    const feedbackId = `inspiration-upload:${this.scope}:${generation}`;
+    publishFeedback({
+      id: feedbackId,
+      label: "Inspiration photo",
+      state: "running",
+      detail: "Uploading and verifying the photo.",
+    });
     this.update({
       error: null,
       file,
@@ -663,12 +671,33 @@ export class CreateSession {
       await this.reloadLook(verified.lookId, true);
       await retainPendingFile(this.scope, null);
       this.remember();
+      publishFeedback({
+        id: feedbackId,
+        label: "Inspiration photo verified",
+        state: "complete",
+        detail: "Photo is ready. Start analysis when your inputs are ready.",
+      });
     } catch (error) {
       if (generation === this.generation) {
         this.update({ uploadStatus: "failed" });
+        publishFeedback({
+          id: feedbackId,
+          label: "Inspiration photo needs attention",
+          state: "failed",
+          detail: feedbackError(error),
+        });
         this.report(error);
       }
       throw error;
+    } finally {
+      if (generation !== this.generation)
+        publishFeedback({
+          id: feedbackId,
+          label: "Inspiration upload replaced",
+          state: "superseded",
+          detail:
+            "A newer upload or draft is active. Open it to check progress.",
+        });
     }
   }
   setOccasion(occasion: string | null) {

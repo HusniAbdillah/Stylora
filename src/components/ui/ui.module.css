@@ -153,6 +153,33 @@
   .notice strong {
     font-weight: 600;
   }
+  .toastContent {
+    min-width: 0;
+    flex: 1;
+    font-size: var(--text-control);
+    line-height: 1.5;
+  }
+  .toastContent strong {
+    display: block;
+    color: var(--color-ink);
+  }
+  .toastContent > div > div {
+    color: var(--color-secondary);
+  }
+  .toastPending {
+    color: var(--color-crimson);
+    animation: toastSpin 1.2s linear infinite;
+  }
+  @keyframes toastSpin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toastPending {
+      animation: none;
+    }
+  }
   .toast .iconButton {
     margin-left: auto;
   }

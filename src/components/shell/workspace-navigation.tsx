@@ -5,6 +5,7 @@ import Link, { useLinkStatus } from "next/link";
 import { Button, Drawer, Icon, Logo } from "@/components/ui";
 import { createPreviewStore } from "@/lib/preview/store";
 import styles from "./shell.module.css";
+import { useFeedback } from "@/lib/feedback/store";
 
 export const workspaceLinks = [
   { href: "/create", label: "Create", icon: "plus" },
@@ -314,7 +315,31 @@ export type ActivityItem = {
   onRetry?: () => void;
 };
 
-export function ActivityMenu({ items }: { items: readonly ActivityItem[] }) {
+export function ActivityMenu({
+  items: supplied,
+}: {
+  items: readonly ActivityItem[];
+}) {
+  const feedback = useFeedback();
+  const items = [
+    ...feedback.map((item) => {
+      const original = supplied.find(
+        (entry) => item.id === `operation:${entry.id}`,
+      );
+      return {
+        ...item,
+        href: original?.href ?? item.href,
+        onRetry: original?.onRetry ?? item.onRetry,
+      };
+    }),
+    ...supplied.filter(
+      (item) =>
+        !feedback.some(
+          (entry) =>
+            entry.id === `operation:${item.id}` || entry.id === item.id,
+        ),
+    ),
+  ];
   const panelId = useId();
   const attention = items.some((item) =>
     ["queued", "running", "partial", "failed"].includes(item.state),

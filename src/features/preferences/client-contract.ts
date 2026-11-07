@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { withFeedback } from "@/lib/feedback/store";
+import { requestNotice } from "@/lib/feedback/request";
 import { skinSwatchOptions } from "./preferences-types";
 
 const optionalChoice = (choices: readonly [string, ...string[]]) =>
@@ -104,7 +106,7 @@ export class SettingsApiError extends Error {
   }
 }
 
-export async function settingsRequest<T>(
+async function settingsRequestData<T>(
   path: string,
   schema: z.ZodType<T>,
   init?: RequestInit,
@@ -152,6 +154,25 @@ export async function settingsRequest<T>(
     );
   }
   return parsed.data;
+}
+export function settingsRequest<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  init?: RequestInit,
+): Promise<T> {
+  const notice = requestNotice(path, init?.method ?? "GET");
+  const run = () => settingsRequestData(path, schema, init);
+  return notice
+    ? withFeedback(
+        {
+          id: `settings:${init?.method ?? "GET"}:${path}`,
+          label: notice.label,
+          success: notice.success,
+          quiet: notice.quiet,
+        },
+        run,
+      )
+    : run();
 }
 
 export function readPreferences(signal?: AbortSignal) {

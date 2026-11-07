@@ -17,6 +17,7 @@ import {
   type PreviewJob,
 } from "./preview-studio";
 import { savePreviewSelection } from "./actions";
+import { publishFeedback } from "@/lib/feedback/store";
 import { previewSelectionSchema } from "./schema";
 import { imageRenderSettingsSchema } from "@/features/ai/image-settings";
 import { isCurrentPreviewResponse } from "./request-context";
@@ -415,6 +416,15 @@ export function PreviewClient({
             selection,
           });
           if (!result.ok) {
+            publishFeedback({
+              id: "preview-selection",
+              label: "Preview selection could not be saved",
+              state: "failed",
+              detail:
+                result.code === "revision_conflict"
+                  ? "This preview changed elsewhere. Review the saved selection before continuing."
+                  : "Try selecting the piece again.",
+            });
             if (result.code === "revision_conflict") setConflict(true);
             setStatus(
               result.code === "revision_conflict"
@@ -440,6 +450,13 @@ export function PreviewClient({
           window.history.replaceState(null, "", url);
           if (selection === latestSelection.current) setSavedSelection(true);
           setStatus("Selections saved");
+          publishFeedback({
+            id: "preview-selection",
+            label: "Preview selection",
+            state: "complete",
+            detail: "Selections saved.",
+            toast: false,
+          });
           if (
             selection === latestSelection.current &&
             !openingPreferences.current &&
@@ -454,6 +471,12 @@ export function PreviewClient({
           setStatus(
             "Selection could not be saved. Try selecting the piece again.",
           );
+          publishFeedback({
+            id: "preview-selection",
+            label: "Preview selection could not be saved",
+            state: "failed",
+            detail: "Check your connection and try selecting the piece again.",
+          });
         }
       });
     },

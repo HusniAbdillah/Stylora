@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { feedbackRequest } from "./feedback/request";
 
 const failureSchema = z.object({
   error: z.object({
@@ -31,7 +32,11 @@ export async function requestData<T>(
   }
   let response: Response;
   try {
-    response = await fetch(url, { ...init, headers, cache: "no-store" });
+    response = await feedbackRequest(url, {
+      ...init,
+      headers,
+      cache: "no-store",
+    });
   } catch (error) {
     if (init?.signal?.aborted) throw error;
     throw new BrowserApiError(

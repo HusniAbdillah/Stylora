@@ -9,6 +9,7 @@ import {
   retryOperationRequest,
 } from "@/features/operations/client";
 import { saveStudioLook } from "./studio-save";
+import { publishFeedback } from "@/lib/feedback/store";
 
 type Source =
   | { kind: "preview"; id: string }
@@ -82,6 +83,13 @@ export function StudioSaveButton({
     busy.current = true;
     setSaving(true);
     setStatus("");
+    const feedbackId = `studio-save:${source.kind}:${source.id}`;
+    publishFeedback({
+      id: feedbackId,
+      label: "Save outfit",
+      state: "running",
+      detail: "Saving the outfit snapshot.",
+    });
     const idempotencyKey = `studio:${source.kind}:${source.id}:${expectedRevision}`;
     const result = await saveStudioLook({
       source,
@@ -95,6 +103,15 @@ export function StudioSaveButton({
     busy.current = false;
     setSaving(false);
     if (!result.ok) {
+      publishFeedback({
+        id: feedbackId,
+        label: "Outfit could not be saved",
+        state: "failed",
+        detail:
+          result.code === "REVISION_CONFLICT"
+            ? "This outfit changed. Reload before saving."
+            : "Try saving the outfit again.",
+      });
       setStatus(
         result.code === "REVISION_CONFLICT"
           ? "This outfit changed. Reload before saving."
@@ -103,6 +120,13 @@ export function StudioSaveButton({
       return;
     }
     setSaved(result);
+    publishFeedback({
+      id: feedbackId,
+      label: "Outfit saved",
+      state: "complete",
+      detail: "The outfit is saved. Avatar image has its own status.",
+      href: `/saved-looks/${result.savedLookId}`,
+    });
     setStatus("Outfit saved. Image preparing.");
     await prepareImage(result.operationId);
   }
