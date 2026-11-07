@@ -122,6 +122,8 @@ BEGIN
   EXCEPTION WHEN lock_not_available THEN NULL;
   END;
   UPDATE public.looks SET revision = 2 WHERE workspace_id = ws_a AND id = look_a;
+  UPDATE public.workflow_operations SET lease_until = clock_timestamp() - interval '1 second'
+    WHERE workspace_id = ws_a AND id = operation.id;
   operation := public.claim_workflow_operation(ws_a, operation.id, 1);
   IF operation.status <> 'superseded' OR operation.lease_until IS NOT NULL THEN RAISE EXCEPTION 'Stale operation was not superseded'; END IF;
   BEGIN

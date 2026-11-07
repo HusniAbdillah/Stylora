@@ -336,7 +336,9 @@ export type Database = {
           created_at: string
           explanation: NonNullable<Json>
           id: string
+          input_metadata: NonNullable<Json>
           inputs_used: NonNullable<Json>
+          is_current: boolean
           look_id: string
           preference_revision: number | null
           source_revision: number
@@ -349,7 +351,9 @@ export type Database = {
           created_at?: string
           explanation: NonNullable<Json>
           id?: string
+          input_metadata?: NonNullable<Json>
           inputs_used?: NonNullable<Json>
+          is_current?: boolean
           look_id: string
           preference_revision?: number | null
           source_revision: number
@@ -361,7 +365,9 @@ export type Database = {
           created_at?: string
           explanation?: NonNullable<Json>
           id?: string
+          input_metadata?: NonNullable<Json>
           inputs_used?: NonNullable<Json>
+          is_current?: boolean
           look_id?: string
           preference_revision?: number | null
           source_revision?: number
@@ -660,6 +666,7 @@ export type Database = {
           explanation: NonNullable<Json>
           id: string
           inputs_used: NonNullable<Json>
+          is_current: boolean
           look_id: string
           option_type: string
           provider_metadata: NonNullable<Json>
@@ -680,6 +687,7 @@ export type Database = {
           explanation?: NonNullable<Json>
           id?: string
           inputs_used?: NonNullable<Json>
+          is_current?: boolean
           look_id: string
           option_type: string
           provider_metadata?: NonNullable<Json>
@@ -699,6 +707,7 @@ export type Database = {
           explanation?: NonNullable<Json>
           id?: string
           inputs_used?: NonNullable<Json>
+          is_current?: boolean
           look_id?: string
           option_type?: string
           provider_metadata?: NonNullable<Json>
@@ -1296,7 +1305,10 @@ export type Database = {
           created_at: string
           differences: NonNullable<Json>
           evidence_coverage: number | null
+          explanation: NonNullable<Json>
           id: string
+          input_metadata: NonNullable<Json>
+          is_current: boolean
           look_id: string
           match_type: string
           piece_id: string
@@ -1314,7 +1326,10 @@ export type Database = {
           created_at?: string
           differences?: NonNullable<Json>
           evidence_coverage?: number | null
+          explanation?: NonNullable<Json>
           id?: string
+          input_metadata?: NonNullable<Json>
+          is_current?: boolean
           look_id: string
           match_type: string
           piece_id: string
@@ -1331,7 +1346,10 @@ export type Database = {
           created_at?: string
           differences?: NonNullable<Json>
           evidence_coverage?: number | null
+          explanation?: NonNullable<Json>
           id?: string
+          input_metadata?: NonNullable<Json>
+          is_current?: boolean
           look_id?: string
           match_type?: string
           piece_id?: string
@@ -1501,6 +1519,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1525,6 +1545,8 @@ export type Database = {
           lease_until?: string | null
           model?: string | null
           prompt_version?: string | null
+          provider_call_count?: number
+          provider_inflight?: number
           provider_request_id?: string | null
           result_ref?: Json | null
           safe_error_code?: string | null
@@ -1548,6 +1570,8 @@ export type Database = {
           lease_until?: string | null
           model?: string | null
           prompt_version?: string | null
+          provider_call_count?: number
+          provider_inflight?: number
           provider_request_id?: string | null
           result_ref?: Json | null
           safe_error_code?: string | null
@@ -1698,6 +1722,31 @@ export type Database = {
       }
     }
     Functions: {
+      append_create_event: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_payload?: Json
+          p_type: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          event_type: string
+          id: string
+          operation_id: string
+          payload: NonNullable<Json>
+          sequence: number
+          source_revision: number
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operation_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       append_workflow_operation_event: {
         Args: {
           p_attempt_count: number
@@ -1720,6 +1769,36 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "workflow_operation_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      attach_inspiration_upload: {
+        Args: {
+          p_asset_id: string
+          p_draft_id: string
+          p_expected_revision: number
+          p_occasion?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          inspiration_asset_id: string | null
+          notes: string
+          occasion: string | null
+          provider_metadata: NonNullable<Json>
+          revision: number
+          selected_option_id: string | null
+          source_type: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "looks"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1777,6 +1856,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1814,6 +1895,51 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      commit_capsule_generation: {
+        Args: {
+          p_attempt_count: number
+          p_capsule_id: string
+          p_expected_revision: number
+          p_input_fingerprint: string
+          p_missing_additions: Json
+          p_operation_id: string
+          p_outfits: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1853,6 +1979,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1892,6 +2020,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1909,9 +2039,104 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      control_create_operation: {
+        Args: {
+          p_action: string
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      delete_capsule: {
+        Args: {
+          p_capsule_id: string
+          p_expected_revision: number
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      delete_capsule_outfit: {
+        Args: {
+          p_capsule_id: string
+          p_expected_revision: number
+          p_outfit_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       delete_saved_look: {
         Args: { p_saved_look_id: string; p_workspace_id: string }
         Returns: string
+      }
+      finish_create_operation: {
+        Args: {
+          p_attempt: number
+          p_metadata: Json
+          p_operation_id: string
+          p_result: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: NonNullable<Json>
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       finish_workflow_operation: {
         Args: {
@@ -1936,6 +2161,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1962,6 +2189,22 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      release_create_provider_call: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      reserve_create_provider_call: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
       }
       retry_saved_look_media: {
         Args: { p_saved_look_id: string; p_workspace_id: string }
@@ -1998,6 +2241,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -2011,6 +2256,46 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_capsule_draft: {
+        Args: {
+          p_brief: Json
+          p_capsule_id: string
+          p_expected_revision: number
+          p_item_ids: string[]
+          p_title: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      save_inspiration_pieces: {
+        Args: {
+          p_expected_revision: number
+          p_look_id: string
+          p_pieces: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          inspiration_asset_id: string | null
+          notes: string
+          occasion: string | null
+          provider_metadata: NonNullable<Json>
+          revision: number
+          selected_option_id: string | null
+          source_type: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "looks"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2076,6 +2361,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      save_studio_look: {
+        Args: {
+          p_expected_revision: number
+          p_idempotency_key: string
+          p_parent_id: string
+          p_source_id: string
+          p_source_kind: string
+          p_title: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       start_workflow_operation: {
         Args: {
           p_input?: Json
@@ -2102,6 +2399,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -2142,6 +2441,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null

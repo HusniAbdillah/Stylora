@@ -1,0 +1,672 @@
+import "server-only";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { z } from "zod";
+import { ApiError } from "../api";
+import { buildFashionPrompt, type FashionTask } from "../../prompts/fashion";
+import type { Garment } from "./fashion-schema";
+import {
+  PieceStreamError,
+  PieceStreamParser,
+  safeValidationIssues,
+} from "./piece-stream";
+
+const responseTextSchema = z.object({
+  id: z.string().optional(),
+  status: z.string(),
+  incomplete_details: z
+    .object({ reason: z.string().optional() })
+    .nullable()
+    .optional(),
+  output: z.array(
+    z.object({
+      type: z.string(),
+      content: z
+        .array(z.object({ type: z.string(), text: z.string().optional() }))
+        .optional(),
+    }),
+  ),
+  usage: z
+    .object({
+      input_tokens: z.number().nonnegative(),
+      output_tokens: z.number().nonnegative(),
+      total_tokens: z.number().nonnegative(),
+      input_tokens_details: z
+        .object({ cached_tokens: z.number().nonnegative().optional() })
+        .optional(),
+      output_tokens_details: z
+        .object({ reasoning_tokens: z.number().nonnegative().optional() })
+        .optional(),
+    })
+    .optional(),
+});
+
+type ProviderUsage = z.infer<typeof responseTextSchema>["usage"];
+
+export type FashionRequest<T extends z.ZodType> = {
+  task: FashionTask;
+  schema: T;
+  context: unknown;
+  imageDataUrl?: string;
+  onPiece?: (piece: Garment, index: number) => Promise<void> | void;
+};
+
+export type ProviderMetadata = {
+  model: string;
+  requestId: string | null;
+  latencyMs: number;
+  usage: ProviderUsage | null;
+  promptVersion: string;
+  knowledgeVersion: string;
+  schemaVersion: string;
+  promptSourceHash: string;
+  knowledgeSourceHash: string;
+  schemaSourceHash: string;
+  promptAssemblyHash: string;
+  attemptCount: number;
+  operationId: string;
+};
+
+type FashionOperationContext = {
+  operationId: string;
+  reserveCall: () => Promise<void>;
+  releaseCall: () => Promise<void>;
+};
+type ProviderFailureDetails = {
+  code: string;
+  retryable: boolean;
+  httpStatus: number | null;
+  providerCode: string | null;
+  requestId: string | null;
+  retryAfterMs: number | null;
+  attemptCount: number;
+  operationId: string | null;
+  validationIssues: Array<{ code: string; path: string }>;
+  responseStatus: string | null;
+  incompleteReason: string | null;
+};
+const operationScope = new AsyncLocalStorage<FashionOperationContext>();
+const failures = new WeakMap<Error, ProviderFailureDetails>();
+const workspaceSlots = new Map<
+  string,
+  { active: number; waiting: Array<() => void> }
+>();
+
+export function withFashionOperation<T>(
+  context: FashionOperationContext,
+  run: () => Promise<T>,
+): Promise<T> {
+  return operationScope.run(context, run);
+}
+
+export function safeProviderError(
+  error: unknown,
+): ProviderFailureDetails | null {
+  if (!(error instanceof ApiError)) return null;
+  return (
+    failures.get(error) ?? {
+      code: error.code,
+      retryable: error.retryable,
+      httpStatus: null,
+      providerCode: null,
+      requestId: null,
+      retryAfterMs: null,
+      attemptCount: 0,
+      operationId: operationScope.getStore()?.operationId ?? null,
+      validationIssues: [],
+      responseStatus: null,
+      incompleteReason: null,
+    }
+  );
+}
+
+function diagnosticError(
+  code: string,
+  message: string,
+  status: number,
+  retryable: boolean,
+  details: Partial<ProviderFailureDetails> = {},
+) {
+  const error = new ApiError(code, message, status, retryable);
+  failures.set(error, {
+    httpStatus: null,
+    providerCode: null,
+    requestId: null,
+    retryAfterMs: null,
+    attemptCount: 0,
+    operationId: operationScope.getStore()?.operationId ?? null,
+    validationIssues: [],
+    responseStatus: null,
+    incompleteReason: null,
+    ...details,
+    code,
+    retryable,
+  });
+  return error;
+}
+
+export function retryAfterMilliseconds(value: string | null, now = Date.now()) {
+  if (!value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0)
+    return Math.round(seconds * 1000);
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - now) : null;
+}
+
+function safeIdentifier(value: unknown) {
+  return typeof value === "string" && /^[a-zA-Z0-9_.\[\]-]{1,200}$/.test(value)
+    ? value
+    : null;
+}
+
+async function acquireSlot(
+  workspaceId: string,
+  deadline: number,
+): Promise<() => void> {
+  let slots = workspaceSlots.get(workspaceId);
+  if (!slots) {
+    slots = { active: 0, waiting: [] };
+    workspaceSlots.set(workspaceId, slots);
+  }
+  const state = slots;
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    const next = state.waiting.shift();
+    if (next) next();
+    else state.active--;
+    if (state.active === 0 && state.waiting.length === 0)
+      workspaceSlots.delete(workspaceId);
+  };
+  if (state.active < 3) {
+    state.active++;
+    return release;
+  }
+  const remaining = deadline - Date.now();
+  if (remaining <= 0)
+    throw diagnosticError(
+      "provider_timeout",
+      "Fashion analysis could not start in time. Retry the operation.",
+      504,
+      true,
+    );
+  return new Promise((resolve, reject) => {
+    const grant = () => {
+      clearTimeout(timer);
+      resolve(release);
+    };
+    const timer = setTimeout(() => {
+      const index = state.waiting.indexOf(grant);
+      if (index !== -1) state.waiting.splice(index, 1);
+      reject(
+        diagnosticError(
+          "provider_timeout",
+          "Fashion analysis could not start in time. Retry the operation.",
+          504,
+          true,
+        ),
+      );
+    }, remaining);
+    state.waiting.push(grant);
+  });
+}
+
+function invalidOutput(details: Partial<ProviderFailureDetails> = {}) {
+  return diagnosticError(
+    "provider_invalid_output",
+    "The analysis returned incomplete or unsupported data. Review the input and retry.",
+    502,
+    false,
+    details,
+  );
+}
+
+function object(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function permitsNull(value: unknown) {
+  if (!object(value)) return false;
+  return (
+    value.type === "null" ||
+    (Array.isArray(value.type) && value.type.includes("null")) ||
+    (Array.isArray(value.anyOf) && value.anyOf.some(permitsNull))
+  );
+}
+
+export function strictJsonSchema(schema: z.ZodType) {
+  const source = z.toJSONSchema(schema, { target: "draft-7", io: "input" });
+  function visit(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(visit);
+    if (!object(value)) return value;
+    const result: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (key !== "$schema") result[key] = visit(entry);
+    }
+    if (value.type === "object" || object(value.properties)) {
+      const properties = object(value.properties) ? value.properties : {};
+      if (
+        Object.keys(properties).length === 0 &&
+        object(value.additionalProperties)
+      ) {
+        throw new ApiError(
+          "provider_unavailable",
+          "The analysis schema is not configured for strict output.",
+          503,
+        );
+      }
+      const required = Array.isArray(value.required) ? value.required : [];
+      result.properties = Object.fromEntries(
+        Object.entries(properties).map(([key, entry]) => {
+          const converted = visit(entry);
+          return [
+            key,
+            required.includes(key) || permitsNull(converted)
+              ? converted
+              : { anyOf: [converted, { type: "null" }] },
+          ];
+        }),
+      );
+      result.required = Object.keys(properties);
+      result.additionalProperties = false;
+    }
+    return result;
+  }
+  const result = visit(source);
+  if (!object(result)) throw invalidOutput();
+  return result;
+}
+
+export function parseFashionResponse<T extends z.ZodType>(
+  schema: T,
+  response: unknown,
+): {
+  data: z.output<T>;
+  usage: ProviderUsage | null;
+  responseId: string | null;
+} {
+  const parsed = responseTextSchema.safeParse(response);
+  if (!parsed.success)
+    throw invalidOutput({
+      providerCode: "response_schema",
+      validationIssues: safeValidationIssues(parsed.error.issues),
+    });
+  if (parsed.data.status !== "completed")
+    throw invalidOutput({
+      providerCode: "response_incomplete",
+      responseStatus: safeIdentifier(parsed.data.status),
+      incompleteReason: safeIdentifier(parsed.data.incomplete_details?.reason),
+    });
+  const content = parsed.data.output.flatMap((entry) => entry.content ?? []);
+  if (content.some((entry) => entry.type === "refusal")) {
+    throw new ApiError(
+      "provider_refused",
+      "The provider could not analyze this reference. Try a different outfit image.",
+      422,
+    );
+  }
+  const text = content
+    .filter((entry) => entry.type === "output_text")
+    .map((entry) => entry.text ?? "")
+    .join("");
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw invalidOutput({
+      providerCode: "invalid_json",
+      responseStatus: "completed",
+    });
+  }
+  const validated = schema.safeParse(value);
+  if (!validated.success)
+    throw invalidOutput({
+      providerCode: "output_schema",
+      responseStatus: "completed",
+      validationIssues: safeValidationIssues(validated.error.issues),
+    });
+  return {
+    data: validated.data,
+    usage: parsed.data.usage ?? null,
+    responseId: parsed.data.id ?? null,
+  };
+}
+
+async function readStream<T extends z.ZodType>(
+  response: Response,
+  request: FashionRequest<T>,
+) {
+  if (!response.body) throw invalidOutput();
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const parser = new PieceStreamParser();
+  let pending = "";
+  let completion: unknown;
+  let emitted = 0;
+  let totalBytes = 0;
+
+  async function consume(frame: string) {
+    const payload = frame
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n");
+    if (!payload || payload === "[DONE]") return;
+    let event: unknown;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      throw invalidOutput({ providerCode: "invalid_event_json" });
+    }
+    if (!object(event) || typeof event.type !== "string") throw invalidOutput();
+    if (
+      event.type === "response.output_text.delta" &&
+      typeof event.delta === "string"
+    ) {
+      for (const piece of parser.append(event.delta)) {
+        await request.onPiece?.(piece, emitted++);
+      }
+    } else if (event.type === "response.completed") {
+      completion = event.response;
+    } else if (
+      event.type === "response.refusal.delta" ||
+      event.type === "response.refusal.done"
+    ) {
+      throw new ApiError(
+        "provider_refused",
+        "The provider could not analyze this reference. Try a different outfit image.",
+        422,
+      );
+    } else if (
+      ["response.failed", "response.incomplete"].includes(event.type)
+    ) {
+      parseFashionResponse(request.schema, event.response);
+      throw invalidOutput({ providerCode: "stream_failed" });
+    } else if (event.type === "error") {
+      throw invalidOutput({
+        providerCode: safeIdentifier(event.code) ?? "stream_error",
+      });
+    }
+  }
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > 8_000_000) throw invalidOutput();
+      pending = (pending + decoder.decode(value, { stream: true })).replace(
+        /\r\n/g,
+        "\n",
+      );
+      let boundary: number;
+      while ((boundary = pending.indexOf("\n\n")) !== -1) {
+        await consume(pending.slice(0, boundary));
+        pending = pending.slice(boundary + 2);
+      }
+    }
+    pending += decoder.decode();
+    if (pending.trim()) await consume(pending);
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+  if (!completion) throw invalidOutput({ providerCode: "stream_incomplete" });
+  const result = parseFashionResponse(request.schema, completion);
+  if (
+    !object(result.data) ||
+    !Array.isArray(result.data.pieces) ||
+    emitted !== result.data.pieces.length
+  ) {
+    throw invalidOutput({ providerCode: "piece_count_mismatch" });
+  }
+  return result;
+}
+
+export async function requestFashion<T extends z.ZodType>(
+  request: FashionRequest<T>,
+): Promise<{ data: z.output<T>; metadata: ProviderMetadata }> {
+  const scope = operationScope.getStore();
+  if (!scope) {
+    throw diagnosticError(
+      "provider_unavailable",
+      "Create a persisted analysis operation before starting the provider.",
+      503,
+      false,
+    );
+  }
+  const key =
+    process.env.OPENAI_API_KEY?.trim() || process.env.MODEL_API_KEY?.trim();
+  const model = process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
+  if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,119}$/.test(model)) {
+    throw new ApiError(
+      "provider_unavailable",
+      "Fashion analysis is not configured yet. Try again after setup.",
+      503,
+    );
+  }
+  const context = JSON.stringify(request.context);
+  if (
+    typeof context !== "string" ||
+    Buffer.byteLength(context, "utf8") > 300_000
+  ) {
+    throw new ApiError(
+      "provider_unavailable",
+      "The analysis context is too large. Narrow the item selection and retry.",
+      422,
+    );
+  }
+  if (
+    request.imageDataUrl &&
+    !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(
+      request.imageDataUrl,
+    )
+  ) {
+    throw new ApiError(
+      "provider_unavailable",
+      "The analysis image has not been verified.",
+      422,
+    );
+  }
+  const { instructions, versions } = buildFashionPrompt(request.task);
+  const content: Array<Record<string, unknown>> = [
+    {
+      type: "input_text",
+      text: `<untrusted_context>\n${context}\n</untrusted_context>`,
+    },
+  ];
+  if (request.imageDataUrl)
+    content.push({
+      type: "input_image",
+      image_url: request.imageDataUrl,
+      detail: "auto",
+    });
+  const body = JSON.stringify({
+    model,
+    instructions,
+    input: [{ role: "user", content }],
+    reasoning: { effort: "low" },
+    store: false,
+    stream: Boolean(request.onPiece),
+    max_output_tokens: 24000,
+    text: {
+      format: {
+        type: "json_schema",
+        name: request.task,
+        strict: true,
+        schema: strictJsonSchema(request.schema),
+      },
+    },
+  });
+  const started = Date.now();
+  const deadline = started + 240_000;
+  const workspaceId = process.env.STYLORA_WORKSPACE_ID || "unconfigured";
+  let provisionalOutput = false;
+  const streamingRequest = request.onPiece
+    ? {
+        ...request,
+        onPiece: async (piece: Garment, index: number) => {
+          provisionalOutput = true;
+          await request.onPiece?.(piece, index);
+        },
+      }
+    : request;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const releaseSlot = await acquireSlot(workspaceId, deadline);
+    let reserved = false;
+    let eligibleRetry = false;
+    let failure: ApiError | undefined;
+    let details: Partial<ProviderFailureDetails> = {
+      attemptCount: attempt,
+      operationId: scope.operationId,
+    };
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      releaseSlot();
+      throw diagnosticError(
+        "provider_timeout",
+        "Fashion analysis took too long. Retry the operation.",
+        504,
+        true,
+        details,
+      );
+    }
+    const timeout = AbortSignal.timeout(Math.min(90_000, remaining));
+    try {
+      await scope.reserveCall();
+      reserved = true;
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body,
+        signal: timeout,
+      });
+      details = {
+        ...details,
+        httpStatus: response.status,
+        requestId: safeIdentifier(response.headers.get("x-request-id")),
+        retryAfterMs: retryAfterMilliseconds(
+          response.headers.get("retry-after"),
+        ),
+      };
+      if (!response.ok) {
+        const payload: unknown = await response.json().catch(() => null);
+        const error =
+          object(payload) && object(payload.error) ? payload.error : {};
+        const providerCode =
+          safeIdentifier(error.code) ?? safeIdentifier(error.type);
+        details.providerCode = providerCode;
+        eligibleRetry =
+          (response.status === 429 || response.status >= 500) &&
+          ![
+            "insufficient_quota",
+            "billing_hard_limit_reached",
+            "model_not_found",
+          ].includes(providerCode ?? "");
+        throw diagnosticError(
+          "provider_unavailable",
+          eligibleRetry
+            ? "Fashion analysis is temporarily unavailable. Retry shortly."
+            : "The fashion provider could not accept this request. Check its configuration.",
+          503,
+          eligibleRetry,
+          details,
+        );
+      }
+      const result = request.onPiece
+        ? await readStream(response, streamingRequest)
+        : parseFashionResponse(request.schema, await response.json());
+      return {
+        data: result.data,
+        metadata: {
+          ...versions,
+          model,
+          requestId: details.requestId ?? result.responseId,
+          latencyMs: Date.now() - started,
+          usage: result.usage,
+          attemptCount: attempt,
+          operationId: scope.operationId,
+        },
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        failure = error;
+      } else if (error instanceof PieceStreamError) {
+        failure = invalidOutput({
+          providerCode: error.reason,
+          validationIssues: error.validationIssues,
+        });
+      } else if (error instanceof SyntaxError || error instanceof z.ZodError) {
+        failure = invalidOutput({
+          providerCode:
+            error instanceof SyntaxError ? "invalid_json" : "output_schema",
+          validationIssues:
+            error instanceof z.ZodError
+              ? safeValidationIssues(error.issues)
+              : [],
+        });
+      } else if (timeout.aborted) {
+        eligibleRetry = true;
+        failure = diagnosticError(
+          "provider_timeout",
+          "Fashion analysis took too long. Retry the operation.",
+          504,
+          true,
+          details,
+        );
+      } else if (error instanceof TypeError || error instanceof DOMException) {
+        eligibleRetry = true;
+        failure = diagnosticError(
+          "provider_unavailable",
+          "Fashion analysis could not connect. Retry shortly.",
+          503,
+          true,
+          details,
+        );
+      } else {
+        failure = diagnosticError(
+          "provider_unavailable",
+          "The analysis could not finish. Check its operation status.",
+          502,
+          false,
+          details,
+        );
+      }
+      const existing = safeProviderError(failure);
+      failures.set(failure, {
+        ...existing!,
+        ...details,
+        code: failure.code,
+        retryable: failure.retryable,
+      });
+    } finally {
+      try {
+        if (reserved) await scope.releaseCall();
+      } finally {
+        releaseSlot();
+      }
+    }
+    if (!failure) throw invalidOutput();
+    if (!eligibleRetry || provisionalOutput) throw failure;
+    if (attempt === 3) {
+      throw diagnosticError(
+        failure.code,
+        failure.message,
+        failure.status,
+        false,
+        { ...safeProviderError(failure)!, ...details },
+      );
+    }
+    const delay =
+      Math.max(details.retryAfterMs ?? 0, 500 * 2 ** (attempt - 1)) +
+      Math.floor(Math.random() * 250);
+    if (Date.now() + delay >= deadline) throw failure;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+  throw invalidOutput();
+}

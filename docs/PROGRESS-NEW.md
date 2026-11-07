@@ -1,5 +1,23 @@
 # Stylora shared progress reporting
 
+## Owner 2 live pipeline verification: 7 November 2026
+
+- Branch: `o2/upload-outfit-backend`; integrated upstream through `a964962`, including the merged Profile/Preferences PR #6, Owner 3 backend, OpenAI defaults, capsule work and Owner 4's shared operation runner. The shared runner remains in `operations/server.ts`; Owner 2 handlers are in `operations/create.ts`.
+- Implemented and live verified: signed inspiration upload and decoded-byte verification, parallel garment description and independent confidence review, correction persistence with 409 recovery, sample-backed matching, exactly three outfit directions, isolated regeneration, reload and paid-work deduplication.
+- Actual E2E: `node scripts/test-owner2-pipeline.mjs` passed against hosted Supabase and OpenAI `gpt-6-luna`. The supplied JPEG produced 4 persisted pieces, 4 matches and 3 current options. Five provider operations completed, including regeneration. Verified look: `264ecc9a-02cf-4de9-a8af-c897202554db` in `dev-owner-2`.
+- Provider evidence from the successful run: description 19,204 ms, confidence 10,078 ms, matching 16,559 ms, options 34,117 ms, regeneration 10,428 ms. These are actual provider request durations for this fixture, not latency guarantees. Prompt `stylora-fashion-v1`, schema `fashion-item.v1`, source and assembly hashes, request IDs and usage are persisted per operation.
+- Problems found and solved: initial description output lacked per-field evidence; a second attempt exposed a scalar/list mismatch. The provider projection now structurally pairs each attribute with evidence and uses separate scalar/list schemas before canonical validation. Confidence evidence IDs/paths and input keys are constrained to supplied context. Failed attempts remain failed; none was converted to synthetic inference success.
+- Profile and draft checks: the first hosted round-trip passed and restored original values. `node scripts/test-owner2-guards.mjs` passed 9 HTTP checks for disabled writes, invalid uploads without allocation, missing resources, concurrent CAS and name-only fingerprint stability, with profile restoration and no provider calls.
+- Additional live checks: SSE replay after a stored event, stale-option rejection, deduplicated regeneration allocation and replayable cancellation passed without new provider calls. The reproducible runner is `node scripts/test-owner2-replay.mjs`.
+- Database verification: complete `supabase/tests/foundation.sql` and `supabase/tests/owner2.sql` passed through Supabase MCP. Synthetic transactions rolled back. Checks cover RLS/direct-role denial, foreign workspace and parent rejection, stale attempts/completions, changed preference snapshots, request limits, cancellation and historical matches after wardrobe archival.
+- Schema: restored the two Owner 3 migration files from hosted migration history; upstream later supplied the same statements. Owner 2 migrations `20261107041044` and `20261107041613` were created with the CLI, reviewed, applied through the connected Supabase migration tool and recorded under their hosted versions. Database types were generated from the hosted schema, not edited as a contract workaround.
+- Local checks: `make fast` passed; final `make test` passed 105 tests across 22 files after integration through `a964962`; `pnpm build` passed again on that integration. A production-server HTTP smoke read the retained look with 4 pieces, 4 matches, 3 non-stale options and an available reference image, without provider calls. The production build traces include the Markdown prompt files. The named replay runner also passed four checks without provider calls.
+- Usage: 10 actual provider HTTP requests were recorded across all diagnostic and successful runs, within the authorized 150-call budget. Seven operations succeeded overall; the final connected run accounts for five. Three initial failed operations retain safe diagnostic evidence. Image generation and shopping usage remained zero for this task.
+- Fixture source and retention: real user-supplied inspiration JPEG and real OpenAI output. Only wardrobe inventory is explicit synthetic sample data, including correctly named design-library sample photos and honest missing-photo states. Three pipeline runs retained their test records in `dev-owner-2`, including failed-operation evidence; the demo workspace was not changed. The successful run's selected synthetic preferences and final results remain inspectable. Optional per-run cleanup is documented in `OWNER-2-BACKEND.md`.
+- Remaining integration: frontend wiring and Owner 1's actual wardrobe intake/export; marketplace execution remains pending with committed option/slot IDs and missing briefs available. No search, image-generation or deployment request was made by Owner 2. Main's general model defaults are preserved; this task explicitly selects `OPENAI_MODEL=gpt-6-luna`.
+- Delivery lane: B. PR #6 is merged. The pipeline PR requires human review before merge; no direct push to main or deployment is authorized by this work.
+- Upstream schema gap: main PR #14 adds `20261107035901_operation_fencing.sql`, but hosted migration history does not contain it at the final synchronization checkpoint. Its migration and policy tests are retained. The types file was regenerated from the actual hosted schema, so uninstalled RPC declarations from that upstream increment are absent until Owner 1 applies its reviewed migration and regenerates types. Owner 2's applied RPCs and live-tested flow are available independently. No hosted completion claim is made for Owner 1's new image/operation RPCs.
+
 ## Owner 2 backend checkpoint: 7 November 2026
 
 Owner 2 now owns the Profile and Preferences backend by explicit task assignment. The user also authorized the additive Owner 2 database contracts and hosted validation for the Create pipeline. Frontend and marketplace implementation are excluded from this task.
@@ -151,6 +169,15 @@ below the latest one.
   live provider, storage, Figma screen or Vercel verification was performed
   for this foundation.
 
+### Owner 1 workspace frontend · 7 November 2026, Asia/Bangkok
+
+- Work branch `o1/workspace-frontend`, base `4fd5aba`. Requirements R33–R36 and work packages O1.3–O1.6. The four application routes under `src/app/(workspace)` compose the shared shell, Wardrobe, Preferences and Profile.
+- Wardrobe supports searching, filtering, returning to the collection, reading and editing details, marking a candidate owned, and archiving and restoring pieces. Each seeded example uses the same existing `/design/images/wardrobe-ivory-shirt.webp` thumbnail. The intake keeps selected files in IndexedDB. Users can save one or more manually described pieces from a photo, or try the labeled sample item.
+- Preferences preserves optional selections and drafts across navigation and reload. Profile saves the workspace name shown in the sidebar and reads the active wardrobe count. The sample workspace keeps local navigation, item records, preferences and profile data in browser storage. Database persistence, automated descriptions and other owners’ routes remain separate integration work.
+- Chrome checks used isolated browser contexts and a fixture selected from the repository. Verified filter restoration through item detail and the sidebar, candidate promotion, invalid-file rejection, photo and manual draft reload, two pieces sharing one file, editing, photo replacement, archive and restore, Activity, reset confirmation, and workspace-name propagation. Reviewed the grid and navigation at 1440, 768, 390 and 360 px. The test browser contexts were closed after inspection. No hosted data or provider calls were used.
+
+- Final checks on Windows passed with `pnpm check` (ESLint, TypeScript and 37 tests), `pnpm build` and `pnpm build:storybook --quiet`. Both Chrome scenarios passed against the production build on loopback.
+
 ### Component library checkpoint · 2026-11-07, Asia/Bangkok
 
 - Owner 1 coordinated shared presentation for all four owners on the working tree based on `82aa65b`. O1.3–O1.6 cover the Wardrobe, preference, profile, shell and ownership controls.
@@ -170,6 +197,90 @@ below the latest one.
 - Verification evidence: Not run.
 - Hosted schema changes and authorization: None reported.
 - Unresolved work and next concrete action: Not reported.
+
+### Wardrobe starter seed, 7 November 2026 (Asia/Bangkok)
+
+- Task O1.6, PRD R33. Branch `o1/wardrobe-seed` from `4fd5aba`. Lane B
+  because this change contains Storage and workspace-scoped seed code.
+- Added `data/wardrobe/` with 45 unchanged WebP photographs, English item
+  descriptions, evidence, source references and a usage README. Initial
+  inventory is owned as requested. Source type stays sample.
+- Added `scripts/seed-wardrobe.mjs` and four focused Vitest cases. The CLI
+  reuses runtime configuration validation, checks the expected workspace and
+  write gate, validates Zod records and hashes, fully decodes WebP, uses three
+  concurrent tasks and random scoped Storage paths. Scoped import keys and
+  stable UUIDs preserve existing records and resume incomplete assets.
+  Stored descriptions use the source description text. User notes start empty.
+- Authorized target was Stylora, workspace `dev-owner-1`. The repository env
+  selected `demo`, so STYLORA_WORKSPACE_ID and DEMO_WRITES_ENABLED were
+  overridden only for the seed process. The env file was untouched. Demo
+  retained zero wardrobe items.
+- Actual commands were `pnpm install --frozen-lockfile`, Prettier on the new
+  files, `pnpm exec vitest run scripts/seed-wardrobe.test.mjs` (4 passed),
+  `pnpm lint` and `pnpm typecheck` (both passed, equivalent to make fast).
+  Node 22.14.0 ran the CLI with `--experimental-strip-types`, the local env
+  file and `--expected-workspace dev-owner-1`.
+- Hosted dry run planned 45 items with zero failures. First apply created 44
+  and left one pending after a Storage download check failed. Second apply
+  resumed it, created one and preserved 44. Third apply created zero, preserved
+  45 and verified all 45 downloaded hashes with zero failures.
+- Final scoped SQL confirmed 45 active owned items, 45 distinct ready assets,
+  45 Storage objects and zero incomplete assets. Full-row fingerprints before
+  and after the final apply matched. Intentionally retained the requested
+  inventory. No synthetic online fixture or orphan remains.
+- Read-only policy inspection confirmed RLS enabled and SELECT denied for
+  anon and authenticated on assets and wardrobe_items. No schema, generated
+  types, provider integration or other feature was changed.
+- Not run were full check and production build, which are CI gates under
+  WORKFLOW section 10.4. Wardrobe application and UI integration remain
+  separate work.
+- Automatic approval review rejected the commit command because authorization
+  covered seeding, with separate permission required for Git-history changes.
+  No commit, push or pull request was made. Files remain in the isolated
+  worktree for review.
+
+### Wardrobe post-seed audit, 7 November 2026 (Asia/Bangkok)
+
+- A new read-only audit compared every supported database field against all 45
+  source records, including canonical attributes, descriptions, inferred values,
+  evidence, corrections, confidence, uncertainty, ownership and source type.
+  All 45 matched. Each item linked to its scoped ready asset and Storage object.
+- Downloaded, hashed and fully decoded all 45 stored WebPs. Every hash, size
+  and dimension matched the local source. Total image bytes were 4,157,480.
+  A temporary signed display URL returned HTTP 200, the expected MIME and
+  identical bytes. The URL was not printed or stored.
+- Independently read allowed attribute names and category groups from
+  FASHION-STRUCTURE.md and checked actual list types, uniqueness, limits and
+  field evidence. All 45 passed. Maximum PostgreSQL attribute JSON size was
+  572 bytes and maximum provenance size was 5,556 bytes.
+- All 45 persisted rows could be projected into schema-valid canonical
+  fashion-item.v1 envelopes using real IDs, asset references and revisions.
+  The source JSON is a seed manifest; its raw records require that projection.
+  Source metadata and image context remain in the manifest. They are not
+  dedicated fields in the existing wardrobe table.
+- Environment discovery found configuration had moved from .env to .env.local.
+  The audit used the latter and explicitly scoped all reads to dev-owner-1.
+  No seed writes or schema changes were performed by this audit. The application
+  response adapter and browser Wardrobe journey were not verified.
+
+### Wardrobe dataset Git delivery, 7 November 2026 (Asia/Bangkok)
+
+- The user authorized pulling updates and publishing the starter dataset to main.
+  Rebased the isolated seed branch onto cb105ff without conflicts. The diff
+  contains the 45 source WebPs, manifest, seed CLI, its tests and this report.
+- New seed uploads now follow the shared Storage path contract using the asset
+  ID as the middle path segment. Existing hosted paths still require the separate
+  normalization task recorded in the Wardrobe backend plan. No hosted writes
+  were performed during Git delivery.
+- After rebase, the four targeted seed tests passed. Lint exited successfully
+  with one existing Preview navigation warning. Typecheck failed at
+  src/features/preview/generation.ts:262 because complete_preview_operation is
+  missing from the generated RPC types. That file and the generated types are
+  unchanged from main. Full check and build are delegated to the PR CI gate.
+- Upstream 4971f04 supplied the missing RPC types while this branch was being
+  prepared. Rebased onto that update and reran typecheck successfully.
+- Formatted the task's new files with the current project formatter. Git delivery
+  uses a pull request to main so the normal merge checks and protections apply.
 
 ## 5. Owner 2 report
 
@@ -382,3 +493,34 @@ which data, code revision or provider behavior was verified.
 - Not run. Hosted database, Storage, provider calls, feature end-to-end journeys and local build. CI is the full build and test gate.
 - Integration pending. Owner 1 atomic completion, workspace image claim quota and retry/cancel contracts. Current failure updates use a scoped attempt and lease compare-and-set. This is request execution with lease recovery on revisit.
 - Client request store and operation HTTP controls are a following increment. No cloud data was changed.
+
+## Owner 1 studio transactions, 7 November 2026
+
+- Branch `o1/studio-transactions` adds the additive Studio transaction RPCs.
+  Capsule drafts use expected revisions and idempotent creation. Generation
+  commits validate the claimed attempt, stable brief, inventory and preference
+  revisions, then save outfits, owned membership and proposed slots together.
+- Studio saves resolve a Preview draft or Capsule outfit to an immutable
+  snapshot, avatar operation and media row in one transaction. A completed
+  Preview image can be reused only when source, render and dependency revisions
+  match. Deleting the source preserves the snapshot.
+- Capsule edits cancel obsolete operations and remove stale outputs before
+  changing membership. Outfit deletion advances the parent and sibling source
+  revisions, recomputes addition support and retains an explicit completed
+  empty result when the final outfit is deleted.
+- Ran the `studio_transactions.sql` suite as `service_role` using
+  `psql -v ON_ERROR_STOP=1` against a separate local database containing the
+  baseline, Owner 3 migrations and operation contract. It passed with fixtures
+  rolled back. Cases include workspace rejection, stale attempts, input
+  revision changes, candidate rejection, save idempotency, exact image reuse,
+  deletion revisions and snapshot survival.
+- Regenerated types from the combined local schema with pinned Supabase CLI 3.
+  Hosted application, hosted policy checks and live provider journeys remain
+  pending their existing authorization.
+- The follow-up image lifecycle migration accepts a server-verified pending PNG
+  and promotes it only with successful fenced completion. Superseded and
+  cancelled results leave pending assets eligible for cleanup.
+- Cancellation retains a running request's lease and image quota until worker
+  acknowledgment or lease expiry. Queued cancellation remains immediate.
+  Updated operation, Studio and foundation suites all passed against the
+  combined local schema. Local lint and typecheck passed; CI is the build gate.

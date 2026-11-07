@@ -18,6 +18,9 @@ type NavigationProps = {
   activeHref: string;
   displayName: string;
   resume?: { href: string; label: string };
+  availableHrefs?: readonly string[];
+  destinationHrefs?: Readonly<Record<string, string>>;
+  contextLabel?: string;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
 };
@@ -26,29 +29,48 @@ function Destinations({
   activeHref,
   rail = false,
   onNavigate,
-}: Pick<NavigationProps, "activeHref"> & {
+  availableHrefs,
+  destinationHrefs,
+}: Pick<
+  NavigationProps,
+  "activeHref" | "availableHrefs" | "destinationHrefs"
+> & {
   rail?: boolean;
   onNavigate?: () => void;
 }) {
   return (
     <nav aria-label="Workspace destinations" className={styles.links}>
-      {workspaceLinks.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          onClick={onNavigate}
-          title={rail ? link.label : undefined}
-          aria-label={rail ? link.label : undefined}
-          aria-current={
-            activeHref === link.href || activeHref.startsWith(link.href + "/")
-              ? "page"
-              : undefined
-          }
-        >
-          <Icon name={link.icon} />
-          {!rail && link.label}
-        </Link>
-      ))}
+      {workspaceLinks.map((link) =>
+        availableHrefs && !availableHrefs.includes(link.href) ? (
+          <span
+            key={link.href}
+            className={styles.unavailable}
+            role="link"
+            aria-disabled="true"
+            aria-label={link.label + ", unavailable in this preview"}
+            title={link.label + " is unavailable in this preview"}
+          >
+            <Icon name={link.icon} />
+            {!rail && link.label}
+          </span>
+        ) : (
+          <Link
+            key={link.href}
+            href={destinationHrefs?.[link.href] ?? link.href}
+            onClick={onNavigate}
+            title={rail ? link.label : undefined}
+            aria-label={rail ? link.label : undefined}
+            aria-current={
+              activeHref === link.href || activeHref.startsWith(link.href + "/")
+                ? "page"
+                : undefined
+            }
+          >
+            <Icon name={link.icon} />
+            {!rail && link.label}
+          </Link>
+        ),
+      )}
     </nav>
   );
 }
@@ -66,6 +88,9 @@ export function WorkspaceSidebar({
   collapsed,
   onCollapsedChange,
   resume,
+  availableHrefs,
+  destinationHrefs,
+  contextLabel,
 }: NavigationProps) {
   const tablet = useSyncExternalStore(
     observeTablet,
@@ -97,7 +122,12 @@ export function WorkspaceSidebar({
         </button>
       </div>
       <div id={navId}>
-        <Destinations activeHref={activeHref} rail={rail} />
+        <Destinations
+          activeHref={activeHref}
+          rail={rail}
+          availableHrefs={availableHrefs}
+          destinationHrefs={destinationHrefs}
+        />
       </div>
       {resume && !rail && (
         <Link className={styles.resume} href={resume.href}>
@@ -115,7 +145,7 @@ export function WorkspaceSidebar({
         <Icon name="user" />
         <span hidden={rail}>
           <strong>{displayName}</strong>
-          <small>Shared workspace</small>
+          <small>{contextLabel ?? "Shared workspace"}</small>
         </span>
       </Link>
     </aside>
@@ -127,7 +157,18 @@ export function MobileTopBar({
   displayName,
   resume,
   activity,
-}: Pick<NavigationProps, "activeHref" | "displayName" | "resume"> & {
+  availableHrefs,
+  destinationHrefs,
+  contextLabel,
+}: Pick<
+  NavigationProps,
+  | "activeHref"
+  | "displayName"
+  | "resume"
+  | "availableHrefs"
+  | "destinationHrefs"
+  | "contextLabel"
+> & {
   activity?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -145,11 +186,19 @@ export function MobileTopBar({
         </button>
         <Link href="/" aria-label="Stylora home">
           <Logo />
+          {contextLabel && (
+            <small className={styles.mobileCaption}>{contextLabel}</small>
+          )}
         </Link>
         <div>{activity}</div>
       </div>
       <Drawer side="left" title="Workspace" open={open} onClose={close}>
-        <Destinations activeHref={activeHref} onNavigate={close} />
+        <Destinations
+          activeHref={activeHref}
+          onNavigate={close}
+          availableHrefs={availableHrefs}
+          destinationHrefs={destinationHrefs}
+        />
         {resume && (
           <Link className={styles.resume} href={resume.href} onClick={close}>
             <Icon name="sparkle" />

@@ -1,6 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import type { ReactNode } from "react";
 import { Badge, Icon } from "@/components/ui";
 import {
   type WardrobeItemSummary,
@@ -11,18 +12,25 @@ import styles from "./wardrobe.module.css";
 export type WardrobeItemCardProps = {
   item: WardrobeItemSummary;
   onOpen: (itemId: string) => void;
+  renderImage?: (item: WardrobeItemSummary) => ReactNode;
 };
 
-export function WardrobeItemCard({ item, onOpen }: WardrobeItemCardProps) {
+export function WardrobeItemCard({
+  item,
+  onOpen,
+  renderImage,
+}: WardrobeItemCardProps) {
   return (
     <button
       className={styles.item}
       type="button"
       onClick={() => onOpen(item.id)}
-      aria-label={`Open ${item.name}${item.inventoryStatus === "saved_candidate" ? ", saved candidate" : ""}`}
+      aria-label={`Open ${item.name}${item.inventoryStatus === "saved_candidate" ? ", saved candidate" : ""}${item.isSample ? ", sample item" : ""}`}
     >
       <span className={styles.itemImage}>
-        {item.imageUrl ? (
+        {renderImage ? (
+          renderImage(item)
+        ) : item.imageUrl ? (
           <img src={item.imageUrl} alt="" />
         ) : (
           <span className={styles.imageFallback}>
@@ -43,6 +51,7 @@ export function WardrobeItemCard({ item, onOpen }: WardrobeItemCardProps) {
       <span className={styles.itemCategory}>
         {wardrobeCategoryLabel(item.category)}
       </span>
+      {item.isSample && <span className={styles.sampleLabel}>Sample item</span>}
     </button>
   );
 }
