@@ -44,6 +44,7 @@ export default async function PreviewPage({
       displayName={initial.displayName}
       breadcrumbs={[{ label: "Preview" }]}
       activity={[]}
+      draftStatus={initial.draftId ? "saved" : undefined}
     >
       <PreviewClient
         key={`${initial.draftId ?? JSON.stringify(source) ?? "new"}:${initial.revision}`}

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Button, Icon } from "@/components/ui";
 
 export type PreviewCategory =
@@ -35,7 +35,9 @@ const CATEGORIES: { key: PreviewCategory; label: string }[] = [
 
 function slotForItem(item: PreviewItem): PreviewCategory {
   if (item.category !== "accessory") return item.category;
-  return /bag|tote|clutch|backpack|purse|satchel|duffel|briefcase|crossbody|messenger/i.test(item.subcategory ?? "")
+  return /bag|tote|clutch|backpack|purse|satchel|duffel|briefcase|crossbody|messenger/i.test(
+    item.subcategory ?? "",
+  )
     ? "bags"
     : "accessories";
 }
@@ -79,6 +81,7 @@ export function PreviewStudio({
   readOnly = false,
   initialCategory = "top",
   onCategoryChange,
+  primarySave,
   onSelectionChange,
   onGenerate,
   onSaveLook,
@@ -97,12 +100,14 @@ export function PreviewStudio({
   readOnly?: boolean;
   initialCategory?: PreviewCategory;
   onCategoryChange?: (category: PreviewCategory) => void;
+  primarySave?: ReactNode;
   onSelectionChange?: (selection: PreviewSelection) => void;
   onGenerate?: (selection: PreviewSelection) => void;
   onSaveLook?: (selection: PreviewSelection) => void;
   onEditPreferences?: () => void;
 }) {
   const [category, setCategory] = useState<PreviewCategory>(initialCategory);
+  const tabId = useId();
   const [selection, setSelection] =
     useState<PreviewSelection>(initialSelection);
   const ownedItems = items.filter((item) => item.inventoryStatus === "owned");
@@ -113,6 +118,7 @@ export function PreviewStudio({
   const canGenerate =
     !!onGenerate &&
     !readOnly &&
+    job.status !== "unavailable" &&
     chosenItems.length > 0 &&
     job.status !== "queued" &&
     job.status !== "running";
@@ -148,13 +154,17 @@ export function PreviewStudio({
           </p>
         </div>
         <div className="hidden md:block">
-          <Button
-            variant="primary"
-            disabled={chosenItems.length === 0 || saving || !onSaveLook || readOnly}
-            onClick={() => onSaveLook?.(selection)}
-          >
-            {saving ? "Saving…" : "Save this look"}
-          </Button>
+          {primarySave ?? (
+            <Button
+              variant="primary"
+              disabled={
+                chosenItems.length === 0 || saving || !onSaveLook || readOnly
+              }
+              onClick={() => onSaveLook?.(selection)}
+            >
+              {saving ? "Saving…" : "Save this look"}
+            </Button>
+          )}
           <p className="mt-2 text-xs text-secondary">
             Saving keeps this exact composition.
           </p>
@@ -172,21 +182,45 @@ export function PreviewStudio({
                 key={key}
                 type="button"
                 role="tab"
+                id={`${tabId}-${key}`}
+                aria-controls={`${tabId}-items`}
                 aria-selected={category === key}
                 tabIndex={category === key ? 0 : -1}
                 onKeyDown={(event) => {
-                  const offset = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-                  if (!offset && event.key !== "Home" && event.key !== "End") return;
+                  const offset =
+                    event.key === "ArrowRight"
+                      ? 1
+                      : event.key === "ArrowLeft"
+                        ? -1
+                        : 0;
+                  if (!offset && event.key !== "Home" && event.key !== "End")
+                    return;
                   event.preventDefault();
-                  const index = event.key === "Home" ? 0 : event.key === "End" ? CATEGORIES.length - 1 : (CATEGORIES.findIndex((item) => item.key === category) + offset + CATEGORIES.length) % CATEGORIES.length;
+                  const index =
+                    event.key === "Home"
+                      ? 0
+                      : event.key === "End"
+                        ? CATEGORIES.length - 1
+                        : (CATEGORIES.findIndex(
+                            (item) => item.key === category,
+                          ) +
+                            offset +
+                            CATEGORIES.length) %
+                          CATEGORIES.length;
                   const next = CATEGORIES[index].key;
                   setCategory(next);
                   onCategoryChange?.(next);
-                  (event.currentTarget.parentElement?.children[index] as HTMLButtonElement | undefined)?.focus();
+                  (
+                    event.currentTarget.parentElement?.children[index] as
+                      HTMLButtonElement | undefined
+                  )?.focus();
                 }}
-                onClick={() => { setCategory(key); onCategoryChange?.(key); }}
+                onClick={() => {
+                  setCategory(key);
+                  onCategoryChange?.(key);
+                }}
                 className={
-                  "min-h-10 shrink-0 rounded-lg px-3 text-xs " +
+                  "min-h-11 shrink-0 rounded-lg px-3 text-xs " +
                   (category === key ? "bg-paper font-medium" : "")
                 }
               >
@@ -196,7 +230,12 @@ export function PreviewStudio({
             ))}
           </div>
           {options.length ? (
-            <div className="mt-4 grid grid-cols-3 gap-2">
+            <div
+              role="tabpanel"
+              id={`${tabId}-items`}
+              aria-labelledby={`${tabId}-${category}`}
+              className="mt-4 grid grid-cols-3 gap-2"
+            >
               {options.map((item) => (
                 <button
                   key={item.id}
@@ -232,8 +271,23 @@ export function PreviewStudio({
               </button>
             </div>
           ) : (
-            <div className="mt-4 rounded-xl bg-porcelain p-5 text-center text-sm text-secondary">
+            <div
+              role="tabpanel"
+              id={`${tabId}-items`}
+              aria-labelledby={`${tabId}-${category}`}
+              className="mt-4 rounded-xl bg-porcelain p-5 text-center text-sm text-secondary"
+            >
               No owned pieces in this category. You may leave it empty.
+              {selection[category] && (
+                <button
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => pick()}
+                  className="mt-3 block min-h-11 w-full text-crimson underline"
+                >
+                  Clear unavailable piece
+                </button>
+              )}
             </div>
           )}
           <h2 className="mt-5 text-sm font-semibold">Your selection</h2>
@@ -301,7 +355,8 @@ export function PreviewStudio({
                       ? (job.errorMessage ??
                         "The image failed. Your selection is still here.")
                       : job.status === "unavailable"
-                        ? "Image generation is unavailable right now."
+                        ? (job.errorMessage ??
+                          "Image generation is unavailable right now.")
                         : "Select pieces to preview a look."}
                 </p>
                 {(job.status === "queued" || job.status === "running") && (
@@ -416,13 +471,15 @@ export function PreviewStudio({
               ? "Retry image"
               : "Generate image"}
         </button>
-        <Button
-          variant="primary"
-          disabled={!chosenItems.length || saving || !onSaveLook || readOnly}
-          onClick={() => onSaveLook?.(selection)}
-        >
-          {saving ? "Saving…" : "Save this look"}
-        </Button>
+        {primarySave ?? (
+          <Button
+            variant="primary"
+            disabled={!chosenItems.length || saving || !onSaveLook || readOnly}
+            onClick={() => onSaveLook?.(selection)}
+          >
+            {saving ? "Saving…" : "Save this look"}
+          </Button>
+        )}
       </div>
     </section>
   );
