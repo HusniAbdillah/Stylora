@@ -128,7 +128,7 @@ garment DTO and is not fabricated from global confidence insights.
 The authorized fixed sample preparation made one provider call and scoped sample
 writes. Visual inspection runs the development server and read-only views.
 The user subsequently authorized brief backend checks. The backend HTTP smoke
-passed seven checks with 26 requests and no inference, restoring original settings
+passed ten checks with 31 requests and no inference, restoring original settings
 and cleaning its temporary rows and private object. Frontend tests, make fast,
 lint, typecheck, build and the frontend E2E journey were not run. Static review
 and screenshots do not prove live end-to-end frontend behavior.

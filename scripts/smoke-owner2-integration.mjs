@@ -22,7 +22,13 @@ const evidence = {
   skipped: [],
   cleanup: [],
 };
-const created = { drafts: [], operations: [], look: null, asset: null };
+const created = {
+  drafts: [],
+  operations: [],
+  wardrobe: [],
+  look: null,
+  asset: null,
+};
 let server;
 let originalPreferences;
 let originalProfile;
@@ -316,6 +322,171 @@ try {
     cleanup: "delete_new_fixture_rows_and_private_object",
   };
 
+  phase = "owner1_live_wardrobe_contract_and_matching_allocation";
+  const wardrobeId = randomUUID();
+  const wardrobeFixture = {
+    id: wardrobeId,
+    workspace_id: workspaceId,
+    name: "Manual live inventory API smoke shirt",
+    category: "top",
+    subcategory: "shirt",
+    description:
+      "Temporary manually entered owned inventory for backend integration verification.",
+    attributes: { primaryColor: "ivory", colors: ["ivory"], fit: "relaxed" },
+    inferred_attributes: {},
+    corrections: {},
+    provenance: {
+      "attributes.primaryColor": {
+        source: "user",
+        state: "reported",
+        confidence: null,
+        evidence: "Explicit manual test input.",
+        uncertainty: null,
+      },
+    },
+    confidence: null,
+    uncertainty: ["Temporary manual test input; no provider analysis."],
+    source_type: "manual",
+    inventory_status: "owned",
+    notes: "Disposable backend smoke fixture.",
+  };
+  const insertedWardrobe = await client
+    .from("wardrobe_items")
+    .insert(wardrobeFixture);
+  assert.ifError(insertedWardrobe.error);
+  created.wardrobe.push(wardrobeId);
+  const wardrobeResponse = await request("/api/wardrobe?status=owned");
+  const ownedFixture = wardrobeResponse.items.find(
+    (item) => item.id === wardrobeId,
+  );
+  assert.equal(
+    ownedFixture?.sourceType,
+    "manual",
+    "Owner 1 API returns actual manual inventory source",
+  );
+  assert.equal(
+    ownedFixture?.inventoryStatus,
+    "owned",
+    "Owner 1 API returns owned inventory",
+  );
+  assert.equal(
+    ownedFixture?.attributes.primaryColor,
+    "ivory",
+    "Owner 1 canonical item attributes",
+  );
+  const matchingInput = {
+    kind: "wardrobe_match",
+    inventoryMode: "live",
+    execute: false,
+  };
+  const matchingRoute = `/api/workflow-drafts/${draft.id}/operations`;
+  const liveOperation = await request(matchingRoute, "POST", matchingInput);
+  created.operations.push(liveOperation.id);
+  const sameLiveOperation = await request(matchingRoute, "POST", matchingInput);
+  assert.equal(
+    sameLiveOperation.id,
+    liveOperation.id,
+    "live matching allocation deduplicates",
+  );
+  assert.equal(
+    liveOperation.inventoryMode,
+    "live",
+    "operation projection preserves live inventory mode",
+  );
+  assert.equal(
+    liveOperation.status,
+    "queued",
+    "live matching remains unexecuted",
+  );
+  const storedOperation = await client
+    .from("workflow_operations")
+    .select("input,provider_call_count")
+    .eq("workspace_id", workspaceId)
+    .eq("id", liveOperation.id)
+    .single();
+  assert.ifError(storedOperation.error);
+  assert.equal(
+    storedOperation.data.input.inventoryMode,
+    "live",
+    "live mode persisted in operation snapshot",
+  );
+  assert.ok(
+    storedOperation.data.input.inventoryState.some(
+      (item) => item.id === wardrobeId,
+    ),
+    "matching snapshot includes actual owned UUID",
+  );
+  assert.equal(
+    storedOperation.data.provider_call_count,
+    0,
+    "matching allocation spends no provider calls",
+  );
+  const includedIds = storedOperation.data.input.inventoryState.map(
+    (item) => item.id,
+  );
+  const includedItems = await client
+    .from("wardrobe_items")
+    .select("id,source_type,inventory_status,archived_at")
+    .eq("workspace_id", workspaceId)
+    .in("id", includedIds);
+  assert.ifError(includedItems.error);
+  assert.ok(
+    includedItems.data.every(
+      (item) =>
+        item.source_type !== "sample" &&
+        item.inventory_status === "owned" &&
+        item.archived_at === null,
+    ),
+    "live matching excludes sample, candidate and archived rows",
+  );
+  passed("owner1_wardrobe_api_and_live_inventory_matching_contract");
+  passed("live_matching_allocation_deduplicates_without_provider_calls");
+
+  phase = "outfit_execution_requires_current_matches_before_provider";
+  const optionsWithoutMatches = await request(matchingRoute, "POST", {
+    kind: "outfit_options",
+    inventoryMode: "live",
+    execute: false,
+  });
+  created.operations.push(optionsWithoutMatches.id);
+  const rejectedOptions = await request(
+    `/api/workflow-operations/${optionsWithoutMatches.id}/execute`,
+    "POST",
+  );
+  assert.equal(
+    rejectedOptions.status,
+    "failed",
+    "outfit execution without matches fails safely",
+  );
+  assert.equal(
+    rejectedOptions.errorCode,
+    "matches_not_ready",
+    "outfit execution reports missing current matches",
+  );
+  const rejectedOperation = await client
+    .from("workflow_operations")
+    .select("status,safe_error_code,provider_call_count")
+    .eq("workspace_id", workspaceId)
+    .eq("id", optionsWithoutMatches.id)
+    .single();
+  assert.ifError(rejectedOperation.error);
+  assert.equal(
+    rejectedOperation.data.status,
+    "failed",
+    "missing-match rejection persisted",
+  );
+  assert.equal(
+    rejectedOperation.data.safe_error_code,
+    "matches_not_ready",
+    "missing-match error persisted",
+  );
+  assert.equal(
+    rejectedOperation.data.provider_call_count,
+    0,
+    "missing matches are rejected before any provider call",
+  );
+  passed("outfit_execution_rejects_missing_matches_before_provider");
+
   phase = "regeneration_intent_allocation_without_provider";
   let previous;
   try {
@@ -423,12 +594,28 @@ try {
         expectedRevision: current.revision,
         preferences: originalPreferences.preferences,
       });
-      await request("/api/profile", "PATCH", {
+      assert.equal(
+        restored.fingerprint,
+        originalPreferences.fingerprint,
+        "original personalization fingerprint restored",
+      );
+      assert.deepEqual(
+        restored.preferences,
+        originalPreferences.preferences,
+        "original preference values restored",
+      );
+      const restoredProfile = await request("/api/profile", "PATCH", {
         expectedRevision: restored.revision,
         displayName: originalProfile.displayName,
       });
+      assert.equal(
+        restoredProfile.displayName,
+        originalProfile.displayName,
+        "original profile name restored",
+      );
+      evidence.personalizationFingerprintRestored = true;
     });
-  await cleanup("remove_allocated_unexecuted_operations", async () => {
+  await cleanup("remove_smoke_operations_and_events", async () => {
     await removeRows(
       "workflow_operation_events",
       "operation_id",
@@ -441,6 +628,7 @@ try {
     async () => {
       if (created.look)
         await removeRows("inspiration_pieces", "look_id", [created.look]);
+      await removeRows("wardrobe_items", "id", created.wardrobe);
       await removeRows("workflow_drafts", "id", created.drafts);
       if (created.look) await removeRows("looks", "id", [created.look]);
       if (created.asset) {
