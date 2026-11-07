@@ -1019,9 +1019,77 @@ which data, code revision or provider behavior was verified.
 - Saved-avatar operation inputs capture the validated manifest and render
   settings under the existing workspace and attempt fence. Retries retain
   captured settings. No migration or dependency was added.
-- The integration `make pr-ready` is running; CI remains the complete check and
-  build gate. An earlier overlapping local check saw the temporarily absent
-  dependent module and was not recorded as passed. No provider calls or hosted
-  fixture writes have been made for this comparison yet. Three controlled image
-  calls and visual review will follow only after the coordinated status contract
-  is integrated; the journal reserves every call before submission.
+- The integration `make pr-ready` passed lint and exposed a saved-item typing
+  boundary, corrected through canonical item validation. Follow-up
+  `pnpm exec tsc --noEmit` passed. Five focused files passed 47 tests. PR #56
+  merged as `b8312ff` after full Check run `42351244996` passed. An earlier
+  overlapping check saw a temporarily absent dependent module and was not
+  recorded as passed.
+
+## Owner 4 preference return and visual comparison, 7 November 2026
+
+- PRs #55 and #58 merged as `4b5223c` and `cd63629` after full Check workflows
+  passed. Status compares current render identity, retains the last ready image,
+  exposes preferences and settings revisions, and marks old images explicitly.
+  Client refresh covers preference events, focus, page restoration and history.
+  Request fencing and module deduplication include preferences, render identity
+  and navigation epoch. Matching failed or cancelled work does not auto-retry.
+  Final client TypeScript and 17 focused tests passed.
+- Browser on localhost port 3114 clicked Edit preferences and Back to preview.
+  Draft and selected Bottoms tab survived the round trip. Captured default
+  desktop and 390 by 844 mobile screenshots; the returned avatar image decoded
+  as 1024 by 1536. Browser changes did not edit preferences or start another
+  image request. This verifies the navigation example, not every browser or an
+  exhaustive accessibility audit.
+- The dev-owner-4 workspace already contained 45 sample garments and assets.
+  An unused initial preparation created no fixtures and was cleaned. PR #57
+  corrected preparation to seed seven run-owned samples even when inventory is
+  present, and to select only those IDs. Its complete Check workflow passed.
+- Ran `scripts/smoke-owner4.mjs --run --prepare` and then
+  `scripts/verify-preview-personalization.mjs --run --case a`, `--case b` and
+  `--case quality`, using one external journal and port 3114. Exactly three
+  image requests were reserved before submission, with zero text requests and
+  one attempt each. All used real OpenAI `gpt-image-1.5` edits, the same two
+  labeled sample garment photos, PNG 1024 by 1536 and high input fidelity.
+  Prompt `avatar-3` and manifest `visual-direction.v1` stayed fixed across the
+  comparison. Quality was changed by a server restart, verified by status and
+  captured operation settings before the third request.
+- A used depth_02, neutral undertone, the women's rectangle reference and
+  regular fit at medium quality (27.1 seconds). B used depth_05, neutral,
+  the women's pear reference and relaxed fit at medium (31.7 seconds). The
+  third request kept B's preferences and used high quality (48.5 seconds).
+  Each produced and stored a private, verified PNG with a different render
+  fingerprint. Operation time includes server and storage work, not just model
+  latency; this is one comparison rather than a performance benchmark.
+- Visual review found clearly different skin appearance and directionally
+  different drape and silhouette. Lavender color blocking, denim fading,
+  pockets, fly and stitching remain recognizable. Logo geometry, detailed fit
+  and construction are approximate. Both B and high added unselected shoes:
+  composition compliance failed despite valid output bytes. High did not
+  consistently improve the sample, so medium remains the default. Coupled
+  preference changes and three outputs do not establish independent accuracy,
+  exact skin color or reproducibility.
+- Ran harness `--restore` through the revision-checked preferences API. GET
+  status then returned idle, imageOutdated=true and the previous image still
+  present. Closed the browser before restoration to avoid a fourth automatic
+  generation. Ran smoke `--cleanup`: removed three operations, seven run-owned
+  garments, two drafts and ten run-owned assets. Follow-up scoped reads confirmed
+  all 45 baseline assets and garments remain, no run-owned asset or garment
+  remains, and original saved preferences were restored. Both local servers
+  were stopped. No production setting, deployment or migration was changed.
+- External evidence is retained under the chat's personalization-review artifact
+  directory: three PNGs, safe operation metadata, review notes, cleanup proof
+  and desktop/mobile screenshots. No images, journals, credentials or signed
+  URLs were committed. The visual follow-up makes omitted slots explicit and
+  prohibits replacement footwear; its request contract can be tested locally,
+  but no fourth paid image is authorized by this three-call run.
+- PR #61 adds the validated visual-direction.v2 selected/omitted slot partition
+  and derives pose visibility from that composition. Its 49 focused cases,
+  `make fast` and full Check run `42352802487` passed. The provider follow-up
+  uses prompt avatar-4, explicitly requires bare mannequin feet without selected
+  shoes, and keeps all omitted garments absent. A local intercepted-request suite
+  checks that those instructions, bundled fashion content and captured quality
+  actually reach the request, while contradictory manifests fail before fetch.
+  The combined final focused command passed 64 cases across five files without
+  accessing a provider. Its single `make pr-ready` is running; full CI is still
+  required on the final follow-up commit before merge.
