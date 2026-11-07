@@ -1677,6 +1677,44 @@ export type Database = {
       }
     }
     Functions: {
+      attach_product_candidate: {
+        Args: {
+          p_expected_option_revision: number
+          p_look_id: string
+          p_option_id: string
+          p_option_item_id: string
+          p_product_id: string
+          p_search_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          candidate_position: number
+          category: string
+          created_at: string
+          id: string
+          item_kind: string
+          look_id: string
+          missing_brief: Json | null
+          option_id: string
+          piece_id: string | null
+          position: number
+          product_id: string | null
+          rationale: string
+          requested_brief: string | null
+          requested_category: string | null
+          revision: number
+          slot_id: string
+          updated_at: string
+          wardrobe_item_id: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "outfit_option_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       claim_workflow_operation: {
         Args: {
           p_input_revision: number
@@ -1710,6 +1748,40 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      delete_saved_look: {
+        Args: { p_saved_look_id: string; p_workspace_id: string }
+        Returns: string
+      }
+      list_saved_looks: {
+        Args: {
+          p_cursor_created_at?: string
+          p_cursor_id?: string
+          p_filter?: string
+          p_limit?: number
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      retry_saved_look_media: {
+        Args: { p_saved_look_id: string; p_workspace_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          operation_id: string
+          output_asset_id: string | null
+          preference_snapshot_hash: string
+          saved_look_id: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "saved_look_media"
           isOneToOne: true
           isSetofReturn: false
         }
