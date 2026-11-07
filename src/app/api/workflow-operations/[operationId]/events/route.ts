@@ -1,7 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import { apiRoute, ApiError } from "@/lib/api";
-import { getEvents, getOperation } from "@/features/operations/server";
+import { getEvents, getOperation } from "@/features/operations/create";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
 
 export const maxDuration = 60;

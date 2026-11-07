@@ -74,7 +74,7 @@ async function readOperation(id: string) {
     .eq("id", id)
     .maybeSingle();
   if (error) throw sqlFailure(error);
-  if (!data || !kindSchema.safeParse(data.kind).success)
+  if (!data)
     throw new ApiError(
       "operation_not_found",
       "This operation is unavailable.",
@@ -171,6 +171,7 @@ export async function startLookOperation(
   lookId: string,
   request: unknown,
   optionType?: z.infer<typeof optionTypeSchema>,
+  expectedOptionId?: string,
 ) {
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
@@ -198,7 +199,7 @@ export async function startLookOperation(
       .eq("is_current", true)
       .eq("source_revision", look.revision)
       .maybeSingle();
-    if (!data)
+    if (!data || data.id !== expectedOptionId)
       throw new ApiError(
         "option_not_ready",
         "Generate the outfit direction before regenerating it.",
@@ -274,6 +275,7 @@ export async function executeOperation(id: string) {
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
   const pending = await readOperation(id);
+  if (!kindSchema.safeParse(pending.kind).success) throw new ApiError("operation_not_supported", "This operation uses another feature's executor.",404);
   if (
     ["succeeded", "failed", "cancelled", "superseded"].includes(pending.status)
   )

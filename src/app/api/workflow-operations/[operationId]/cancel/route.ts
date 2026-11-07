@@ -1,5 +1,5 @@
 import { apiRoute } from "@/lib/api";
-import { controlOperation } from "@/features/operations/server";
+import { controlOperation } from "@/features/operations/create";
 export async function POST(
   _request: Request,
   context: { params: Promise<{ operationId: string }> },
