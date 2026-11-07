@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
+import { attributesSchema } from "@/lib/ai/fashion-schema";
 import { ApiError } from "@/lib/api";
 import {
   getWorkspaceDatabase,
@@ -155,19 +156,7 @@ async function capsuleContext(id: string) {
         subcategory: z.string().max(120).nullable(),
         description: z.string().max(600),
         revision: z.number().int().positive(),
-        attributes: z
-          .record(
-            z.string(),
-            z.union([
-              z.string().max(120),
-              z.array(z.string().max(40)).max(8),
-              z.null(),
-            ]),
-          )
-          .refine(
-            (attributes) =>
-              Buffer.byteLength(JSON.stringify(attributes)) <= 8192,
-          ),
+        attributes: attributesSchema,
       }),
     )
     .parse(data);
@@ -197,6 +186,7 @@ async function capsuleContext(id: string) {
   ];
   const input = {
     brief: capsule.brief,
+    capsuleRevision: capsule.revision,
     items,
     knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
     itemRevisions: Object.fromEntries(

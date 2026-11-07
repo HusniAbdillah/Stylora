@@ -1,28 +1,28 @@
 import { z } from "zod";
+import { attributesSchema, garmentSchema } from "@/lib/ai/fashion-schema";
 import { categorySchema, type CapsuleDraftState } from "./schema";
 
 const text = z.string().trim().min(1).max(600);
-const attribute = z.string().trim().max(120).nullable();
 export const missingBriefSchema = z.strictObject({
   schemaVersion: z.literal("fashion-item.v1"),
-  name: z.string().trim().min(1).max(160),
+  name: garmentSchema.shape.name,
   category: categorySchema,
-  subcategory: attribute,
-  description: text,
+  subcategory: garmentSchema.shape.subcategory,
+  description: garmentSchema.shape.description,
   inventoryStatus: z.literal("not_applicable"),
   attributes: z.strictObject({
-    garmentForm: attribute,
-    functionalFamily: attribute,
-    primaryColor: attribute,
-    pattern: attribute,
-    apparentMaterial: attribute,
-    silhouette: attribute,
-    fit: attribute,
-    layeringRole: attribute,
-    formality: attribute,
-    coverage: attribute,
+    garmentForm: attributesSchema.shape.garmentForm.unwrap(),
+    functionalFamily: attributesSchema.shape.functionalFamily.unwrap(),
+    primaryColor: attributesSchema.shape.primaryColor.unwrap(),
+    pattern: attributesSchema.shape.pattern.unwrap(),
+    apparentMaterial: attributesSchema.shape.apparentMaterial.unwrap(),
+    silhouette: attributesSchema.shape.silhouette.unwrap(),
+    fit: attributesSchema.shape.fit.unwrap(),
+    layeringRole: attributesSchema.shape.layeringRole.unwrap(),
+    formality: attributesSchema.shape.formality.unwrap(),
+    coverage: attributesSchema.shape.coverage.unwrap(),
   }),
-  uncertainty: z.array(text).max(8),
+  uncertainty: garmentSchema.shape.uncertainty,
 });
 
 const reasonSchema = z.strictObject({
