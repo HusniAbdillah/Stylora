@@ -50,3 +50,7 @@ migrations and type generation. Set runtime values separately in Vercel
 Preview and Production with their assigned workspace IDs. Use Node.js 22 and
 the Next.js framework preset. Keep the secret key and provider credentials
 in server environment variables.
+
+Automatic Vercel Git deployments run only for `main`. Pull requests still run
+GitHub CI; request a Preview deployment only when needed, or review locally.
+See the [deployment policy and manual Preview steps](docs/WORKFLOW.md#3-git-pull-requests-and-merge-rhythm).

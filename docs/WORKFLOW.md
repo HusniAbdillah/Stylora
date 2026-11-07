@@ -81,6 +81,22 @@ Rules:
 - `main` is always deployable and auto-deploys to Vercel production. Protect
   it: pull requests only and CI green. Approval requirements and the agent
   merge lane are in section 10.6.
+- `vercel.json` permits automatic Git deployments only from `main`. Owner
+  branches still run the GitHub `Check` workflow on every pull request, but
+  Preview deployments are requested only when needed. This reduces deployment
+  creation against the Hobby limit of 100 per 24 hours; it does not restore an
+  exhausted allowance. Keep the Vercel Production branch set to `main`.
+- For an authorized Preview, open the project's Deployments page, select
+  Create Deployment, and enter the full owner branch name or commit SHA. Use
+  the Preview environment and its assigned workspace from section 2. If the
+  same SHA belongs to multiple branches, select the owner branch. Record the
+  deployed SHA and URL in the pull request. Manual deployments still consume
+  quota. Existing owner branches must merge or rebase this configuration before
+  their next push; branches without it can still trigger automatic deployments.
+- Do not use Ignored Build Step as the deployment-quota gate: canceled builds
+  still count as deployments. See Vercel's [Git configuration](https://vercel.com/docs/project-configuration/git-configuration),
+  [manual Git deployments](https://vercel.com/docs/git#creating-a-deployment-from-a-git-reference),
+  and [Ignored Build Step](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step).
 - Branch names: `o1/wardrobe-grid`, `o2/review-stream`, `o3/marketplace`,
   `o4/capsule-wizard`. A branch lives at most 90 minutes; split bigger work.
 - Each PR stays under roughly 400 changed lines, includes the Figma frame ID it
@@ -90,7 +106,8 @@ Rules:
   lane report). CI runs the full check and build, and it tests the merge with
   current `main`, so rebase only when GitHub reports a conflict. Section 10.4 is
   the single rule for local checks. After opening, click the changed UI flow once
-  on the preview.
+  on an authorized Preview or locally with `make dev`. Record which environment
+  was used; local review is not evidence of a deployed feature.
 - Reviewer rotation applies to Lane B pull requests: Owner 1 reviews 2, Owner 2
   reviews 3, Owner 3 reviews 4, Owner 4 reviews 1. Owner 1 must also approve any
   change to shared files. Lane A merges on green CI without waiting for a
@@ -99,7 +116,7 @@ Rules:
   merge window.
 
 Shared files with a single owner (Owner 1): `src/app/globals.css`,
-`src/app/layout.tsx`, the workspace shell, `package.json`, `pnpm-lock.yaml`,
+`src/app/layout.tsx`, the workspace shell, `package.json`, `pnpm-lock.yaml`, `vercel.json`,
 `.env.example`, `supabase/**`, `src/types/database.ts`, and the shared UI
 primitives folder. Feature owners touch only their feature folders and their
 thin route files.
@@ -414,7 +431,7 @@ push. Do not duplicate CI locally.
 | 0    | Per commit                 | Nothing                                | 0           |
 | 1    | Once before opening the PR | `make fast` (lint and typecheck)       | under 1 min |
 | 2    | CI on the pull request     | `pnpm check` and `pnpm build`          | automatic   |
-| 3    | UI changes, one pass       | Click the changed flow once on preview | 2 to 5 min  |
+| 3    | UI changes, one pass       | Click once on an authorized Preview or `make dev` | 2 to 5 min  |
 
 - Run `make test` before the PR only when the diff touches code that already has
   a test file, for example config, schemas, scoping or matching gates.
@@ -456,7 +473,7 @@ comparison in section 4 and the definition of done, not repeated here.
 | Lane | Scope                                                                                                                                                                                                                                                                                                                                                                                                                  | Merge rule                                                                                   |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | A    | The owner's own feature folders and thin routes, tests for them, PROGRESS-NEW.md, TODO.md; no new dependency; about 400 lines or fewer                                                                                                                                                                                                                                                                                 | The agent may squash-merge after the Lane A conditions below                                 |
-| B    | `src/app/globals.css`, `src/app/layout.tsx`, shell and shared UI primitives, `package.json`, lockfile, `.env.example`, `supabase/**`, generated types, `.github/**`, `Makefile`, `scripts/**`, `.agents/**`, `AGENTS.md`, `src/prompts`, security, storage and workspace-scoping code, public sharing and media, governing specs (PRD, TDD, DESIGN, TASK, RULES, FASHION*), cross-owner contracts, more than 400 lines | The agent opens the pull request, reports it and stops. A human reviewer approves and merges |
+| B    | `src/app/globals.css`, `src/app/layout.tsx`, shell and shared UI primitives, `package.json`, lockfile, `.env.example`, `supabase/**`, generated types, `.github/**`, `Makefile`, `vercel.json`, `scripts/**`, `.agents/**`, `AGENTS.md`, `src/prompts`, security, storage and workspace-scoping code, public sharing and media, governing specs (PRD, TDD, DESIGN, TASK, RULES, FASHION*), cross-owner contracts, more than 400 lines | The agent opens the pull request, reports it and stops. A human reviewer approves and merges |
 
 When in doubt, treat the change as Lane B. A pull request that mixes lanes is
 Lane B; split it when practical.
