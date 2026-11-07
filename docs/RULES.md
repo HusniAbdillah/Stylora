@@ -3,7 +3,7 @@
 These rules apply to the complete scope in [PRD.md](PRD.md). [TDD.md](TDD.md)
 defines technical contracts, [DESIGN.md](DESIGN.md) defines interaction and
 visual behavior, [TASK.md](TASK.md) assigns accountability, and
-[AGENTS.md](AGENTS.md) governs agent execution.
+[AGENTS.md](../AGENTS.md) governs agent execution.
 
 ## 1. Product integrity
 

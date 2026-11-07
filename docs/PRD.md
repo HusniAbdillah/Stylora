@@ -33,7 +33,7 @@ sense. Reuse is preferred to unnecessary purchases.
 - [FASHION.md](FASHION.md): professional fashion reasoning and task-specific
   knowledge.
 - [TASK.md](TASK.md), [WORKFLOW.md](WORKFLOW.md), [RULES.md](RULES.md), and
-  [AGENTS.md](AGENTS.md): ownership, delivery workflow and execution rules.
+  [AGENTS.md](../AGENTS.md): ownership, delivery workflow and execution rules.
 - [Stylora Design System](https://www.figma.com/design/ta9JYu4Q7fLWeuu0PJgWhp/Stylora-Design-System)
   Figma pages 03 to 05: brand guidelines and desktop and mobile frames for
   every requirement below.

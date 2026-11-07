@@ -1,0 +1,13 @@
+/node_modules/
+/.next/
+/out/
+/coverage/
+/.vercel/
+/.env*
+!/.env.example
+/next-env.d.ts
+*.tsbuildinfo
+*.log
+/supabase/.branches/
+/supabase/.temp/
+/docs/TODO.md

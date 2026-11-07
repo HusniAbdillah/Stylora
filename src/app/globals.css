@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-crimson: #73091d;
+  --color-crimson-deep: #540615;
+  --color-ink: #211f20;
+  --color-porcelain: #f5f2ec;
+  --color-paper: #fffefc;
+  --color-night: #1b1718;
+  --color-blush: #f3e3e0;
+  --color-rose-wash: #e9cfcb;
+  --color-camel: #b08a62;
+  --color-sand: #e8dfd3;
+  --color-sage: #6f7f63;
+  --color-stone: #dcd6ce;
+  --color-secondary: #6e6662;
+}
+
+@layer base {
+  body {
+    background: var(--color-porcelain);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-crimson);
+    outline-offset: 4px;
+  }
+}
