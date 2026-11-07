@@ -44,7 +44,7 @@ export function normalizeAvatarItems(input: unknown[]) {
         .passthrough(),
     )
     .min(1)
-    .max(16)
+    .max(20)
     .parse(input);
   return captured.map((item) =>
     avatarItemSchema.parse({
@@ -104,6 +104,8 @@ export async function renderAndStoreAvatar(input: {
   signal?: AbortSignal;
 }) {
   const items = normalizeAvatarItems(input.items);
+  if (items.filter((item) => item.asset_id).length > 16)
+    throw new Error("AVATAR_IMAGE_REFERENCE_LIMIT");
   const knownIds = items.map((item) => item.id).filter((id) => id !== null);
   if (new Set(knownIds).size !== knownIds.length)
     throw new Error("AVATAR_DUPLICATE_ITEM");
