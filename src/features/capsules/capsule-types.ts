@@ -7,6 +7,7 @@ export type CapsuleTemplateId =
 
 export type CapsuleItem = {
   id: string;
+  revision?: number;
   name: string;
   category: "top" | "bottom" | "dress" | "outerwear" | "shoes" | "accessory";
   imageUrl?: string | null;

@@ -62,7 +62,7 @@ export async function getCapsuleInventory(): Promise<CapsuleItem[]> {
   const { client, workspaceId } = getWorkspaceDatabase();
   const { data, error } = await client
     .from("active_owned_wardrobe")
-    .select("id,name,category,asset_id")
+    .select("id,name,category,asset_id,revision")
     .eq("workspace_id", workspaceId)
     .order("name")
     .limit(200);
@@ -74,6 +74,7 @@ export async function getCapsuleInventory(): Promise<CapsuleItem[]> {
         name: z.string(),
         category: categorySchema,
         asset_id: z.uuid().nullable(),
+        revision: z.number().int().positive(),
       }),
     )
     .parse(data);
@@ -92,6 +93,7 @@ export async function getCapsuleInventory(): Promise<CapsuleItem[]> {
         }
         return {
           id: row.id,
+          revision: row.revision,
           name: row.name,
           category: row.category,
           inventoryStatus: "owned" as const,
