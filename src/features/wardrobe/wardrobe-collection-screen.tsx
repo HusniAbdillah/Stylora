@@ -238,21 +238,21 @@ export function WardrobeCollectionScreen({
         onOpenItem={openItem}
       />
 
-      <Button
-        variant="quiet"
-        disabled={refreshing}
-        onClick={() => void refresh()}
-        className="mt-4"
-      >
-        <Icon name="refresh" size={16} />
-        {refreshing ? "Refreshing wardrobe" : "Refresh wardrobe"}
-      </Button>
-
-      {records.some((item) => item.isSample) && (
-        <p className={styles.sampleCaption}>
-          Starter items are labeled sample data.
-        </p>
-      )}
+      <div className={styles.collectionFooter}>
+        <Button
+          variant="quiet"
+          disabled={refreshing}
+          onClick={() => void refresh()}
+        >
+          <Icon name="refresh" size={16} />
+          {refreshing ? "Refreshing wardrobe" : "Refresh wardrobe"}
+        </Button>
+        {records.some((item) => item.isSample) && (
+          <p className={styles.sampleCaption}>
+            Starter items are labeled sample data.
+          </p>
+        )}
+      </div>
       <WardrobeIntakeFlow
         open={view.add === "1"}
         onClose={() => updateView({ add: undefined })}
