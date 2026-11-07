@@ -578,6 +578,19 @@ below the latest one.
 - Not run. Hosted migrations, database or Storage commands, paid provider calls, browser end-to-end journeys and local build. CI remains the full build and suite gate.
 - Limits. The app must be open for the bounded client pump. Server crashes need a later visit and lease recovery. Provider availability, Storage and end-to-end image completion still require the coordinator’s approved integration smoke. No cloud data was changed.
 
+### Owner 4 Preview preference return, 7 November 2026
+
+- Task O4.6 and R01, R36, R41. Editing preferences waits for queued Preview
+  selection saves and returns to the exact draft and category. Failed saves keep
+  the local choices on Preview with Retry save. The preferences return validator
+  also retains Create drafts and selected outfit IDs through allowlisted routes.
+- Verification: nine pure return-destination tests passed in 5.52 seconds.
+  Fixtures are in memory; external URLs are rejection cases. `git diff --check`
+  passed. The pre-PR gate and full CI results are recorded on the pull request.
+- Not run: hosted writes, provider calls, browser journeys and local build.
+  Preference revision invalidation and preserved previous images follow in a
+  separate increment using the coordinated Preview status contract.
+
 ### Owner 4 saved image recovery and regeneration, 7 November 2026
 
 - Task O4.7 and R44. Branch `o4/saved-media-bridge` connects saved detail's
