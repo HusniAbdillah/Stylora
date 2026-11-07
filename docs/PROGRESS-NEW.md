@@ -409,3 +409,34 @@ which data, code revision or provider behavior was verified.
 - Not run. Hosted database, Storage, provider calls, feature end-to-end journeys and local build. CI is the full build and test gate.
 - Integration pending. Owner 1 atomic completion, workspace image claim quota and retry/cancel contracts. Current failure updates use a scoped attempt and lease compare-and-set. This is request execution with lease recovery on revisit.
 - Client request store and operation HTTP controls are a following increment. No cloud data was changed.
+
+## Owner 1 studio transactions, 7 November 2026
+
+- Branch `o1/studio-transactions` adds the additive Studio transaction RPCs.
+  Capsule drafts use expected revisions and idempotent creation. Generation
+  commits validate the claimed attempt, stable brief, inventory and preference
+  revisions, then save outfits, owned membership and proposed slots together.
+- Studio saves resolve a Preview draft or Capsule outfit to an immutable
+  snapshot, avatar operation and media row in one transaction. A completed
+  Preview image can be reused only when source, render and dependency revisions
+  match. Deleting the source preserves the snapshot.
+- Capsule edits cancel obsolete operations and remove stale outputs before
+  changing membership. Outfit deletion advances the parent and sibling source
+  revisions, recomputes addition support and retains an explicit completed
+  empty result when the final outfit is deleted.
+- Ran the `studio_transactions.sql` suite as `service_role` using
+  `psql -v ON_ERROR_STOP=1` against a separate local database containing the
+  baseline, Owner 3 migrations and operation contract. It passed with fixtures
+  rolled back. Cases include workspace rejection, stale attempts, input
+  revision changes, candidate rejection, save idempotency, exact image reuse,
+  deletion revisions and snapshot survival.
+- Regenerated types from the combined local schema with pinned Supabase CLI 3.
+  Hosted application, hosted policy checks and live provider journeys remain
+  pending their existing authorization.
+- The follow-up image lifecycle migration accepts a server-verified pending PNG
+  and promotes it only with successful fenced completion. Superseded and
+  cancelled results leave pending assets eligible for cleanup.
+- Cancellation retains a running request's lease and image quota until worker
+  acknowledgment or lease expiry. Queued cancellation remains immediate.
+  Updated operation, Studio and foundation suites all passed against the
+  combined local schema. Local lint and typecheck passed; CI is the build gate.
