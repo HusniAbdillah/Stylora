@@ -85,7 +85,7 @@ describe("provider wire validation", () => {
       code: "provider_unavailable",
       retryable: false,
       attemptCount: 0,
-      providerCode: null,
+      providerCode: "operation_scope_missing",
     });
   });
 

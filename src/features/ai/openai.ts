@@ -15,7 +15,7 @@ export const FASHION_SCHEMA_VERSION = "fashion-item.v1";
 export const FASHION_KNOWLEDGE_VERSION =
   getFashionVersions().knowledgeSourceHash;
 export const FASHION_PROMPT_VERSION = `stylora-fashion-v1.openai-2.${FASHION_KNOWLEDGE_VERSION}`;
-export const AVATAR_PROMPT_VERSION = `stylora-fashion-v1.avatar-3.${FASHION_KNOWLEDGE_VERSION}`;
+export const AVATAR_PROMPT_VERSION = `stylora-fashion-v1.avatar-4.${FASHION_KNOWLEDGE_VERSION}`;
 export const TEXT_MODEL =
   process.env.OPENAI_TEXT_MODEL?.trim() ||
   process.env.OPENAI_MODEL?.trim() ||
@@ -157,6 +157,36 @@ const imageResponse = z.object({
   data: z.array(z.object({ b64_json: z.string().min(1) })).length(1),
 });
 
+// One fixed figure keeps every render consistent. It mirrors the avatar section
+// of FASHION-PROMPT.md and sits in its own block so it is not lost among the
+// long runtime instructions.
+export const AVATAR_FIGURE_DIRECTION =
+  "A smooth, matte, human-proportioned mannequin with a featureless oval head: no face, eyes, mouth, hair or ears, and no headwear unless a hat is a selected item. Neck, arms, hands and legs are plain and jointless in one uniform matte tone set by the selected skin swatch and undertone, or neutral warm stone when none is selected. Never render a realistic face and never omit the head. Feet stay plain mannequin feet unless footwear is selected.";
+const AVATAR_COMPOSITION_RULES =
+  "The visualDirection.composition.selectedSlots list is exhaustive. This may be a partial composition, not a request to complete an outfit. Render no clothing or accessories from omittedSlots, even when style, occasion, footwear comfort or pose suggests them. Unselected areas remain unadorned mannequin material. Garment photographs are authoritative for existing graphics and construction; preserve their lettering, geometry, pockets, fastenings and hems without replacing or simplifying them.";
+const AVATAR_RENDER_RULES =
+  "Full-length figure on a warm porcelain studio background with soft diffuse light. Render believable fabric texture, seams, drape and construction from the supplied garment references. Keep the exact selected garment colors, patterns, logos and silhouette; do not invent branding, clothing or accessories. Apply only the supplied visual preferences and outfit pose. Keep garment fronts, hems and selected accessories readable. The skin swatch is an approximate appearance reference under neutral lighting, never an ethnicity. Fit intent affects the illustrative styling without redesigning the garment. Avoid beauty filters, extreme proportions, text labels and impossible anatomy.";
+
+export function buildAvatarImagePrompt(input: {
+  instructions: string;
+  items: unknown[];
+  visualDirection: AvatarVisualDirection;
+}) {
+  return [
+    input.instructions,
+    `<figure>\n${AVATAR_FIGURE_DIRECTION}\n</figure>`,
+    `<render_rules>\n${AVATAR_RENDER_RULES}\n</render_rules>`,
+    AVATAR_COMPOSITION_RULES,
+    input.visualDirection.composition.omittedSlots.includes("shoes")
+      ? "No footwear is selected. Show bare mannequin feet: no shoes, sandals, socks, slippers or neutral replacement footwear."
+      : "Footwear is selected. Use only the selected referenced footwear; never substitute a generic pair.",
+    `<outfit>\n${JSON.stringify({
+      items: input.items,
+      visualDirection: input.visualDirection,
+    })}\n</outfit>`,
+  ].join("\n\n");
+}
+
 export async function generateFashionImage(input: {
   items: unknown[];
   visualDirection: AvatarVisualDirection;
@@ -190,14 +220,11 @@ export async function generateFashionImage(input: {
   body.set("input_fidelity", settings.inputFidelity);
   body.set(
     "prompt",
-    [
-      instructions("avatar"),
-      "Create one full-length non-identifying fashion mannequin on a warm porcelain studio background with soft diffuse light. Render believable fabric texture, seams, drape and construction from the supplied garment references. Keep the exact selected garment colors, patterns, logos and silhouette; do not invent branding, clothing or accessories. Apply only the supplied visual preferences and outfit pose. Keep garment fronts, hems and selected accessories readable. Skin swatch is an approximate appearance reference under neutral lighting, never an ethnicity. Fit intent affects the illustrative styling without redesigning the garment. Show a neutral mannequin for unspecified human features. Avoid beauty filters, extreme proportions, text labels and impossible anatomy.",
-      JSON.stringify({
-        items: input.items,
-        visualDirection,
-      }),
-    ].join("\n\n"),
+    buildAvatarImagePrompt({
+      instructions: instructions("avatar"),
+      items: input.items,
+      visualDirection,
+    }),
   );
   for (const [index, image] of input.images.entries()) {
     const extension =

@@ -235,7 +235,7 @@ export async function previewImageStatus(draftId: string) {
     }
   }
   if (outdated) {
-    job = { status: "idle", superseded: true, imageUrl: job.imageUrl };
+    job = { status: "idle", superseded: !!inputs, imageUrl: job.imageUrl };
     operationId = null;
   }
   if (!job.imageUrl && ready.data) {
@@ -262,6 +262,7 @@ export async function previewImageStatus(draftId: string) {
     job,
     renderRequestId: payload.renderRequestId,
     preferenceRevision,
+    renderFingerprint: inputs?.renderFingerprint ?? null,
     imageOutdated,
     staleNotice: outdated
       ? "Your wardrobe or preferences changed. The previous image is shown."

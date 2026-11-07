@@ -221,6 +221,8 @@ export async function readPreview(source?: PreviewSource, draftId?: string) {
     seedNotice,
     staleNotice: "staleNotice" in image ? image.staleNotice : undefined,
     imageOutdated: "imageOutdated" in image ? image.imageOutdated : false,
+    renderFingerprint:
+      "renderFingerprint" in image ? image.renderFingerprint : null,
     preferenceRevision:
       "preferenceRevision" in image
         ? image.preferenceRevision

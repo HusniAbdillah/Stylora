@@ -60,7 +60,7 @@ describe("avatar visual direction", () => {
     (input) => {
       const result = buildAvatarVisualDirection(input, []);
       expect(result).toMatchObject({
-        version: "visual-direction.v1",
+        version: "visual-direction.v2",
         mode: "neutral",
         preferences: {},
         pose: { id: "standing-clear" },
@@ -203,7 +203,7 @@ describe("avatar visual direction", () => {
     [[item("outerwear", "coat")], "three-quarter-outerwear"],
     [[item("dress")], "standing-dress"],
     [[item("accessory", "messenger")], "three-quarter-bag"],
-    [[item("accessory", null, { bagType: "tote" })], "three-quarter-bag"],
+    [[item("accessory", null, { bagType: "tote" })], "standing-accessories"],
     [
       [item("accessory", "belt", { bagType: "Not applicable" })],
       "standing-accessories",
@@ -240,6 +240,130 @@ describe("avatar visual direction", () => {
       avatarVisualDirectionSchema.safeParse({
         ...result,
         pose: { id: result.pose.id, instructions: "Extreme jumping pose." },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("marks shoes omitted for top and bottom without requesting footwear", () => {
+    const result = buildAvatarVisualDirection({}, [
+      item("top"),
+      item("bottom"),
+    ]);
+    expect(result.composition).toEqual({
+      selectedSlots: ["top", "bottom"],
+      omittedSlots: ["dress", "outerwear", "shoes", "bags", "accessories"],
+    });
+    expect(result.pose.instructions).not.toMatch(/footwear|shoes/i);
+    expect(
+      buildAvatarVisualDirection({}, [item("dress")]).pose.instructions,
+    ).not.toMatch(/footwear|shoes/i);
+  });
+
+  it("requests only selected footwear when shoes are chosen", () => {
+    const result = buildAvatarVisualDirection({}, [
+      item("top"),
+      item("bottom"),
+      item("shoes"),
+    ]);
+    expect(result.composition.selectedSlots).toEqual([
+      "top",
+      "bottom",
+      "shoes",
+    ]);
+    expect(result.composition.omittedSlots).not.toContain("shoes");
+    expect(result.pose.instructions).toContain("selected footwear");
+    expect(
+      buildAvatarVisualDirection({}, [item("dress"), item("shoes")]).pose
+        .instructions,
+    ).toContain("selected footwear");
+  });
+
+  it.each([
+    "tote",
+    "purse",
+    "satchel",
+    "duffel",
+    "briefcase",
+    "crossbody",
+    "messenger",
+    "clutch",
+    "backpack",
+    "handbag",
+  ])("classifies %s using the Preview bag slot", (subcategory) => {
+    const result = buildAvatarVisualDirection({}, [
+      item("accessory", subcategory),
+      item("accessory", "belt"),
+    ]);
+    expect(result.composition.selectedSlots).toEqual(["bags", "accessories"]);
+    expect(result.composition.omittedSlots).toEqual([
+      "top",
+      "bottom",
+      "dress",
+      "outerwear",
+      "shoes",
+    ]);
+  });
+
+  it("does not invent a bag slot from attributes outside the Preview classifier", () => {
+    const result = buildAvatarVisualDirection({}, [
+      item("accessory", null, { bagType: "tote" }),
+    ]);
+    expect(result.composition.selectedSlots).toEqual(["accessories"]);
+    expect(result.composition.omittedSlots).toContain("bags");
+    expect(result.pose.instructions).not.toContain("bag");
+  });
+
+  it.each([
+    {
+      selectedSlots: ["top", "top", "bottom"],
+      omittedSlots: ["dress", "outerwear", "shoes", "bags", "accessories"],
+    },
+    {
+      selectedSlots: ["top", "bottom"],
+      omittedSlots: ["dress", "outerwear", "top", "bags", "accessories"],
+    },
+    {
+      selectedSlots: ["top", "bottom"],
+      omittedSlots: ["dress", "outerwear", "bags", "accessories"],
+    },
+    {
+      selectedSlots: ["top", "bottom", "socks"],
+      omittedSlots: ["dress", "outerwear", "shoes", "bags", "accessories"],
+    },
+  ])(
+    "rejects non-exhaustive, overlapping, duplicate or unsupported composition %#",
+    (composition) => {
+      const result = buildAvatarVisualDirection({}, [
+        item("top"),
+        item("bottom"),
+      ]);
+      expect(
+        avatarVisualDirectionSchema.safeParse({ ...result, composition })
+          .success,
+      ).toBe(false);
+    },
+  );
+
+  it("rejects unsupported categories and pose directions for unselected slots", () => {
+    expect(() => buildAvatarVisualDirection({}, [item("socks")])).toThrow();
+    expect(() =>
+      buildAvatarVisualDirection({}, [item("bags", "tote")]),
+    ).toThrow();
+    const result = buildAvatarVisualDirection({}, [
+      item("top"),
+      item("bottom"),
+    ]);
+    const bagPose = buildAvatarVisualDirection({}, [
+      item("accessory", "tote"),
+    ]).pose;
+    expect(
+      avatarVisualDirectionSchema.safeParse({ ...result, pose: bagPose })
+        .success,
+    ).toBe(false);
+    expect(
+      avatarVisualDirectionSchema.safeParse({
+        ...result,
+        version: "visual-direction.v1",
       }).success,
     ).toBe(false);
   });

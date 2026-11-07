@@ -15,7 +15,7 @@ export default async function HomePage() {
   const sample = await getLandingSample();
   const links = {
     createHref: "/create",
-    sampleHref: "/sample",
+    sampleHref: "/create?sample=1",
     wardrobeHref: "/wardrobe",
     capsulesHref: "/capsules",
     previewHref: "/preview",

@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, Chip, ConfirmDialog, Icon, SelectField } from "@/components/ui";
+import {
+  Button,
+  Chip,
+  ConfirmDialog,
+  Icon,
+  SelectField,
+} from "@/components/ui";
 import type { DetectedPiece, PieceEditValues } from "./types";
 import styles from "./create-presentation.module.css";
 
@@ -105,6 +111,7 @@ function EditorField({
 }
 
 export type PieceEditorProps = {
+  adoptionCount?: number;
   open: boolean;
   piece?: DetectedPiece | null;
   pieceNumber?: number;
@@ -124,6 +131,7 @@ export function PieceEditor(props: PieceEditorProps) {
 function PieceEditorPanel({
   piece,
   pieceNumber,
+  adoptionCount,
   onClose,
   onSave,
   onRemove,
@@ -460,10 +468,14 @@ function PieceEditorPanel({
               type="button"
               variant="primary"
               onClick={() =>
-                piece && changed ? setConfirmAction("save") : void submit()
+                (piece && changed) || adoptionCount
+                  ? setConfirmAction("save")
+                  : void submit()
               }
               disabled={
-                !values.name.trim() || busy || Boolean(piece && !changed)
+                !values.name.trim() ||
+                busy ||
+                Boolean(piece && !changed && !adoptionCount)
               }
             >
               {busy ? "Saving…" : "Save changes"}
@@ -474,7 +486,11 @@ function PieceEditorPanel({
       <ConfirmDialog
         open={confirmAction === "save"}
         title="Apply piece changes?"
-        description="Matches and outfit ideas for this look will refresh. Your upload, other pieces and saved looks stay unchanged."
+        description={
+          adoptionCount
+            ? `Apply this edit and save all ${adoptionCount} complete provisional pieces? They will become reviewed pieces available for matching.`
+            : "Matches and outfit ideas for this look will refresh. Your upload, other pieces and saved looks stay unchanged."
+        }
         confirmLabel="Apply changes"
         onConfirm={() => void submit()}
         onClose={() => setConfirmAction(null)}

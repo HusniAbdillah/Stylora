@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { WorkspaceShell } from "@/components/shell";
 import { Button, LoadingLayout, StateNotice } from "@/components/ui";
 import {
   requestOperation,
@@ -142,16 +141,7 @@ export function CapsuleResultScreen({
   const index = result.outfits.findIndex((outfit) => outfit.id === outfitId);
   const selected = result.outfits[index];
   return (
-    <WorkspaceShell
-      activeHref="/capsules"
-      displayName="Studio guest"
-      activity={[]}
-      breadcrumbs={[
-        { label: "Capsules", href: "/capsules" },
-        { label: result.title, href: `/capsules/${result.id}` },
-        ...(selected ? [{ label: selected.title }] : []),
-      ]}
-    >
+    <>
       {saving ? (
         <SavedLooksLoading detail />
       ) : (
@@ -233,6 +223,6 @@ export function CapsuleResultScreen({
           )}
         </>
       )}
-    </WorkspaceShell>
+    </>
   );
 }

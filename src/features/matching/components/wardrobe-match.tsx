@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Badge, Button, Icon } from "@/components/ui";
 import styles from "./matching.module.css";
 
@@ -7,7 +8,14 @@ export type WardrobeMatch = {
   id: string;
   outcome: "owned_match" | "wardrobe_alternative" | "missing";
   inspiration: { name: string; category?: string; summary?: string };
-  wardrobeItem?: { id: string; name: string; imageUrl?: string | null } | null;
+  wardrobeItem?: {
+    id: string;
+    name: string;
+    imageUrl?: string | null;
+    sourceType?: string;
+    inventoryStatus?: string;
+    archivedAt?: string | null;
+  } | null;
   sharedAttributes?: string[];
   differences?: string[];
   explanation?: string | null;
@@ -44,6 +52,11 @@ const outcomeLabel = {
   wardrobe_alternative: "Alternative",
   missing: "Missing",
 } as const;
+const outcomeOrder = {
+  owned_match: 0,
+  wardrobe_alternative: 1,
+  missing: 2,
+} as const;
 
 export function MatchSummary({ matches }: { matches: WardrobeMatch[] }) {
   const counts = {
@@ -76,7 +89,7 @@ export function MatchSummary({ matches }: { matches: WardrobeMatch[] }) {
           <span className={styles.summaryIcon}>
             <Icon name="swap" className="size-5" />
           </span>
-          Alternative in your wardrobe
+          Alternative item
         </span>
         <strong className="block font-serif text-3xl font-normal leading-none sm:order-2">
           {counts.wardrobe_alternative}
@@ -101,6 +114,23 @@ export function MatchSummary({ matches }: { matches: WardrobeMatch[] }) {
 
 export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
   const owned = match.outcome !== "missing";
+  const category = match.inspiration.category?.toLowerCase();
+  const missingIcon =
+    category === "accessory"
+      ? "bag"
+      : category === "outerwear" || category === "bottom"
+        ? "layers"
+        : category === "top" || category === "dress"
+          ? "shirt"
+          : "search";
+  const missingExplanation =
+    match.explanation?.trim() || match.missingBrief?.trim();
+  const conciseMissingExplanation =
+    missingExplanation?.split(/(?<=[.!?])\s+/)[0];
+  const distinctBrief =
+    match.missingBrief?.trim() &&
+    match.missingBrief.trim().replace(/\s+/g, " ") !==
+      missingExplanation?.replace(/\s+/g, " ");
   return (
     <article className={`${styles.card} ${!owned ? styles.missing : ""}`}>
       <div className={styles.matchRow}>
@@ -120,52 +150,51 @@ export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
           className={`${styles.thumbnail} ${owned ? "bg-sand" : "bg-[var(--color-missing-bg)]"}`}
         >
           {owned && match.wardrobeItem?.imageUrl ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={match.wardrobeItem.imageUrl}
-                alt={match.wardrobeItem.name}
-                className="size-full object-cover"
-              />
-            </>
+            <Image
+              src={match.wardrobeItem.imageUrl}
+              alt={match.wardrobeItem.name}
+              width={132}
+              height={132}
+              unoptimized
+              className="size-full object-contain"
+            />
           ) : (
             <div
               className={`text-center text-xs ${owned ? "text-secondary" : "text-[var(--color-missing)]"}`}
             >
               <Icon
-                name={owned ? "image" : "bag"}
+                name={owned ? "image" : missingIcon}
+                label={owned ? undefined : "To find"}
                 className="mx-auto mb-1 size-6"
               />
               {owned ? (
                 "Image unavailable"
               ) : (
-                <span className="hidden sm:inline">Text brief</span>
+                <span className={styles.missingVisualLabel}>To find</span>
               )}
             </div>
           )}
         </div>
         <div className={styles.matchContent}>
-          {owned && (
-            <p className="text-xs text-secondary sm:hidden">
-              For: {match.inspiration.name}
-            </p>
-          )}
+          <p className="text-xs text-secondary sm:hidden">
+            For: {match.inspiration.name}
+          </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <h3 className="font-semibold leading-5 text-ink">
-              {owned ? (
-                (match.wardrobeItem?.name ?? "Wardrobe item unavailable")
-              ) : (
-                <>
-                  <span className="sm:hidden">{match.inspiration.name}</span>
-                  <span className="hidden sm:inline">
-                    Nothing credible in your wardrobe
-                  </span>
-                </>
-              )}
+              {owned
+                ? (match.wardrobeItem?.name ?? "Wardrobe item unavailable")
+                : "No match yet"}
             </h3>
             <Badge tone={outcomeTone[match.outcome]}>
               {outcomeLabel[match.outcome]}
             </Badge>
+            {match.wardrobeItem?.sourceType === "sample" && (
+              <Badge>Example item</Badge>
+            )}
+            {match.wardrobeItem?.archivedAt && <Badge>Archived</Badge>}
+            {match.wardrobeItem?.inventoryStatus === "saved_candidate" && (
+              <Badge>Saved candidate · not owned</Badge>
+            )}
           </div>
           {match.sharedAttributes?.length ? (
             <div className="mt-2 hidden flex-wrap gap-1 sm:flex">
@@ -195,59 +224,38 @@ export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
               Changes: {match.differences.join("; ")}
             </p>
           ) : null}
-          {match.explanation && (
+          {!owned && conciseMissingExplanation && (
+            <p className={styles.missingExplanation}>
+              {conciseMissingExplanation}
+            </p>
+          )}
+          {owned && match.explanation && (
             <p className="mt-1 hidden text-xs leading-5 text-secondary sm:block">
               {match.explanation}
             </p>
           )}
-          {match.missingBrief && (
+          {match.missingBrief && (owned || distinctBrief) && (
             <p className="mt-2 hidden text-xs leading-5 text-secondary sm:block">
               Brief: {match.missingBrief}
             </p>
           )}
         </div>
-        {match.rejectedCandidates?.length ? (
-          <div className={`${styles.candidateRows} space-y-1.5`}>
-            {match.rejectedCandidates.map((candidate, index) => (
-              <div
-                key={`${candidate.name ?? "excluded"}-${index}`}
-                className="flex items-center gap-2 rounded-xl bg-porcelain px-2 py-1.5 text-xs leading-5 text-secondary"
-              >
-                {candidate.imageUrl ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={candidate.imageUrl}
-                      alt={candidate.name ?? "Excluded wardrobe candidate"}
-                      className="size-9 shrink-0 rounded-lg object-cover"
-                    />
-                  </>
-                ) : (
-                  <Icon
-                    name="x"
-                    className="size-4 shrink-0 text-[var(--color-missing)]"
-                  />
-                )}
-                <span>
-                  {candidate.name
-                    ? `${candidate.name} rejected: `
-                    : "Excluded: "}
-                  {candidate.reason}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : null}
         {Boolean(
           match.reasons?.length ||
           match.evidence?.length ||
           match.inputsUsed?.length ||
-          match.uncertainty?.length,
+          match.uncertainty?.length ||
+          (!owned && missingExplanation !== conciseMissingExplanation),
         ) && (
           <details className={styles.whyThis}>
             <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-medium text-crimson">
               Why this match <Icon name="chevron-down" className="size-3.5" />
             </summary>
+            {!owned && missingExplanation !== conciseMissingExplanation && (
+              <p className="mb-3 text-xs leading-5 text-secondary">
+                {missingExplanation}
+              </p>
+            )}
             {match.reasons?.length ? (
               <ul className="space-y-2">
                 {match.reasons.map((reason, index) => (
@@ -304,6 +312,9 @@ export function WardrobeMatchView({
   onBack,
   onRetry,
 }: WardrobeMatchViewProps) {
+  const orderedMatches = [...matches].sort(
+    (left, right) => outcomeOrder[left.outcome] - outcomeOrder[right.outcome],
+  );
   return (
     <section className={styles.page} aria-labelledby="wardrobe-match-title">
       <div className={styles.header}>
@@ -382,7 +393,7 @@ export function WardrobeMatchView({
         <>
           <MatchSummary matches={matches} />
           <div className="mt-4 space-y-3">
-            {matches.map((match) => (
+            {orderedMatches.map((match) => (
               <WardrobeMatchCard key={match.id} match={match} />
             ))}
             {matches.length === 0 && (

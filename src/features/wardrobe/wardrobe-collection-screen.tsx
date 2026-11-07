@@ -125,7 +125,9 @@ export function WardrobeCollectionScreen({
   );
   const [error, setError] = useState(initialError);
   const [ready, setReady] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   async function refresh() {
+    setRefreshing(true);
     try {
       const result = await wardrobeRequest<{ items: CanonicalWardrobeItem[] }>(
         "",
@@ -140,6 +142,7 @@ export function WardrobeCollectionScreen({
       );
     } finally {
       setReady(true);
+      setRefreshing(false);
     }
   }
   useEffect(() => {
@@ -216,7 +219,7 @@ export function WardrobeCollectionScreen({
 
   return (
     <>
-      {error && (
+      {error && view.status === "archived" && (
         <div className={styles.messageCard} role="alert">
           <p>{error}</p>
           <Button variant="secondary" onClick={() => void refresh()}>
@@ -231,11 +234,10 @@ export function WardrobeCollectionScreen({
       )}
       {view.status === "archived" ? (
         <section className={styles.wardrobe} aria-labelledby="archived-title">
-          <p className={styles.eyebrow}>Your wardrobe</p>
           <div className={styles.archiveHeading}>
             <div>
               <h1 className={styles.title} id="archived-title">
-                Archived <em>pieces.</em>
+                Archived pieces
               </h1>
               <p className={styles.intro}>
                 These pieces stay here for reference and can be restored from
@@ -318,6 +320,14 @@ export function WardrobeCollectionScreen({
             onOpenItem={openItem}
           />
           <div className={styles.archiveLinkRow}>
+            <Button
+              variant="quiet"
+              disabled={refreshing}
+              onClick={() => void refresh()}
+            >
+              <Icon name="refresh" size={16} />
+              {refreshing ? "Refreshing wardrobe" : "Refresh wardrobe"}
+            </Button>
             <Button
               variant="quiet"
               onClick={() =>

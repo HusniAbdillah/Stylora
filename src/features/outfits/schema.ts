@@ -6,6 +6,8 @@ import {
 } from "@/lib/ai/fashion-schema";
 import {
   itemConstraintConflict,
+  isOwnedInventoryItem,
+  type InventoryMode,
   type MatchItem,
 } from "@/features/matching/gates";
 
@@ -48,6 +50,7 @@ export function validateOptionComposition(
   constraints: {
     preferences: Record<string, string | string[]>;
     occasion: string | null;
+    inventoryMode?: InventoryMode;
   } = { preferences: {}, occasion: null },
 ) {
   const errors: string[] = [];
@@ -68,8 +71,7 @@ export function validateOptionComposition(
     inventory
       .filter(
         (item) =>
-          item.inventoryStatus === "owned" &&
-          !item.archivedAt &&
+          isOwnedInventoryItem(item, constraints.inventoryMode) &&
           !itemConstraintConflict(
             item,
             constraints.preferences,
@@ -122,8 +124,7 @@ export function validateOptionComposition(
           : null;
         if (
           !owned ||
-          owned.inventoryStatus !== "owned" ||
-          owned.archivedAt ||
+          !isOwnedInventoryItem(owned, constraints.inventoryMode) ||
           owned.category !== item.category ||
           item.missingBrief !== null
         )
