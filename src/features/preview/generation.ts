@@ -19,7 +19,7 @@ import {
   IMAGE_MODEL,
 } from "@/features/ai/openai";
 import {
-  avatarItemSchema,
+  normalizeAvatarItems,
   avatarRenderFingerprint,
   renderAndStoreAvatar,
   discardPendingAvatar,
@@ -59,7 +59,7 @@ export async function readPreviewImageInputs(draftId: string) {
     client
       .from("wardrobe_items")
       .select(
-        "id,name,category,subcategory,description,attributes,revision,asset_id",
+        "id,name,category,subcategory,description,attributes,inferred_attributes,corrections,provenance,revision,asset_id",
       )
       .eq("workspace_id", workspaceId)
       .eq("inventory_status", "owned")
@@ -78,7 +78,7 @@ export async function readPreviewImageInputs(draftId: string) {
       503,
       true,
     );
-  const items = z.array(avatarItemSchema).parse(wardrobe.data);
+  const items = normalizeAvatarItems(wardrobe.data ?? []);
   if (
     items.length !== ids.length ||
     items.some(
@@ -238,12 +238,12 @@ export async function generatePreviewImage(input: unknown) {
     subjectId: current.draft.id,
     inputRevision: current.draft.revision,
     inputFingerprint,
-    input: {
+    input: z.record(z.string(), z.json()).parse({
       items: current.items,
       preferences: current.preferences,
       renderFingerprint: current.renderFingerprint,
       knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
-    },
+    }),
     promptVersion: FASHION_PROMPT_VERSION,
     schemaVersion: FASHION_SCHEMA_VERSION,
     model: IMAGE_MODEL,

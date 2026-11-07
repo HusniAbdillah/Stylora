@@ -28,7 +28,9 @@ export function slotForPreviewItem(
   item: Pick<PreviewItem, "category" | "subcategory">,
 ) {
   if (item.category !== "accessory") return item.category;
-  return /bag|tote|clutch|backpack|handbag/i.test(item.subcategory ?? "")
+  return /bag|tote|clutch|backpack|purse|satchel|duffel|briefcase|crossbody|messenger/i.test(
+    item.subcategory ?? "",
+  )
     ? "bags"
     : "accessories";
 }

@@ -11,7 +11,10 @@ export async function savePreviewSelection(input: unknown) {
   const { client, workspaceId, writesEnabled } = getWorkspaceDatabase();
   if (!writesEnabled) return { ok: false, code: "writes_disabled" } as const;
   if (
-    !validatePreviewSelection(parsed.data.selection, await readPreviewItems())
+    !validatePreviewSelection(
+      parsed.data.selection,
+      await readPreviewItems(false),
+    )
   )
     return { ok: false, code: "selection_unavailable" } as const;
   const { draftId, revision, selection } = parsed.data;
@@ -41,11 +44,18 @@ export async function savePreviewSelection(input: unknown) {
     .eq("revision", revision)
     .maybeSingle();
   if (!prior) return { ok: false, code: "revision_conflict" } as const;
+  const previousSelection = z
+    .object({ selection: previewDraftInput.shape.selection })
+    .parse(prior.payload).selection;
+  if (JSON.stringify(previousSelection) === JSON.stringify(selection))
+    return { ok: true, draftId, revision } as const;
+  const payload = z.record(z.string(), z.json()).parse(prior.payload);
+  delete payload.renderRequestId;
   const { data, error } = await client
     .from("workflow_drafts")
     .update({
       payload: {
-        ...z.record(z.string(), z.json()).parse(prior.payload),
+        ...payload,
         selection,
       },
       revision: revision + 1,
