@@ -255,6 +255,23 @@ async function imageReference(assetId: string | null) {
 export async function getLook(lookId: string) {
   const { look, pieces } = await getLookContext(lookId);
   const { client, workspaceId } = getWorkspaceDatabase();
+  const { data: activeDraft, error: draftError } = await client
+    .from("workflow_drafts")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("look_id", lookId)
+    .eq("feature_kind", "inspiration")
+    .eq("status", "active")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (draftError)
+    throw new ApiError(
+      "draft_read_failed",
+      "The inspiration draft could not be restored.",
+      503,
+      true,
+    );
   const [reviews, matches, options, slots] = await Promise.all([
     client
       .from("look_reviews")
@@ -296,7 +313,7 @@ export async function getLook(lookId: string) {
   const operations = await client
     .from("workflow_operations")
     .select(
-      "id,kind,status,input_revision,input_fingerprint,attempt_count,prompt_version,schema_version,model,result_ref,safe_error_code,created_at,completed_at",
+      "id,kind,status,input_revision,input_fingerprint,attempt_count,prompt_version,schema_version,model,result_ref,safe_error_code,created_at,completed_at,input,subject_id",
     )
     .eq("workspace_id", workspaceId)
     .in("subject_type", ["look", "outfit_option"])
@@ -317,6 +334,12 @@ export async function getLook(lookId: string) {
     ...new Set([
       ...(matches.data ?? []).flatMap((match) =>
         match.wardrobe_item_id ? [match.wardrobe_item_id] : [],
+      ),
+      ...(matches.data ?? []).flatMap((match) =>
+        z
+          .array(z.object({ wardrobeItemId: z.uuid(), reason: z.string() }))
+          .parse(match.rejected_candidates)
+          .map((candidate) => candidate.wardrobeItemId),
       ),
       ...(slots.data ?? []).flatMap((slot) =>
         slot.wardrobe_item_id ? [slot.wardrobe_item_id] : [],
@@ -361,8 +384,8 @@ export async function getLook(lookId: string) {
     : null;
   const personalization = await getPersonalizationSnapshot();
   const inputMetadataSchema = z.object({
-    preferenceFingerprint: z.string().optional(),
-    inventoryFingerprint: z.string().optional(),
+    preferenceFingerprint: z.string().nullable().optional(),
+    inventoryFingerprint: z.string().nullable().optional(),
     inventoryMode: z.enum(["sample", "live"]).optional(),
   });
   const inventoryModes = new Set<"sample" | "live">();
@@ -396,8 +419,23 @@ export async function getLook(lookId: string) {
       parsedMetadata.data.inventoryFingerprint !== currentInventory.get(mode)
     );
   }
+  function inventoryMode(metadata: unknown) {
+    const parsed = inputMetadataSchema.safeParse(metadata);
+    return parsed.success ? (parsed.data.inventoryMode ?? null) : null;
+  }
+  const latestInventoryOperation = operations.data?.find((operation) =>
+    ["wardrobe_match", "outfit_options", "option_regeneration"].includes(
+      operation.kind,
+    ),
+  );
   return {
     id: look.id,
+    activeDraftId: activeDraft?.id ?? null,
+    inventoryMode: inventoryMode(
+      matches.data?.[0]?.input_metadata ??
+        options.data?.[0]?.provider_metadata ??
+        latestInventoryOperation?.input,
+    ),
     title: look.title,
     occasion: look.occasion,
     revision: look.revision,
@@ -414,13 +452,16 @@ export async function getLook(lookId: string) {
           sourceRevision: review.source_revision,
           preferenceRevision: review.preference_revision,
           sourceType: review.source_type,
-          stale: inputsStale(review.input_metadata, false),
+          stale:
+            review.source_revision !== look.revision ||
+            inputsStale(review.input_metadata, false),
         }
       : null,
     matches: (matches.data ?? []).map((match) => ({
       id: match.id,
       pieceId: match.piece_id,
       outcome: match.match_type,
+      inventoryMode: inventoryMode(match.input_metadata),
       wardrobeItem: match.wardrobe_item_id
         ? (itemReferences.get(match.wardrobe_item_id) ?? null)
         : null,
@@ -428,7 +469,13 @@ export async function getLook(lookId: string) {
       explanation: explanationSchema.parse(match.explanation),
       sharedAttributes: match.shared_attributes,
       differences: match.differences,
-      rejectedCandidates: match.rejected_candidates,
+      rejectedCandidates: z
+        .array(z.object({ wardrobeItemId: z.uuid(), reason: z.string() }))
+        .parse(match.rejected_candidates)
+        .map((candidate) => ({
+          ...candidate,
+          wardrobeItem: itemReferences.get(candidate.wardrobeItemId) ?? null,
+        })),
       evidenceCoverage: match.evidence_coverage,
       confidence: match.confidence,
       sourceRevision: match.source_revision,
@@ -440,6 +487,7 @@ export async function getLook(lookId: string) {
     outfitOptions: (options.data ?? []).map((option) => ({
       id: option.id,
       optionType: option.option_type,
+      inventoryMode: inventoryMode(option.provider_metadata),
       title: option.title,
       concept: option.concept,
       rationale: option.rationale,
@@ -486,6 +534,27 @@ export async function getLook(lookId: string) {
       errorCode: operation.safe_error_code,
       createdAt: operation.created_at,
       completedAt: operation.completed_at,
+      subjectId: operation.subject_id,
+      inventoryMode:
+        operation.input &&
+        typeof operation.input === "object" &&
+        !Array.isArray(operation.input)
+          ? z
+              .enum(["sample", "live"])
+              .nullable()
+              .catch(null)
+              .parse(operation.input.inventoryMode ?? null)
+          : null,
+      optionType:
+        operation.input &&
+        typeof operation.input === "object" &&
+        !Array.isArray(operation.input)
+          ? z
+              .enum(["closest", "from_wardrobe", "fresh_alternative"])
+              .nullable()
+              .catch(null)
+              .parse(operation.input.optionType ?? null)
+          : null,
     })),
     marketplaceIntegration: "pending" as const,
   };
@@ -515,6 +584,12 @@ export async function savePieces(lookId: string, input: unknown) {
   requireWorkspaceWrites(context);
   const parsed = savePiecesSchema.parse(input);
   const current = await getLookContext(lookId);
+  if (current.look.source_type === "sample")
+    throw new ApiError(
+      "sample_read_only",
+      "Prepared sample looks cannot be edited.",
+      409,
+    );
   if (current.look.revision !== parsed.expectedRevision)
     throw new ApiError(
       "revision_conflict",

@@ -4,10 +4,10 @@ import { Button, Icon } from "@/components/ui";
 import styles from "./profile.module.css";
 
 export type ProfileStats = {
-  wardrobeItems: number;
-  savedLooks?: number;
-  capsules?: number;
-  activeShareLinks?: number;
+  wardrobeItems: number | null;
+  savedLooks?: number | null;
+  capsules?: number | null;
+  activeShareLinks?: number | null;
   savedCandidates?: number;
   archivedItems?: number;
 };
@@ -25,6 +25,8 @@ export type ProfileOverviewProps = {
     | "draftSaved"
     | "saveError";
   errorMessage?: string;
+  statusMessage?: string;
+  readOnly?: boolean;
   onDisplayNameChange: (name: string) => void;
   onSaveName: () => void;
   onRetry?: () => void;
@@ -35,6 +37,8 @@ export function ProfileOverview({
   stats,
   status = "ready",
   errorMessage,
+  statusMessage,
+  readOnly = false,
   onDisplayNameChange,
   onSaveName,
   onRetry,
@@ -76,15 +80,15 @@ export function ProfileOverview({
         >
           <h2>Display name</h2>
           <p>
-            Shown in this browser’s sidebar. It labels this sample workspace; it
-            is not an account.
+            Shown on saved looks and as the owner of shared links. It is not an
+            account.
           </p>
           <label>
             <span className={styles.srOnly}>Display name</span>
             <input
               value={displayName}
               onChange={(event) => onDisplayNameChange(event.target.value)}
-              disabled={status === "loading" || status === "saving"}
+              disabled={readOnly || status === "loading" || status === "saving"}
               maxLength={80}
               autoComplete="off"
             />
@@ -93,24 +97,30 @@ export function ProfileOverview({
             <Button
               variant="primary"
               type="submit"
-              disabled={
-                status === "loading" ||
-                status === "saving" ||
-                !displayName.trim()
-              }
+              disabled={status === "loading" || status === "saving" || readOnly}
             >
               {status === "saving" ? "Saving…" : "Save name"}
             </Button>
             {(status === "saved" ||
               status === "draftSaving" ||
-              status === "draftSaved") && (
+              status === "draftSaved" ||
+              (status === "ready" && statusMessage)) && (
               <span role="status">
-                <Icon name={status === "draftSaving" ? "refresh" : "check"} />{" "}
-                {status === "saved"
-                  ? "Name saved in this browser"
-                  : status === "draftSaving"
-                    ? "Saving draft…"
-                    : "Draft saved in this browser"}
+                <Icon
+                  name={
+                    status === "draftSaving"
+                      ? "refresh"
+                      : status === "ready"
+                        ? "info"
+                        : "check"
+                  }
+                />{" "}
+                {statusMessage ||
+                  (status === "saved"
+                    ? "Name saved to this workspace"
+                    : status === "draftSaving"
+                      ? "Saving draft…"
+                      : "Draft saved")}
               </span>
             )}
           </div>
@@ -119,16 +129,18 @@ export function ProfileOverview({
           <h2 id="scope-title">About this workspace</h2>
           <ul>
             <li>
-              <Icon name="user" /> One sample workspace, no login
+              <Icon name="user" /> One shared workspace, no login
             </li>
             <li>
-              <Icon name="info" /> Changes are saved in this browser
+              <Icon name="info" /> Anyone with this app can see and change data
             </li>
             <li>
-              <Icon name="sparkle" /> Sample pieces are labeled in Wardrobe
+              <Icon name="sparkle" /> Use non-sensitive outfit photos and sample
+              preferences
             </li>
             <li>
-              <Icon name="trash" /> Clearing browser data removes local edits
+              <Icon name="link" /> Shared links can be turned off from each
+              saved look
             </li>
           </ul>
         </aside>
@@ -141,20 +153,34 @@ export function ProfileOverview({
         <dl>
           <div>
             <dt>Wardrobe items</dt>
-            <dd>{status === "loading" ? "—" : stats.wardrobeItems}</dd>
+            <dd>
+              {status === "loading"
+                ? "Unavailable"
+                : (stats.wardrobeItems ?? "Unavailable")}
+            </dd>
           </div>
           <div>
             <dt>Saved looks</dt>
-            <dd>{status === "loading" ? "—" : (stats.savedLooks ?? "—")}</dd>
+            <dd>
+              {status === "loading"
+                ? "Unavailable"
+                : (stats.savedLooks ?? "Unavailable")}
+            </dd>
           </div>
           <div>
             <dt>Capsules</dt>
-            <dd>{status === "loading" ? "—" : (stats.capsules ?? "—")}</dd>
+            <dd>
+              {status === "loading"
+                ? "Unavailable"
+                : (stats.capsules ?? "Unavailable")}
+            </dd>
           </div>
           <div>
             <dt>Active share links</dt>
             <dd>
-              {status === "loading" ? "—" : (stats.activeShareLinks ?? "—")}
+              {status === "loading"
+                ? "Unavailable"
+                : (stats.activeShareLinks ?? "Unavailable")}
             </dd>
           </div>
         </dl>
@@ -166,10 +192,11 @@ export function ProfileOverview({
           {stats.archivedItems != null && (
             <> Archived pieces: {stats.archivedItems}.</>
           )}
-          {(stats.savedLooks == null ||
+          {(stats.wardrobeItems == null ||
+            stats.savedLooks == null ||
             stats.capsules == null ||
             stats.activeShareLinks == null) && (
-            <> Other totals are unavailable in this browser preview.</>
+            <> Unavailable totals could not be loaded from this workspace.</>
           )}
         </p>
       </section>

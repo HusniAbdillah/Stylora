@@ -23,6 +23,9 @@ export type ConfidenceReview = {
   occasions?: string[];
   uncertainty?: string | null;
   errorMessage?: string;
+  reasons?: string[];
+  evidence?: string[];
+  inputsUsed?: string[];
 };
 
 export type PieceEditValues = {

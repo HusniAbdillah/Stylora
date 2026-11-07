@@ -1,12 +1,71 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Skeleton } from "@/components/ui";
-import { useWardrobeCounts } from "@/features/wardrobe/wardrobe-preview";
-import { ProfileOverview, type ProfileOverviewProps } from "./profile-overview";
-import { profilePreviewStore } from "./profile-preview";
+import { useState } from "react";
+import { Button, ConfirmDialog, Skeleton } from "@/components/ui";
+import {
+  profileDraftClientSchema,
+  readProfile,
+  saveProfile,
+} from "@/features/preferences/client-contract";
+import { useLiveSettingsDraft } from "@/features/preferences/live-settings-draft";
+import { ProfileOverview, type ProfileStats } from "./profile-overview";
+import styles from "./profile.module.css";
 
-type ProfileStatus = NonNullable<ProfileOverviewProps["status"]>;
+type ProfileValue = {
+  displayName: string;
+  stats: ProfileStats;
+};
+
+const unavailableStatistics: ProfileStats = {
+  wardrobeItems: null,
+  savedLooks: null,
+  capsules: null,
+  activeShareLinks: null,
+};
+
+const profileConfiguration = {
+  feature: "profile" as const,
+  read: async () => {
+    const snapshot = await readProfile();
+    return {
+      value: {
+        displayName: snapshot.displayName ?? "",
+        stats: snapshot.stats
+          ? {
+              wardrobeItems: snapshot.stats.wardrobeItems,
+              savedLooks: snapshot.stats.savedLooks,
+              capsules: snapshot.stats.capsules,
+              activeShareLinks: snapshot.stats.activeShares,
+            }
+          : unavailableStatistics,
+      },
+      revision: snapshot.revision,
+    };
+  },
+  save: async (value: ProfileValue, revision: number) => {
+    const snapshot = await saveProfile(value.displayName, revision);
+    window.dispatchEvent(
+      new CustomEvent("stylora:profile-updated", {
+        detail: {
+          displayName: snapshot.displayName,
+          revision: snapshot.revision,
+        },
+      }),
+    );
+    return {
+      value: { ...value, displayName: snapshot.displayName ?? "" },
+      revision: snapshot.revision,
+    };
+  },
+  parse: (payload: unknown, saved: ProfileValue): ProfileValue => ({
+    ...saved,
+    displayName: profileDraftClientSchema.parse(payload).displayName ?? "",
+  }),
+  input: (value: ProfileValue) => ({
+    featureKind: "profile" as const,
+    payload: { displayName: value.displayName },
+  }),
+};
 
 export function ProfileLoading() {
   return (
@@ -41,76 +100,96 @@ export function ProfileLoading() {
 }
 
 export function ProfilePage() {
-  const profile = profilePreviewStore.useValue();
-  const ready = profilePreviewStore.useReady();
-  const counts = useWardrobeCounts();
-  const [fallbackDraft, setFallbackDraft] = useState<string | null>(null);
-  const [status, setStatus] = useState<ProfileStatus>("ready");
-  const [errorMessage, setErrorMessage] = useState<string>();
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settings = useLiveSettingsDraft<ProfileValue>(profileConfiguration);
+  const [discardOpen, setDiscardOpen] = useState(false);
 
-  useEffect(
-    () => () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    },
-    [],
-  );
+  if (settings.loading) return <ProfileLoading />;
 
-  function stopStatusTimer() {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = null;
+  if (settings.value === null) {
+    return (
+      <section className={styles.error} role="alert">
+        <div>
+          <h1>Profile is unavailable</h1>
+          <p>{settings.message}</p>
+        </div>
+        <Button variant="secondary" onClick={() => void settings.reload()}>
+          Retry
+        </Button>
+      </section>
+    );
   }
 
-  function changeName(name: string) {
-    stopStatusTimer();
-    setStatus("draftSaving");
-    setErrorMessage(undefined);
-    try {
-      profilePreviewStore.set((previous) => ({ ...previous, draftName: name }));
-      setFallbackDraft(null);
-      saveTimer.current = setTimeout(() => setStatus("draftSaved"), 600);
-    } catch {
-      setFallbackDraft(name);
-      setStatus("saveError");
-      setErrorMessage(
-        "This browser could not save the name draft. Try Save name.",
-      );
-    }
-  }
-
-  function saveName() {
-    stopStatusTimer();
-    const name = (fallbackDraft ?? profilePreviewStore.get().draftName).trim();
-    if (!name) return;
-    setStatus("saving");
-    try {
-      profilePreviewStore.set({ draftName: name, displayName: name });
-      setFallbackDraft(null);
-      setErrorMessage(undefined);
-      setStatus("saved");
-    } catch {
-      setStatus("saveError");
-      setErrorMessage(
-        "Could not save the workspace name in this browser. Check available storage and try again.",
-      );
-    }
-  }
-
-  if (!ready) return <ProfileLoading />;
+  const value = settings.value;
+  const status =
+    settings.status === "idle"
+      ? "ready"
+      : settings.status === "error"
+        ? "saveError"
+        : settings.status === "saved" && settings.dirty
+          ? "draftSaved"
+          : settings.status;
 
   return (
-    <ProfileOverview
-      displayName={fallbackDraft ?? profile.draftName}
-      stats={{
-        wardrobeItems: counts.activeOwned,
-        savedCandidates: counts.savedCandidates,
-        archivedItems: counts.archived,
-      }}
-      status={status}
-      errorMessage={errorMessage}
-      onDisplayNameChange={changeName}
-      onSaveName={saveName}
-      onRetry={saveName}
-    />
+    <>
+      {!settings.writesEnabled && (
+        <p className={styles.notice} role="status">
+          This workspace is read-only. You can view the profile; changes are
+          disabled.
+        </p>
+      )}
+      {settings.conflict && (
+        <div className={styles.notice} role="alert">
+          <p>{settings.message}</p>
+          <Button
+            variant="secondary"
+            onClick={() => void settings.reloadRevision()}
+          >
+            Reload latest revision
+          </Button>
+        </div>
+      )}
+      <ProfileOverview
+        displayName={value.displayName}
+        stats={value.stats}
+        status={status}
+        statusMessage={settings.message}
+        errorMessage={settings.message}
+        readOnly={!settings.writesEnabled}
+        onDisplayNameChange={(displayName) =>
+          settings.change({
+            ...value,
+            displayName,
+          })
+        }
+        onSaveName={() => void settings.save()}
+        onRetry={() =>
+          void (settings.conflict ? settings.reloadRevision() : settings.save())
+        }
+      />
+      {settings.dirty && settings.writesEnabled && (
+        <div className={styles.draftActions}>
+          <span>Your name draft is separate from the saved display name.</span>
+          <Button
+            variant="quiet"
+            disabled={settings.status === "saving"}
+            onClick={() => setDiscardOpen(true)}
+          >
+            Discard draft
+          </Button>
+        </div>
+      )}
+      <ConfirmDialog
+        open={discardOpen}
+        onClose={() => setDiscardOpen(false)}
+        title="Discard name draft?"
+        description="Your unsaved name will be removed. The saved workspace name stays in place."
+        confirmLabel="Discard draft"
+        cancelLabel="Keep editing"
+        onConfirm={() => {
+          setDiscardOpen(false);
+          void settings.discard();
+        }}
+      />
+    </>
   );
 }

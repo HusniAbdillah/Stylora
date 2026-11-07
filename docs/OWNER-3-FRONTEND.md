@@ -41,10 +41,11 @@ from temporary errors.
 
 ## Remaining cross-owner integration
 
-Owner 2 owns Upload, Review pieces, Wardrobe match and Outfit ideas. Until its
-shared `/looks/[lookId]` dispatcher lands, requests for these earlier steps show
-an explicit return-to-details state and retain the look reference. This does not
-claim those earlier screens are implemented by Owner 3.
+Owner 2 owns Upload, Review pieces, Wardrobe match and Outfit ideas at
+`/create/[lookId]?step=...`. The detail route redirects earlier-step links there,
+preserving the look reference and a valid draft parameter. Committed option IDs
+open `/looks/[lookId]?option_id=...`; historical and older-revision options are
+excluded from the active detail picker.
 
 Latest main `2b88681` supplies the saved-avatar executor and the saved snapshot
 preview source adapter. Saved detail now opens `/preview?savedLookId=...` so the

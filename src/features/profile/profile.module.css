@@ -60,7 +60,7 @@
 .scopeCard,
 .statsCard {
   border: 1px solid var(--color-stone);
-  border-radius: 20px;
+  border-radius: 24px;
   background: var(--color-paper);
   padding: 24px;
 }
@@ -69,7 +69,7 @@
 .scopeCard h2,
 .statsCard h2 {
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: 25px;
+  font-size: 26px;
   font-weight: 400;
   line-height: 1.2;
   margin: 0 0 16px;
@@ -88,20 +88,21 @@
 
 .nameCard input {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   border: 1px solid var(--color-secondary);
   border-radius: 8px;
   background: var(--color-paper);
   color: var(--color-ink);
   font: inherit;
-  font-size: 14px;
-  padding: 10px 12px;
+  font-size: 15px;
+  padding: 12px 14px;
 }
 
 .nameAction {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
   margin-top: 12px;
 }
 
@@ -178,9 +179,10 @@
 .statsCard dd {
   color: var(--color-crimson);
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: 36px;
+  font-size: clamp(20px, 3vw, 36px);
   line-height: 1;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .statsNote {
@@ -218,15 +220,54 @@
   margin: 4px 0 0;
 }
 
+.notice,
+.draftActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: 1096px;
+  margin: 0 auto 20px;
+  color: var(--color-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.notice {
+  padding: 16px 20px;
+  border: 1px solid var(--color-stone);
+  border-radius: 16px;
+  background: var(--color-paper);
+}
+
+.notice p {
+  margin: 0;
+}
+.error {
+  flex-wrap: wrap;
+}
+.error h1 {
+  margin: 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 30px;
+}
+.draftActions {
+  margin-top: 20px;
+}
+
 @media (max-width: 1100px) {
   .profile {
-    padding-inline: 24px;
+    min-width: 0;
   }
 }
 
 @media (max-width: 700px) {
   .profile {
-    padding: 16px 16px 36px;
+    padding: 16px 0 36px;
+  }
+  :global(#workspace-content) .profile {
+    padding: 16px 0 36px;
   }
   .profile h1 {
     font-size: 36px;
