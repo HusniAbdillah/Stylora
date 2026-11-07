@@ -18,6 +18,20 @@ export type SavedMediaState = {
   readyMediaId: string | null;
 };
 
+export function pendingSavedAvatarOperations(
+  looks: { media: Pick<SavedMediaState, "status" | "operationId"> }[],
+) {
+  return [
+    ...new Set(
+      looks.flatMap(({ media }) =>
+        media.operationId && ["queued", "running"].includes(media.status)
+          ? [media.operationId]
+          : [],
+      ),
+    ),
+  ].slice(0, 2);
+}
+
 export function savedMediaState(
   media: {
     id: string;

@@ -22,6 +22,7 @@ import {
 import { scoreOffer } from "./score";
 import { selectionChoices, type Choice } from "./outfit-choice";
 import type { OutfitPageData } from "./page-data";
+import { startOperationRequest } from "@/features/operations/client";
 
 type Detail = NonNullable<OutfitPageData["detail"]>;
 type Shopping = NonNullable<OutfitPageData["shopping"]>;
@@ -862,18 +863,28 @@ export function OutfitPage({
         )
       )
         revision = (await persistChoices(id, choices)).revision;
-      const saved = await requestData<{ id: string }>(
-        `/api/looks/${data.lookId}/save`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            optionId: id,
-            expectedRevision: revision,
-            idempotencyKey: `outfit:${data.lookId}:${id}:${revision}`,
-            title: state.detail.option.title,
-          }),
-        },
-      );
+      const saved = await requestData<{
+        id: string;
+        media: { operationId: string | null; status: string };
+      }>(`/api/looks/${data.lookId}/save`, {
+        method: "POST",
+        body: JSON.stringify({
+          optionId: id,
+          expectedRevision: revision,
+          idempotencyKey: `outfit:${data.lookId}:${id}:${revision}`,
+          title: state.detail.option.title,
+        }),
+      });
+      if (
+        saved.media.operationId &&
+        ["queued", "running"].includes(saved.media.status)
+      ) {
+        // The saved page owns image failures and retry; saving the outfit already succeeded.
+        void startOperationRequest(
+          saved.media.operationId,
+          `/api/avatars/${saved.media.operationId}`,
+        ).catch(() => {});
+      }
       router.push(`/saved-looks/${saved.id}`);
     } catch (error) {
       await handleConflict(error, id);

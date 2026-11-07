@@ -59,8 +59,16 @@ const candidate: WardrobeItemDetailData = {
   category: "accessory",
   subcategory: "Tote",
   inventoryStatus: "saved_candidate",
-  sourceName: "Uniqlo",
-  priceWhenSaved: "$39.90",
+  sourceName: "Shopee",
+  marketplace: {
+    sourceName: "Shopee",
+    priceMinor: 29900000,
+    currency: "IDR",
+    rating: 4.7,
+    reviewCount: 121,
+    url: "https://www.google.com/shopping/product/123",
+    retrievedAt: "2026-11-07T00:00:00Z",
+  },
   imageUrl: "/design/images/wardrobe-oxblood-tote.webp",
   fields: [
     { key: "color", label: "Color", value: "Oxblood", source: "catalog" },
