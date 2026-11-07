@@ -313,17 +313,78 @@ below the latest one.
 
 ## 7. Owner 4 report
 
-- Reporter and timestamp: Not reported.
-- Source revision and task IDs: Not reported.
-- Contract published: worker execution, capsule text inputs, category selection
-  and avatar result; not assessed.
-- Behavior implemented: Not reported.
-- Files changed: Not reported.
-- Consumer integration: Owner 1 schema; Owner 2 operation protocol; Owner 3 save
-  outbox and media; not assessed.
-- Verification evidence: Not run.
-- Real text and image provider evidence: Not verified.
-- Unresolved work and next concrete action: Not reported.
+- Owner 4 coordinator, 7 November 2026. Tasks O4.1 through O4.7 and
+  R37 through R44. Integration source `4e5df88` includes the Capsule wizard,
+  scoped reasoning and persistence, responsive Preview, automatic stable-input
+  execution, immutable Studio saves and saved-avatar execution.
+- Incremental delivery used isolated managed worktrees and independent feature
+  branches. OpenAI documentation and runtime changes merged in PRs #8 and #9.
+  Capsule increments merged in #11, #16, #17, #18, #23 and #31. Preview increments
+  merged in #10, #19, #26, #30, #32 and #36. Runner and client controls merged in
+  #12 and #22. Studio save integration merged in #27. Each merged head passed
+  the GitHub Check workflow, which runs the full check and production build.
+- Owner 1 applied the reviewed operation, Studio, verified-image promotion and
+  bag-subcategory migrations under the human's migration approval. Hosted
+  generated types remain the database contract. The coordinator did not edit
+  generated types or applied migrations.
+- Real hosted smoke passed against the Next.js webpack development server at
+  port 3104 on Windows, with process-scoped writes enabled only for
+  `dev-owner-4`. Commands used Node 22 and
+  `node --experimental-strip-types scripts/smoke-owner4.mjs --run`, followed by
+  `--prepare`, `--exercise` and `--cleanup` with an external temporary journal
+  and `--base http://127.0.0.1:3104`. The exact phase invocations and guard
+  requirements are retained in the script. Existing preferences were read and
+  preserved.
+- Paid usage was one text request and two image requests, within the approved
+  two-text and two-image ceiling. The existing `OPENAI_MODEL=gpt-6-luna`
+  configuration produced three distinct schema-valid complete owned outfits
+  with concrete evidence. `gpt-image-1.5` produced a private verified PNG for
+  Preview and another for the saved Capsule outfit. Actual operation durations
+  for Capsule and Preview were about 20 and 31 seconds for these fixtures.
+  Prompt version was `stylora-fashion-v1.openai-2` plus the canonical knowledge
+  hash. Schema version was `fashion-item.v1`.
+- Repeated Studio RPC saves returned the same saved-look and operation IDs.
+  Preview save reused the exact completed asset with attempt count zero.
+  Capsule save completed its independent image operation. Save success and
+  image success were inspected separately. Capsule reasoning received IDs and
+  text, without inventory photographs.
+- Browser verification exercised the real Preview Server Action at 1440 by
+  1000 and 390 by 844. Both desktop and mobile save controls reached
+  "Outfit saved. Image ready." and returned the same immutable snapshot and
+  reused asset. Restoring the Capsule draft retained six included pieces, one
+  required piece and one exclusion at the Items step. Build returned to the
+  existing three-outfit result without advancing draft revision 2 or creating
+  another reasoning operation. Both screens had equal document client and
+  scroll widths at the mobile viewport. Screenshots are stored outside git in
+  the coordinator's visualization directory.
+- Fixtures were seven explicitly labeled sample-owned pieces from
+  `data/wardrobe/wardrobe.json`, with their real dataset WebP photographs.
+  Inference and avatar images were real OpenAI output. No visual preferences
+  were supplied, so the observed image used a neutral non-identifying mannequin.
+  No selected-swatch or body-profile fidelity claim is made by this smoke.
+- Cleanup passed for the first preflight journal and the successful run.
+  The successful run removed two scripted saves, four operations, seven wardrobe
+  rows and nine assets. The additional browser-created snapshot and its
+  zero-attempt reuse operation were journaled, ownership-checked and removed
+  separately. Read-only hosted queries then found zero wardrobe items, assets,
+  workflow drafts, capsules, saved snapshots and workflow operations in this
+  initially empty workspace. Original preference revision 1 remains present.
+- Focused prompt, Capsule output and receipt, Preview selection and terminal
+  state, operation identity and request-pump tests passed in their respective
+  feature worktrees. Local `make fast` passed for the runner, controls, smoke
+  harness and Preview surfaces. One redundant coordinator `make fast` attempt
+  stalled under host contention and was stopped. Its final integrated build
+  was validated by CI instead. No check was disabled or weakened.
+- Execution uses WORKFLOW section 5 Option A. Module-level requests survive
+  client navigation and healthy leases are polled. A server-function crash
+  requires a later visit and lease recovery. There is no dedicated queue worker.
+- Final audit found the Saved looks retry path allocated work without executing
+  it, and the required successful-image regeneration control was disabled.
+  Owner 1 and Owner 4 are completing versioned media allocation, execution and
+  previous-image retention in follow-up PRs. These follow-ups use synthetic
+  regression fixtures and no additional paid image calls. Production inference,
+  general Wardrobe intake and Profile frontend persistence were not exercised
+  by this Owner 4 smoke.
 
 
 ### Owner 4 operation controls increment, 7 November 2026
