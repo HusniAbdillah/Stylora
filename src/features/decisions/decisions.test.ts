@@ -22,12 +22,14 @@ describe("decision contracts", () => {
     ).toBe(false);
   });
 
-  it.each(["queued", "failed", "cancelled"])(
+  it.each(["queued", "failed", "cancelled", "superseded"])(
     "keeps the prior ready image while the latest operation is %s",
     (status) => {
       const media = {
         id: mediaId,
-        status: status === "cancelled" ? "failed" : status,
+        status: ["cancelled", "superseded"].includes(status)
+          ? "failed"
+          : status,
         operation_id: operationId,
         output_asset_id: null,
       };
@@ -47,7 +49,8 @@ describe("decision contracts", () => {
         assetId,
         imageUrl: "https://example.com/previous.png",
       });
-      if (status === "cancelled") expect(result.canRetry).toBe(false);
+      if (["cancelled", "superseded"].includes(status))
+        expect(result.canRetry).toBe(false);
     },
   );
   it("rejects duplicate slots and client-supplied workspace IDs", () => {

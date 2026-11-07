@@ -115,7 +115,9 @@ export function SavedLookAvatar({
                 ? "New image preparing. Showing the previous image."
                 : look.mediaStatus === "cancelled"
                   ? "New image cancelled. Showing the previous image."
-                  : "New image unavailable. Showing the previous image."}
+                  : look.mediaStatus === "superseded"
+                    ? "New image out of date. Showing the previous image."
+                    : "New image unavailable. Showing the previous image."}
             </p>
             {look.canRetry && onRetry && (
               <Button

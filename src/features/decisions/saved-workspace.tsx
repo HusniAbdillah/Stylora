@@ -74,7 +74,7 @@ export function SavedCollectionWorkspace({
           method: "POST",
         }),
       );
-      setMessage("Image retry requested. Your saved outfit is unchanged.");
+      setMessage("Retrying the saved image.");
       polling.refresh();
       await startOperationRequest(
         result.media.operationId,
@@ -210,7 +210,7 @@ export function SavedDetailWorkspace({
           method: "POST",
         }),
       );
-      setMessage("Image retry requested. Your saved outfit is unchanged.");
+      setMessage("Retrying the saved image.");
       polling.refresh();
       await startOperationRequest(
         result.media.operationId,
@@ -249,9 +249,7 @@ export function SavedDetailWorkspace({
           body: JSON.stringify(regeneration.current),
         }),
       );
-      setMessage(
-        "New image requested. Your saved outfit and shared images are unchanged.",
-      );
+      setMessage("Preparing a new image. The previous image stays visible.");
       polling.refresh();
       await startOperationRequest(
         result.media.operationId,

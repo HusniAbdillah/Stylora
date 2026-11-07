@@ -421,7 +421,7 @@ below the latest one.
   and existing approved share media are not modified. Regeneration uses the
   latest media ID and a UUID retained across transport retries.
 - Verification: `pnpm exec vitest run src/features/decisions/decisions.test.ts`
-  passed seven tests in 2.42 seconds with synthetic in-memory fixtures.
+  passed eight tests in 2.10 seconds with synthetic in-memory fixtures.
   `git diff --check` passed. `make fast` awaits Owner 1's generated RPC types.
   Hosted persistence, Storage, provider calls, browser journeys and local build
   were not run. Owner 1's additive RPC and generated types are a prerequisite;
