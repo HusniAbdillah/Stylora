@@ -51,9 +51,10 @@ These are target routes. The scaffold currently exposes `/` and `/api/health`.
 | 2 and 4 | Operations | Draft and operation endpoints. Owner 2 publishes the protocol. Owner 4 implements runner integration. Each slice owns its own task handler and domain commit. |
 
 Use one thin `/looks/[lookId]` page to dispatch validated views. Resolve a
-detail option against that look and workspace. Define how conflicting query
-parameters are handled at the route boundary, and check visited and ready
-steps against persisted progress before rendering. A forward action can
+detail option against that look and workspace. Accept either a step or an
+option selector and recover ambiguous requests at the last valid visited
+step. Check visited and ready steps against persisted progress before
+rendering. A forward action can
 navigate once its own input is saved. The destination owns its skeleton,
 partial result, retry and error state. Outfit-detail shopping stays on the same
 page, and Preview gets its own navigation entry.
@@ -97,7 +98,8 @@ page, and Preview gets its own navigation entry.
   operation in the same transaction. Store image status independently and
   retry by operation identity. Share publishes a reviewed allowlist with a
   hashed token, expiry and revocation. Recheck those fields and approved media
-  membership on every public data or media request.
+  membership on every public data or media request. Serve those responses
+  with `no-store` so an old cache cannot extend access after revocation.
 
 ### Resolve before freezing the schema
 

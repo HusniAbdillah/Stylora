@@ -85,6 +85,30 @@ below the latest one.
 
 ## 4. Owner 1 report
 
+### Foundation checkpoint, 7 November 2026 (Asia/Bangkok)
+
+- Scope: local App Router and Supabase setup, Node 22 and pinned pnpm, shared
+  CSS tokens, feature directories and architecture. This prepares Owner 1's
+  contract gate and the route entry points for the other owners.
+- Source: `o1/nextjs-supabase-foundation` working tree. See
+  [ARCHITECTURE.md](ARCHITECTURE.md) for the ownership map and proposed
+  resolution for per-option selections, workspace roots and job execution.
+- Local checks: `pnpm check` completed lint, route type generation, strict
+  TypeScript and all three Vitest cases using synthetic configuration only.
+- Build and smoke: `pnpm build` and `pnpm format:check` exited 0. With
+  `next start --hostname 127.0.0.1` on ports 3413 and 3414, `GET /` returned
+  200 in both runs. `GET /api/health` returned 503 with blank configuration
+  and 200 with a synthetic configuration. Both responses used `no-store`.
+  The smoke script stopped both server processes and wrote no fixture data.
+- Supabase CLI: `supabase init` succeeded using the pinned 3.0.0 binary.
+  `pnpm exec supabase --version` confirmed 3.0.0. The CLI help confirmed
+  `--remote=<ref>` for hosted type generation. `pnpm db:types` with an empty
+  project reference returned the expected exit code 1 and wrote no type file.
+- Pending: Owner 1's reviewed baseline migration, workspace rows, private
+  Storage, generated database types and policy tests. No hosted database,
+  live provider, storage, Figma screen or Vercel verification was performed
+  for this foundation.
+
 - Reporter and timestamp: Not reported.
 - Source revision and task IDs: Not reported.
 - Contract published: canonical items, preference mapping, candidate ownership,

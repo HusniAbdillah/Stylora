@@ -12,7 +12,9 @@ const databaseConfigSchema = z.object({
   DEMO_WRITES_ENABLED: z.enum(["true", "false"]).default("false"),
 });
 
-export function parseDatabaseConfig(env: NodeJS.ProcessEnv) {
+export function parseDatabaseConfig(
+  env: Readonly<Record<string, string | undefined>>,
+) {
   const result = databaseConfigSchema.safeParse(env);
   if (!result.success) return null;
 
