@@ -28,6 +28,7 @@ export const operationSchema = z
       "superseded",
     ]),
     inputRevision: z.number().int().positive(),
+    inventoryMode: z.enum(["live", "sample"]).nullable().default(null),
     errorCode: z.string().nullable(),
     optionType: z
       .enum(["closest", "from_wardrobe", "fresh_alternative"])
@@ -64,6 +65,7 @@ export const canonicalPieceSchema = garmentSchema
   .passthrough();
 export const lookSchema = z.object({
   activeDraftId: z.uuid().nullable().optional(),
+  inventoryMode: z.enum(["live", "sample"]).nullable().default(null),
   id: z.uuid(),
   title: z.string(),
   occasion: z.string().nullable(),
@@ -82,6 +84,7 @@ export const lookSchema = z.object({
         id: z.uuid(),
         pieceId: z.uuid(),
         outcome: z.enum(["owned_match", "wardrobe_alternative", "missing"]),
+        inventoryMode: z.enum(["live", "sample"]).nullable().default(null),
         wardrobeItem: wardrobeItemSchema,
         explanation: explanationSchema,
         sharedAttributes: z.json(),
@@ -97,6 +100,7 @@ export const lookSchema = z.object({
       .object({
         id: z.uuid(),
         optionType: z.enum(["closest", "from_wardrobe", "fresh_alternative"]),
+        inventoryMode: z.enum(["live", "sample"]).nullable().default(null),
         title: z.string(),
         concept: z.string(),
         explanation: explanationSchema,

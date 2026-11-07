@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, ConfirmDialog, Icon, Stepper } from "@/components/ui";
+import { Button, Chip, ConfirmDialog, Icon, Stepper } from "@/components/ui";
 import {
   InspirationUpload,
   ReviewPieces,
@@ -88,30 +88,47 @@ export function CreatePage({
   const confidence = session.currentOperation("inspiration_confidence");
   const matching = session.currentOperation("wardrobe_match");
   const options = session.currentOperation("outfit_options");
+  const inventoryLocked =
+    Boolean(look?.matches.length || look?.outfitOptions.length) ||
+    state.operations.some((operation) =>
+      ["wardrobe_match", "outfit_options", "option_regeneration"].includes(
+        operation.kind,
+      ),
+    );
   const completeDescription =
     Boolean(look?.pieces.length) && !isActive(description);
   const matchesReady =
     Boolean(look?.pieces.length) &&
-    look!.matches.filter((match) => !match.stale).length ===
-      look!.pieces.length;
+    look!.matches.filter(
+      (match) => !match.stale && match.inventoryMode === state.inventoryMode,
+    ).length === look!.pieces.length;
   const ideasReady =
-    look?.outfitOptions.filter((option) => !option.stale).length === 3;
+    look?.outfitOptions.filter(
+      (option) => !option.stale && option.inventoryMode === state.inventoryMode,
+    ).length === 3;
   useEffect(() => {
     if (!look || !optionId) return;
-    const identity = `${look.id}:${optionId}`;
+    const identity = `${look.id}:${optionId}:${state.inventoryMode}`;
     if (restoredOption.current === identity) return;
-    restoredOption.current = identity;
     const option = look.outfitOptions.find(
-      (option) => option.id === optionId && !option.stale,
+      (option) =>
+        option.id === optionId &&
+        !option.stale &&
+        option.inventoryMode === state.inventoryMode,
     );
-    if (option) session.selectDirection(option.optionType);
-  }, [look, optionId, session]);
+    if (option) {
+      restoredOption.current = identity;
+      session.selectDirection(option.optionType);
+    }
+  }, [look, optionId, session, state.inventoryMode]);
   useEffect(() => {
     if (!look || !ideasReady) return;
-    const options = look.outfitOptions.filter((option) => !option.stale);
-    const identity = options
+    const options = look.outfitOptions.filter(
+      (option) => !option.stale && option.inventoryMode === state.inventoryMode,
+    );
+    const identity = `${state.inventoryMode}:${options
       .map((option) => `${option.id}:${option.revision}`)
-      .join(":");
+      .join(":")}`;
     if (lastHandoff.current === identity) return;
     lastHandoff.current = identity;
     for (const option of options.filter((option) => option.status === "ready"))
@@ -121,6 +138,7 @@ export function CreatePage({
         detail: {
           lookId: look.id,
           revision: look.revision,
+          inventoryMode: state.inventoryMode,
           options: options.map((option) => ({
             optionId: option.id,
             optionType: option.optionType,
@@ -135,7 +153,7 @@ export function CreatePage({
         },
       }),
     );
-  }, [look, ideasReady, router]);
+  }, [look, ideasReady, router, state.inventoryMode]);
   const retryInit = () => {
     void session
       .hydrate(draftId, lookId)
@@ -152,9 +170,11 @@ export function CreatePage({
     };
     window.addEventListener("focus", refresh);
     window.addEventListener("stylora:preferences-updated", refresh);
+    window.addEventListener("stylora:wardrobe-changed", refresh);
     return () => {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("stylora:preferences-updated", refresh);
+      window.removeEventListener("stylora:wardrobe-changed", refresh);
     };
   }, [session]);
   useEffect(() => {
@@ -208,6 +228,7 @@ export function CreatePage({
     state.preferenceFingerprint,
     state.contextSaving,
     state.hasEditorDraft,
+    state.inventoryMode,
     step,
     description,
     confidence,
@@ -233,7 +254,7 @@ export function CreatePage({
   function go(target: CreateStep) {
     if (target === "details") {
       const idea = look
-        ? presentIdeas(look, state.operations).find(
+        ? presentIdeas(look, state.operations, state.inventoryMode).find(
             (idea) => idea.direction === state.selectedDirection,
           )
         : undefined;
@@ -400,6 +421,49 @@ export function CreatePage({
           This workspace is read-only. Existing results remain available.
         </p>
       )}
+      {step === "upload" && (
+        <section
+          className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone bg-paper px-4 py-3"
+          aria-labelledby="inventory-choice-title"
+        >
+          <div>
+            <h2 id="inventory-choice-title" className="text-sm font-medium">
+              Wardrobe for this look
+            </h2>
+            <p className="mt-1 text-xs text-secondary">
+              {state.inventoryMode === "sample"
+                ? "Example pieces stay separate from your wardrobe."
+                : "Matching uses active pieces marked owned in your wardrobe."}
+            </p>
+            {inventoryLocked && (
+              <p className="mt-1 text-xs text-secondary">
+                The wardrobe source is fixed for this look after matching
+                starts.
+              </p>
+            )}
+          </div>
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label="Wardrobe source"
+          >
+            <Chip
+              selected={state.inventoryMode === "live"}
+              disabled={!writesEnabled || busy || inventoryLocked}
+              onClick={() => session.setInventoryMode("live")}
+            >
+              Your wardrobe
+            </Chip>
+            <Chip
+              selected={state.inventoryMode === "sample"}
+              disabled={!writesEnabled || busy || inventoryLocked}
+              onClick={() => session.setInventoryMode("sample")}
+            >
+              Sample inventory
+            </Chip>
+          </div>
+        </section>
+      )}
       {state.error && (
         <div
           role="alert"
@@ -534,11 +598,13 @@ export function CreatePage({
       )}
       {step === "matches" && look && (
         <>
-          <p className="mt-5 text-xs text-secondary">
-            Sample inventory · Matches use example wardrobe pieces
-          </p>
+          {state.inventoryMode === "sample" && (
+            <p className="mt-5 text-xs text-secondary">
+              Sample inventory · Matches use example wardrobe pieces
+            </p>
+          )}
           <WardrobeMatchView
-            matches={presentMatches(look)}
+            matches={presentMatches(look, state.inventoryMode)}
             status={
               matchesReady
                 ? "ready"
@@ -567,11 +633,13 @@ export function CreatePage({
       )}
       {step === "ideas" && look && (
         <>
-          <p className="mt-5 text-xs text-secondary">
-            Sample inventory · Matches use example wardrobe pieces
-          </p>
+          {state.inventoryMode === "sample" && (
+            <p className="mt-5 text-xs text-secondary">
+              Sample inventory · Matches use example wardrobe pieces
+            </p>
+          )}
           <OutfitIdeas
-            ideas={presentIdeas(look, state.operations)}
+            ideas={presentIdeas(look, state.operations, state.inventoryMode)}
             status={
               ideasReady
                 ? "ready"
@@ -592,7 +660,11 @@ export function CreatePage({
             preferencesUsed={[
               ...new Set(
                 look.outfitOptions
-                  .filter((option) => !option.stale)
+                  .filter(
+                    (option) =>
+                      !option.stale &&
+                      option.inventoryMode === state.inventoryMode,
+                  )
                   .flatMap((option) => option.explanation.inputsUsed)
                   .filter(
                     (key) =>
@@ -622,6 +694,11 @@ export function CreatePage({
                 : undefined
             }
             onSetPreferences={() => router.push(preferencesHref)}
+            onAddWardrobe={
+              state.inventoryMode === "live"
+                ? () => router.push("/wardrobe")
+                : undefined
+            }
             onRetry={
               writesEnabled ? () => retryTask("outfit_options") : undefined
             }

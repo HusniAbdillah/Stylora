@@ -40,6 +40,7 @@ type SessionState = {
   selectedDirection: "closest" | "from_wardrobe" | "fresh_alternative";
   hasEditorDraft: boolean;
   contextSaving: boolean;
+  inventoryMode: "live" | "sample";
 };
 const initial: SessionState = {
   ready: false,
@@ -58,6 +59,7 @@ const initial: SessionState = {
   selectedDirection: "closest",
   hasEditorDraft: false,
   contextSaving: false,
+  inventoryMode: "live",
 };
 const recoverySchema = z.object({
   draftId: z.uuid().nullable(),
@@ -66,6 +68,7 @@ const recoverySchema = z.object({
     .enum(["closest", "from_wardrobe", "fresh_alternative"])
     .default("closest"),
   selectedOptionId: z.uuid().nullable().optional(),
+  inventoryMode: z.enum(["live", "sample"]).optional(),
   editor: z
     .object({
       pieceId: z.uuid().nullable(),
@@ -100,6 +103,7 @@ export class CreateSession {
   private contextQueue: Promise<void> = Promise.resolve();
   private contextIntent = 0;
   private regenerationAllocations = new Set<string>();
+  private modeSelected = false;
   constructor(readonly scope: string) {}
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -122,10 +126,12 @@ export class CreateSession {
         draftId: this.state.draft?.id ?? null,
         lookId: this.state.look?.id ?? null,
         selectedDirection: this.state.selectedDirection,
+        inventoryMode: this.state.inventoryMode,
         selectedOptionId:
           this.state.look?.outfitOptions.find(
             (option) =>
               option.optionType === this.state.selectedDirection &&
+              option.inventoryMode === this.state.inventoryMode &&
               !option.stale,
           )?.id ?? null,
         editor: this.editor,
@@ -161,6 +167,7 @@ export class CreateSession {
       (lookId && lookId !== this.state.look?.id)
     ) {
       this.generation++;
+      this.modeSelected = false;
       this.editor = null;
       this.cursors = {};
       this.update({
@@ -190,6 +197,10 @@ export class CreateSession {
         const sameRecovery =
           (!draftId || draftId === recovery?.draftId) &&
           (!lookId || lookId === recovery?.lookId);
+        if (sameRecovery && recovery?.inventoryMode) {
+          this.modeSelected = true;
+          this.update({ inventoryMode: recovery.inventoryMode });
+        }
         this.cursors = sameRecovery ? (recovery?.cursors ?? {}) : {};
         this.editor = sameRecovery ? (recovery?.editor ?? null) : null;
         this.update({ hasEditorDraft: Boolean(this.editor) });
@@ -271,8 +282,12 @@ export class CreateSession {
               stored.data.lookId === this.state.look?.id
             ) {
               this.editor = stored.data.editor ?? null;
+              if (stored.data.inventoryMode) this.modeSelected = true;
               this.update({
                 selectedDirection: stored.data.selectedDirection,
+                ...(stored.data.inventoryMode
+                  ? { inventoryMode: stored.data.inventoryMode }
+                  : {}),
                 hasEditorDraft: Boolean(this.editor),
               });
             }
@@ -334,6 +349,9 @@ export class CreateSession {
       return;
     this.update({
       look,
+      ...(!this.modeSelected && look.inventoryMode
+        ? { inventoryMode: look.inventoryMode }
+        : {}),
       operations: look.operations,
       uploadStatus: "verified",
       previewUrl: look.inspirationImage?.url ?? null,
@@ -342,6 +360,16 @@ export class CreateSession {
         ? { provisionalConfidence: null }
         : {}),
     });
+    for (const kind of ["wardrobe_match", "outfit_options"]) {
+      const stale =
+        kind === "wardrobe_match"
+          ? look.matches.some((match) => match.stale)
+          : look.outfitOptions.some((option) => option.stale);
+      if (stale)
+        for (const key of this.prepared)
+          if (key.startsWith(`${look.id}:`) && key.endsWith(`:${kind}`))
+            this.prepared.delete(key);
+    }
     this.remember();
     for (const operation of look.operations.filter(active)) {
       if (
@@ -590,7 +618,8 @@ export class CreateSession {
   }
   start(kind: string, force = false) {
     if (!this.writesEnabled) return Promise.resolve();
-    const key = `${this.state.look?.id}:${this.state.look?.revision}:${this.state.preferenceFingerprint}:${kind}`;
+    const mode = this.state.inventoryMode;
+    const key = `${this.state.look?.id}:${this.state.look?.revision}:${this.state.preferenceFingerprint}:${mode}:${kind}`;
     const existing = this.starting.get(key);
     if (existing) return existing;
     if (!force && this.prepared.has(key)) return Promise.resolve();
@@ -608,7 +637,7 @@ export class CreateSession {
             method: "POST",
             body: JSON.stringify({
               kind,
-              inventoryMode: "sample",
+              inventoryMode: mode,
               execute: false,
             }),
           },
@@ -829,7 +858,7 @@ export class CreateSession {
           body: JSON.stringify({
             expectedRevision: look.revision,
             expectedOptionId: option.id,
-            inventoryMode: "sample",
+            inventoryMode: this.state.inventoryMode,
             intentId,
             execute: false,
           }),
@@ -848,6 +877,29 @@ export class CreateSession {
   }
   selectDirection(direction: SessionState["selectedDirection"]) {
     this.update({ selectedDirection: direction });
+    this.remember();
+  }
+  setInventoryMode(inventoryMode: "live" | "sample") {
+    if (
+      !this.writesEnabled ||
+      [...this.starting.keys()].some((key) =>
+        ["wardrobe_match", "outfit_options"].some((kind) =>
+          key.endsWith(`:${kind}`),
+        ),
+      ) ||
+      Boolean(
+        this.state.look?.matches.length ||
+        this.state.look?.outfitOptions.length,
+      ) ||
+      this.state.operations.some((operation) =>
+        ["wardrobe_match", "outfit_options", "option_regeneration"].includes(
+          operation.kind,
+        ),
+      )
+    )
+      return;
+    this.modeSelected = true;
+    this.update({ inventoryMode });
     this.remember();
   }
   getEditor(pieceId: string | null) {
@@ -958,6 +1010,7 @@ export class CreateSession {
     if (generation !== this.generation) return;
     this.editor = null;
     this.cursors = {};
+    this.modeSelected = false;
     if (this.temporaryUrl) URL.revokeObjectURL(this.temporaryUrl);
     this.update({
       ...initial,
@@ -972,7 +1025,10 @@ export class CreateSession {
   currentOperation(kind: string) {
     return this.state.operations.find(
       (op) =>
-        op.kind === kind && op.inputRevision === this.state.look?.revision,
+        op.kind === kind &&
+        op.inputRevision === this.state.look?.revision &&
+        (!["wardrobe_match", "outfit_options"].includes(kind) ||
+          op.inventoryMode === this.state.inventoryMode),
     );
   }
 }

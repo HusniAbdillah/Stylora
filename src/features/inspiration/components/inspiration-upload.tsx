@@ -349,14 +349,14 @@ export function InspirationUpload({
           />
           <div className={styles.uploadImageWell}>
             {imageUrl ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imageUrl}
-                  alt={imageAlt}
-                  className={styles.uploadImage}
-                />
-              </>
+              <Image
+                src={imageUrl}
+                alt={imageAlt}
+                width={600}
+                height={800}
+                unoptimized
+                className={styles.uploadImage}
+              />
             ) : (
               <div className="max-w-xs text-center">
                 <Icon name="image" className="mx-auto size-12 text-secondary" />

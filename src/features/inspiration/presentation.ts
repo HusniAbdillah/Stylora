@@ -170,9 +170,12 @@ export function presentPreferences(
   };
 }
 
-export function presentMatches(look: CreateLook): WardrobeMatch[] {
+export function presentMatches(
+  look: CreateLook,
+  mode?: "live" | "sample",
+): WardrobeMatch[] {
   return look.matches
-    .filter((match) => !match.stale)
+    .filter((match) => !match.stale && (!mode || match.inventoryMode === mode))
     .map((match) => ({
       id: match.id,
       outcome: match.outcome,
@@ -242,9 +245,12 @@ export function presentMatches(look: CreateLook): WardrobeMatch[] {
 export function presentIdeas(
   look: CreateLook,
   operations: CreateOperation[],
+  mode?: "live" | "sample",
 ): OutfitIdea[] {
   return look.outfitOptions
-    .filter((option) => !option.stale)
+    .filter(
+      (option) => !option.stale && (!mode || option.inventoryMode === mode),
+    )
     .map((option) => {
       const regeneration = operations.find(
         (operation) =>

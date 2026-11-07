@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge, Button, Icon } from "@/components/ui";
+import Image from "next/image";
 import type { ColorSwatch, ConfidenceReview, DetectedPiece } from "./types";
 import styles from "./create-presentation.module.css";
 
@@ -374,14 +375,14 @@ export function ReviewPieces({
           <figure className="flex gap-3 rounded-[20px] border border-stone bg-paper p-3 sm:block">
             <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sand sm:aspect-[4/5] sm:size-auto">
               {imageUrl ? (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={imageUrl}
-                    alt={imageAlt}
-                    className="h-full max-h-[460px] w-full object-contain"
-                  />
-                </>
+                <Image
+                  src={imageUrl}
+                  alt={imageAlt}
+                  width={600}
+                  height={800}
+                  unoptimized
+                  className="h-full max-h-[460px] w-full object-contain"
+                />
               ) : (
                 <Icon
                   name="image"

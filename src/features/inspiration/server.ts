@@ -419,9 +419,23 @@ export async function getLook(lookId: string) {
       parsedMetadata.data.inventoryFingerprint !== currentInventory.get(mode)
     );
   }
+  function inventoryMode(metadata: unknown) {
+    const parsed = inputMetadataSchema.safeParse(metadata);
+    return parsed.success ? (parsed.data.inventoryMode ?? null) : null;
+  }
+  const latestInventoryOperation = operations.data?.find((operation) =>
+    ["wardrobe_match", "outfit_options", "option_regeneration"].includes(
+      operation.kind,
+    ),
+  );
   return {
     id: look.id,
     activeDraftId: activeDraft?.id ?? null,
+    inventoryMode: inventoryMode(
+      matches.data?.[0]?.input_metadata ??
+        options.data?.[0]?.provider_metadata ??
+        latestInventoryOperation?.input,
+    ),
     title: look.title,
     occasion: look.occasion,
     revision: look.revision,
@@ -447,6 +461,7 @@ export async function getLook(lookId: string) {
       id: match.id,
       pieceId: match.piece_id,
       outcome: match.match_type,
+      inventoryMode: inventoryMode(match.input_metadata),
       wardrobeItem: match.wardrobe_item_id
         ? (itemReferences.get(match.wardrobe_item_id) ?? null)
         : null,
@@ -472,6 +487,7 @@ export async function getLook(lookId: string) {
     outfitOptions: (options.data ?? []).map((option) => ({
       id: option.id,
       optionType: option.option_type,
+      inventoryMode: inventoryMode(option.provider_metadata),
       title: option.title,
       concept: option.concept,
       rationale: option.rationale,
@@ -519,6 +535,16 @@ export async function getLook(lookId: string) {
       createdAt: operation.created_at,
       completedAt: operation.completed_at,
       subjectId: operation.subject_id,
+      inventoryMode:
+        operation.input &&
+        typeof operation.input === "object" &&
+        !Array.isArray(operation.input)
+          ? z
+              .enum(["sample", "live"])
+              .nullable()
+              .catch(null)
+              .parse(operation.input.inventoryMode ?? null)
+          : null,
       optionType:
         operation.input &&
         typeof operation.input === "object" &&

@@ -106,8 +106,21 @@ this snapshot and sign scoped asset references; they never invoke a model.
 
 ## Remaining boundaries and evidence
 
-Wardrobe matching retains its explicit sample adapter until the teammate's
-live inventory integration is ready. Owner 3 detail and shopping screens are now
+Create now defaults to `inventoryMode=live`, consuming Owner 1's hosted wardrobe
+rows with owned status and no archive timestamp. Manual and live sources are
+eligible; sample rows remain available only through the explicit Sample inventory
+selection. Candidate and archived rows are excluded before functional matching.
+Inventory reads page through the scoped owned rows in stable ID order. The mode
+is included in operation/read projections and retained in scoped browser draft
+recovery. The source choice locks for that look once matching or outfit work is
+allocated; a new inspiration can choose another source. This preserves deduplication
+and prevents archived results from another mode being reused as current results.
+The `stylora:wardrobe-changed` event refreshes the look and its inventory freshness.
+Outfit execution rejects incomplete matches and mismatched source, inventory or
+preference fingerprints before requesting the provider.
+No database migration is required.
+
+Owner 3 detail and shopping screens are now
 merged and the committed-option handoff is connected; shopping provider behavior
 was not exercised. Per-piece preference advice is unavailable in the current
 garment DTO and is not fabricated from global confidence insights.

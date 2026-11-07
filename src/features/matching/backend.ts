@@ -45,28 +45,36 @@ const inventoryRowSchema = z.object({
 
 export async function listInventory(mode: "sample" | "live") {
   const { client, workspaceId } = getWorkspaceDatabase();
-  let query = client
-    .from("wardrobe_items")
-    .select(
-      "id,name,description,confidence,uncertainty,category,subcategory,attributes,inferred_attributes,corrections,provenance,source_type,revision,asset_id,inventory_status,archived_at",
-    )
-    .eq("workspace_id", workspaceId)
-    .eq("inventory_status", "owned")
-    .is("archived_at", null);
-  query =
-    mode === "sample"
-      ? query.eq("source_type", "sample")
-      : query.neq("source_type", "sample");
-  const { data, error } = await query.order("id");
-  if (error)
-    throw new ApiError(
-      "inventory_read_failed",
-      "Wardrobe matching is unavailable. Try again.",
-      503,
-      true,
-    );
-  const items: MatchItem[] = (data ?? []).map((row) => {
-    const parsed = inventoryRowSchema.parse(row);
+  const rows: z.infer<typeof inventoryRowSchema>[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    let query = client
+      .from("wardrobe_items")
+      .select(
+        "id,name,description,confidence,uncertainty,category,subcategory,attributes,inferred_attributes,corrections,provenance,source_type,revision,asset_id,inventory_status,archived_at",
+      )
+      .eq("workspace_id", workspaceId)
+      .eq("inventory_status", "owned")
+      .is("archived_at", null);
+    query =
+      mode === "sample"
+        ? query.eq("source_type", "sample")
+        : query.neq("source_type", "sample");
+    const { data, error } = await query
+      .order("id")
+      .range(offset, offset + pageSize - 1);
+    if (error)
+      throw new ApiError(
+        "inventory_read_failed",
+        "Wardrobe matching is unavailable. Try again.",
+        503,
+        true,
+      );
+    const page = z.array(inventoryRowSchema).parse(data ?? []);
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+  const items: MatchItem[] = rows.map((parsed) => {
     return {
       id: parsed.id,
       name: parsed.name,

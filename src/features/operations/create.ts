@@ -99,6 +99,7 @@ function toOperation(op: Operation) {
     promptVersion: op.prompt_version,
     schemaVersion: op.schema_version,
     optionType: input.success ? (input.data.optionType ?? null) : null,
+    inventoryMode: input.success ? input.data.inventoryMode : null,
     subjectId: op.subject_id,
     leaseUntil: op.lease_until,
   };
@@ -555,7 +556,34 @@ export async function executeOperation(id: string) {
               .eq("source_revision", look.revision)
               .eq("is_current", true);
             if (matchError) throw sqlFailure(matchError);
-            const parsedMatches = (matches ?? []).map((match) =>
+            const matchInputs = z.object({
+              inventoryMode: z.enum(["sample", "live"]),
+              inventoryFingerprint: z.string(),
+              preferenceFingerprint: z.string(),
+            });
+            const currentMatches = matches ?? [];
+            if (
+              currentMatches.length !== pieces.length ||
+              new Set(currentMatches.map((match) => match.piece_id)).size !==
+                pieces.length ||
+              currentMatches.some((match) => {
+                const inputs = matchInputs.safeParse(match.input_metadata);
+                return (
+                  !pieces.some((piece) => piece.id === match.piece_id) ||
+                  !inputs.success ||
+                  inputs.data.inventoryMode !== snapshot.inventoryMode ||
+                  inputs.data.inventoryFingerprint !== inventory.fingerprint ||
+                  inputs.data.preferenceFingerprint !==
+                    snapshot.preferenceFingerprint
+                );
+              })
+            )
+              throw new ApiError(
+                "matches_not_ready",
+                "Refresh wardrobe matching for the current inputs before generating outfits.",
+                409,
+              );
+            const parsedMatches = currentMatches.map((match) =>
               matchResultSchema.parse({
                 pieceId: match.piece_id,
                 wardrobeItemId: match.wardrobe_item_id,
