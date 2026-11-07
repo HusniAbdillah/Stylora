@@ -6,6 +6,7 @@ const optionId = "3f9b6f84-5379-4d39-8ea0-82b2e3cbd653";
 const optionItemId = "0913da75-d639-4a78-849b-a0d37553c837";
 const operationId = "a71c2b6e-71d3-40f6-91c3-8312754f4e01";
 const assetId = "c83d6d9c-f37d-47c1-85c7-f24c9016829e";
+const mediaId = "2b69cebf-fce6-418d-b317-0bdb79bec823";
 
 describe("decision contracts", () => {
   it("rejects duplicate slots and client-supplied workspace IDs", () => {
@@ -37,6 +38,7 @@ describe("decision contracts", () => {
 
   it("keeps queued and failed images absent while preserving operation identity", () => {
     const media = {
+      id: mediaId,
       status: "queued",
       output_asset_id: assetId,
       operation_id: operationId,
@@ -50,6 +52,7 @@ describe("decision contracts", () => {
         true,
       ),
     ).toMatchObject({
+      id: mediaId,
       status: "queued",
       assetId: null,
       imageUrl: null,
@@ -83,6 +86,7 @@ describe("decision contracts", () => {
 
   it("only exposes an image after succeeded media references a ready preview", () => {
     const media = {
+      id: mediaId,
       status: "succeeded",
       output_asset_id: assetId,
       operation_id: operationId,

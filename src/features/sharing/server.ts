@@ -345,6 +345,7 @@ export async function readPublicShare(token: string) {
   );
   return {
     ...parsed.data,
+    expiresAt: share.expires_at,
     items: parsed.data.items.map((item, index) => ({
       ...item,
       imageUrl: thumbnails[index]
