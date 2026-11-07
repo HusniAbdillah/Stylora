@@ -33,7 +33,7 @@ BEGIN
     WHEN 'option_item' THEN SELECT o.revision INTO v_revision FROM public.outfit_option_items x JOIN public.outfit_options o ON o.workspace_id = x.workspace_id AND o.id = x.option_id AND o.look_id = x.look_id WHERE x.workspace_id = p_workspace_id AND x.id = p_subject_id FOR SHARE OF o;
     WHEN 'capsule' THEN SELECT x.revision INTO v_revision FROM public.capsules x WHERE x.workspace_id = p_workspace_id AND x.id = p_subject_id FOR SHARE;
     WHEN 'draft' THEN SELECT x.revision INTO v_revision FROM public.workflow_drafts x WHERE x.workspace_id = p_workspace_id AND x.id = p_subject_id AND x.status = 'active' FOR SHARE;
-    WHEN 'saved_look' THEN SELECT x.source_revision INTO v_revision FROM public.saved_look_snapshots x WHERE x.workspace_id = p_workspace_id AND x.id = p_subject_id FOR SHARE;
+    WHEN 'saved_look' THEN SELECT x.source_revision INTO v_revision FROM public.saved_look_snapshots x WHERE x.workspace_id = p_workspace_id AND x.id = p_subject_id;
     ELSE RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'STYLORA_SUBJECT_TYPE_INVALID';
   END CASE;
   IF v_revision IS NULL THEN

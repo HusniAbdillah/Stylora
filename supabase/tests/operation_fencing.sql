@@ -1,4 +1,5 @@
 BEGIN;
+SET LOCAL ROLE service_role;
 DO $$
 DECLARE
   ws uuid := gen_random_uuid(); foreign_ws uuid := gen_random_uuid();
