@@ -1,5 +1,24 @@
 # Stylora shared progress reporting
 
+## Owner 1 sidebar edge toggle: 7 November 2026
+
+- The user requested a smooth sidebar toggle anchored to its divider. Moved
+  the existing accessible button out of the changing logo row and centered it
+  on the sidebar edge with a fixed vertical offset. The scrolling content sits
+  inside a separate container so it cannot clip the boundary control.
+- Removed the blank-surface pointer toggle. Expanded and collapsed headers use
+  the same height; icons keep the same left padding. Labels stay mounted and
+  fade while width and chevron rotation share a 220 ms transition. Reduced
+  motion sets the duration to zero. Existing persisted state, destination links,
+  profile access and the mobile drawer are preserved.
+- `pnpm exec vitest run src/components/shell/navigation.test.tsx` passed both
+  tests. `git diff --check` passed. Local `make fast` passed lint and is finishing
+  typecheck. CI remains the complete suite and build gate.
+- Browser verification was attempted against a separate local Next.js server
+  on port 3133. The browser bridge timed out before loading the page; visual
+  alignment, repeated interaction and viewport checks remain unverified.
+  No database, provider, deployment or environment changes were made.
+
 ## Owner 1 demo data enrichment: 7 November 2026
 
 - The user explicitly authorized richer seed data directly in hosted Supabase.
