@@ -27,7 +27,7 @@ import {
   type DraftPayload,
 } from "./schema";
 
-const asJson = (value: unknown) => z.json().parse(value);
+const asJson = (value: unknown) => z.record(z.string(), z.json()).parse(value);
 export function wardrobeDatabaseError(error: { code?: string }): never {
   if (
     error.code === "40001" ||
