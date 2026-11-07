@@ -263,6 +263,23 @@ below the latest one.
   No seed writes or schema changes were performed by this audit. The application
   response adapter and browser Wardrobe journey were not verified.
 
+### Wardrobe dataset Git delivery, 7 November 2026 (Asia/Bangkok)
+
+- The user authorized pulling updates and publishing the starter dataset to main.
+  Rebased the isolated seed branch onto cb105ff without conflicts. The diff
+  contains the 45 source WebPs, manifest, seed CLI, its tests and this report.
+- New seed uploads now follow the shared Storage path contract using the asset
+  ID as the middle path segment. Existing hosted paths still require the separate
+  normalization task recorded in the Wardrobe backend plan. No hosted writes
+  were performed during Git delivery.
+- After rebase, the four targeted seed tests passed. Lint exited successfully
+  with one existing Preview navigation warning. Typecheck failed at
+  src/features/preview/generation.ts:262 because complete_preview_operation is
+  missing from the generated RPC types. That file and the generated types are
+  unchanged from main. Full check and build are delegated to the PR CI gate.
+- Formatted the task's new files with the current project formatter. Git delivery
+  uses a pull request to main so the normal merge checks and protections apply.
+
 ## 5. Owner 2 report
 
 - Reporter and timestamp: Not reported.
