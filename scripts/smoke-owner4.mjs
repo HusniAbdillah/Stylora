@@ -35,7 +35,14 @@ const scoped = (table, fields = "*") =>
   client.from(table).select(fields).eq("workspace_id", config.workspaceId);
 async function data(query, code) {
   const result = await query;
-  check(!result.error, code);
+  const databaseCode = result.error?.code;
+  check(
+    !result.error,
+    code +
+      (typeof databaseCode === "string" && /^[A-Z0-9]{5,12}$/.test(databaseCode)
+        ? "_" + databaseCode
+        : ""),
+  );
   return result.data;
 }
 async function checkpoint() {
@@ -257,15 +264,13 @@ async function prepare() {
     ...(bags[0] ? { bags: bags[0].id } : {}),
   };
   await data(
-    client
-      .from("workflow_drafts")
-      .insert({
-        id: state.previewDraftId,
-        workspace_id: config.workspaceId,
-        feature_kind: "preview",
-        payload: { selection },
-        current_step: "selection",
-      }),
+    client.from("workflow_drafts").insert({
+      id: state.previewDraftId,
+      workspace_id: config.workspaceId,
+      feature_kind: "preview",
+      payload: { selection },
+      current_step: "selection",
+    }),
     "PREVIEW_FIXTURE_FAILED",
   );
   const preview = await app("/api/previews?draftId=" + state.previewDraftId);
@@ -294,7 +299,12 @@ async function prepare() {
     "PUT",
     { expectedRevision: 0, brief, step: 3, visited: 3 },
   );
-  check(draft.ok && draft.id === state.capsuleDraftId, "CAPSULE_DRAFT_FAILED");
+  check(
+    draft.id === state.capsuleDraftId &&
+      Number.isInteger(draft.revision) &&
+      draft.revision > 0,
+    "CAPSULE_DRAFT_FAILED",
+  );
   state.capsuleDraftRevision = draft.revision;
   state.previewRevision = preview.revision;
   state.prepared = true;
@@ -583,13 +593,13 @@ async function cleanup() {
     );
     const snakeRefs = await data(
       scoped("saved_look_snapshots", "id")
-        .contains("items", [{ asset_id: id }])
+        .contains("items", JSON.stringify([{ asset_id: id }]))
         .limit(1),
       "ASSET_REFERENCE_CHECK_FAILED",
     );
     const camelRefs = await data(
       scoped("saved_look_snapshots", "id")
-        .contains("items", [{ assetId: id }])
+        .contains("items", JSON.stringify([{ assetId: id }]))
         .limit(1),
       "ASSET_REFERENCE_CHECK_FAILED",
     );
@@ -776,8 +786,14 @@ async function main() {
       await { prepare, exercise, cleanup }[phase[0]]();
     } catch (error) {
       if (phase[0] !== "cleanup")
-        await cleanup().catch(() =>
-          log("cleanup_pending", { manifest: statePath }),
+        await cleanup().catch((cleanupError) =>
+          log("cleanup_pending", {
+            manifest: statePath,
+            code:
+              cleanupError instanceof SmokeFailure
+                ? cleanupError.message
+                : "SMOKE_CLEANUP_FAILED",
+          }),
         );
       throw error;
     }

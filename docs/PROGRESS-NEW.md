@@ -350,10 +350,16 @@ below the latest one.
   leases, preserves referenced assets and journals exact private paths before
   removing asset metadata and Storage objects.
 - Local verification: `node --check scripts/smoke-owner4.mjs` and the unflagged
-  dry run passed. No hosted reads, writes, seeding or provider calls were run by
+  dry run passed. `make fast` passed with one existing Preview navigation warning.
+  No hosted reads, writes, seeding or provider calls were run by
   this preparation agent. The coordinator owns live execution and its evidence.
   The script calls the Studio RPC; browser verification of the save action remains
   part of the coordinator's UI check.
+- The coordinator's first prepare run found a draft response envelope difference
+  and an invalid JSONB array containment filter during cleanup, before any model
+  request. The script now accepts the returned ID and positive revision, encodes
+  JSONB containment explicitly and reports safe cleanup error codes. Live rerun
+  and final cleanup evidence remain with the coordinator.
 
 ## 8. Task evidence ledger
 
