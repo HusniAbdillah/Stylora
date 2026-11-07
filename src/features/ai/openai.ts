@@ -15,7 +15,7 @@ export const FASHION_SCHEMA_VERSION = "fashion-item.v1";
 export const FASHION_KNOWLEDGE_VERSION =
   getFashionVersions().knowledgeSourceHash;
 export const FASHION_PROMPT_VERSION = `stylora-fashion-v1.openai-2.${FASHION_KNOWLEDGE_VERSION}`;
-export const AVATAR_PROMPT_VERSION = `stylora-fashion-v1.avatar-3.${FASHION_KNOWLEDGE_VERSION}`;
+export const AVATAR_PROMPT_VERSION = `stylora-fashion-v1.avatar-4.${FASHION_KNOWLEDGE_VERSION}`;
 export const TEXT_MODEL =
   process.env.OPENAI_TEXT_MODEL?.trim() ||
   process.env.OPENAI_MODEL?.trim() ||
@@ -193,6 +193,10 @@ export async function generateFashionImage(input: {
     [
       instructions("avatar"),
       "Create one full-length non-identifying fashion mannequin on a warm porcelain studio background with soft diffuse light. Render believable fabric texture, seams, drape and construction from the supplied garment references. Keep the exact selected garment colors, patterns, logos and silhouette; do not invent branding, clothing or accessories. Apply only the supplied visual preferences and outfit pose. Keep garment fronts, hems and selected accessories readable. Skin swatch is an approximate appearance reference under neutral lighting, never an ethnicity. Fit intent affects the illustrative styling without redesigning the garment. Show a neutral mannequin for unspecified human features. Avoid beauty filters, extreme proportions, text labels and impossible anatomy.",
+      "The visualDirection.composition.selectedSlots list is exhaustive. This may be a partial composition, not a request to complete an outfit. Render no clothing or accessories from omittedSlots, even when style, occasion, footwear comfort or pose suggests them. Unselected areas remain unadorned mannequin material. Garment photographs are authoritative for existing graphics and construction; preserve their lettering, geometry, pockets, fastenings and hems without replacing or simplifying them.",
+      visualDirection.composition.omittedSlots.includes("shoes")
+        ? "No footwear is selected. Show bare mannequin feet: no shoes, sandals, socks, slippers or neutral replacement footwear."
+        : "Footwear is selected. Use only the selected referenced footwear; never substitute a generic pair.",
       JSON.stringify({
         items: input.items,
         visualDirection,
