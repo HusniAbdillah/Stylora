@@ -171,6 +171,7 @@ below the latest one.
 
 ### Owner 1 workspace frontend · 7 November 2026, Asia/Bangkok
 
+- Wardrobe Add Item (D08, M15) uses the eight desktop fields on both screen sizes. Existing drafts keep their color, fabric and fit values under the updated labels. Extra notes from earlier drafts are retained in the saved item. `pnpm check` passed with 112 tests.
 - Work branch `o1/workspace-frontend`, base `4fd5aba`. Requirements R33–R36 and work packages O1.3–O1.6. The four application routes under `src/app/(workspace)` compose the shared shell, Wardrobe, Preferences and Profile.
 - Wardrobe supports searching, filtering, returning to the collection, reading and editing details, marking a candidate owned, and archiving and restoring pieces. Each seeded example uses the same existing `/design/images/wardrobe-ivory-shirt.webp` thumbnail. The intake keeps selected files in IndexedDB. Users can save one or more manually described pieces from a photo, or try the labeled sample item.
 - Preferences preserves optional selections and drafts across navigation and reload. Profile saves the workspace name shown in the sidebar and reads the active wardrobe count. The sample workspace keeps local navigation, item records, preferences and profile data in browser storage. Database persistence, automated descriptions and other owners’ routes remain separate integration work.
@@ -323,6 +324,17 @@ below the latest one.
 - Verification evidence: Not run.
 - Real text and image provider evidence: Not verified.
 - Unresolved work and next concrete action: Not reported.
+
+
+### Owner 4 operation controls increment, 7 November 2026
+
+- Task O4.1 and R01, R04–R06. Branch `o4/operation-controls`, based on merged runner and Owner 1 typed operation RPC contracts.
+- Implemented module-level request deduplication, three-second status polling and a five-minute resubmission window for queued or expired operations. Healthy leases only poll. Each started server request remains awaited and can finish beyond that resubmission window. Normal client navigation retains the request store.
+- Added scoped activity and atomic Studio controls while preserving published Create status metadata, retry execution and numeric event cursors. Default failure finalization now calls the attempt-fenced RPC with safe retry metadata. Domain success remains in its atomic feature callback.
+- Checks in the managed Windows worktree. `make fast` passed lint and typecheck, with one inherited Preview navigation warning. `pnpm exec vitest run src/features/operations` passed six files and eighteen tests. `git diff --check` passed. Fixtures are synthetic unit data in memory and required no hosted cleanup.
+- Covered concurrent active claims, request deduplication, queued resubmission, healthy lease polling without another execution request, completed output reaching commit, failure RPC fences, stable fingerprints, status projection and read-only RPC readiness.
+- Not run. Hosted migrations, database or Storage commands, paid provider calls, browser end-to-end journeys and local build. CI remains the full build and suite gate.
+- Limits. The app must be open for the bounded client pump. Server crashes need a later visit and lease recovery. Provider availability, Storage and end-to-end image completion still require the coordinator’s approved integration smoke. No cloud data was changed.
 
 ## 8. Task evidence ledger
 

@@ -6,6 +6,7 @@ import {
   type WardrobeIntakeProps,
   type WardrobeProposal,
 } from "./wardrobe-intake";
+import { getIntakeFields } from "./wardrobe-intake-draft";
 
 const initialProposals: WardrobeProposal[] = [
   {
@@ -13,32 +14,32 @@ const initialProposals: WardrobeProposal[] = [
     name: "Ivory relaxed shirt",
     category: "top",
     imageUrl: "/design/images/wardrobe-ivory-shirt.webp",
-    fields: [
+    fields: getIntakeFields([
       {
         key: "color",
-        label: "Color",
+        label: "Colors",
         value: "Ivory",
         source: "visual_inference",
       },
       {
         key: "silhouette",
-        label: "Silhouette",
+        label: "Silhouette and fit",
         value: "Relaxed button-front shirt",
         source: "visual_inference",
       },
       {
-        key: "sleeve",
-        label: "Sleeves",
+        key: "necklineSleeve",
+        label: "Neckline and sleeve",
         value: "Long sleeve",
         source: "visual_inference",
       },
       {
-        key: "fabric",
-        label: "Visible texture",
+        key: "texture",
+        label: "Fabric look",
         value: "Smooth woven appearance",
         source: "visual_inference",
       },
-    ],
+    ]),
   },
 ];
 
@@ -77,7 +78,7 @@ function IntakeDemo(props: WardrobeIntakeProps) {
           updateProposal(id, (item) => ({
             ...item,
             fields: item.fields.map((field) =>
-              field.key === key ? { ...field, value } : field,
+              field.key === key ? { ...field, value, source: "user" } : field,
             ),
           }))
         }
@@ -126,20 +127,20 @@ export const TwoGarments: Story = {
         name: "Charcoal wide-leg trousers",
         category: "bottom",
         imageUrl: "/design/images/wardrobe-charcoal-trousers.webp",
-        fields: [
+        fields: getIntakeFields([
           {
             key: "color",
-            label: "Color",
+            label: "Colors",
             value: "Charcoal",
             source: "visual_inference",
           },
           {
-            key: "fit",
-            label: "Fit",
+            key: "silhouette",
+            label: "Silhouette and fit",
             value: "Wide leg",
             source: "visual_inference",
           },
-        ],
+        ]),
       },
     ],
   },
