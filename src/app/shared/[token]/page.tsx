@@ -39,10 +39,12 @@ export default async function SharedLookPage({
           name: item.name,
           imageUrl: item.imageUrl,
         })),
-        expiresLabel: new Intl.DateTimeFormat("en", {
-          dateStyle: "long",
-          timeZone: "Asia/Jakarta",
-        }).format(new Date(shared.expiresAt)),
+        expiresLabel: shared.expiresAt
+          ? new Intl.DateTimeFormat("en", {
+              dateStyle: "long",
+              timeZone: "Asia/Jakarta",
+            }).format(new Date(shared.expiresAt))
+          : null,
       }}
     />
   );
