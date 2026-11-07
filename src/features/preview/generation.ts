@@ -238,7 +238,7 @@ export async function generatePreviewImage(input: unknown) {
     subjectId: current.draft.id,
     inputRevision: current.draft.revision,
     inputFingerprint,
-    input: z.json().parse({
+    input: z.record(z.string(), z.json()).parse({
       items: current.items,
       preferences: current.preferences,
       renderFingerprint: current.renderFingerprint,
