@@ -436,7 +436,8 @@ export async function requestFashion<T extends z.ZodType>(
       false,
     );
   }
-  const key = process.env.MODEL_API_KEY?.trim();
+  const key =
+    process.env.OPENAI_API_KEY?.trim() || process.env.MODEL_API_KEY?.trim();
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
   if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,119}$/.test(model)) {
     throw new ApiError(

@@ -109,6 +109,8 @@ Single-direction regeneration replaces that option identity while preserving
 the other two and historical records. Owner 3 must use current option IDs and
 their revision before searching, selecting or saving. No marketplace request
 is made by this slice.
+Consumers must also respect the returned preference and inventory staleness
+metadata before starting new personalized work or saving a newly selected look.
 
 ## Verification commands
 
