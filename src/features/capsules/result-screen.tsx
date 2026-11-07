@@ -4,7 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { WorkspaceShell } from "@/components/shell";
 import { Button, LoadingLayout, StateNotice } from "@/components/ui";
-import { requestOperation } from "@/features/operations/client";
+import {
+  requestOperation,
+  startOperationRequest,
+} from "@/features/operations/client";
 import { saveStudioLook } from "@/features/outfits/studio-save";
 import { CapsuleOutfitDetail, CapsuleResults } from "./capsule-results";
 import type { CapsuleResult } from "./capsule-types";
@@ -79,10 +82,16 @@ export function CapsuleResultScreen({
       title:
         result.outfits.find((item) => item.id === outfit)?.title ??
         result.title,
-      idempotencyKey: `capsule:${result.id}:${revision}:${outfit}`,
+      idempotencyKey: `studio:capsule:${outfit}:${revision}`,
     });
-    if (response.ok) router.push(`/saved-looks/${response.savedLookId}`);
-    else
+    if (response.ok) {
+      void startOperationRequest(
+        response.operationId,
+        `/api/avatars/${response.operationId}`,
+        { method: "POST" },
+      ).catch(() => {});
+      router.push(`/saved-looks/${response.savedLookId}`);
+    } else
       setMessage(
         "This look could not be saved. Your capsule is kept. Retry saving.",
       );
@@ -151,8 +160,9 @@ export function CapsuleResultScreen({
             {running ? "Preparing your outfits" : result.title}
           </h1>
           <p className="my-4 text-sm text-secondary">
-            Your capsule brief and selected owned pieces are saved. Complete,
-            validated combinations will appear here.
+            {running || generationNeeded
+              ? "Your capsule brief and selected owned pieces are saved. Complete, validated combinations will appear here."
+              : "No outfits remain in this capsule. Edit the saved brief to prepare fresh combinations."}
           </p>
           {running && (
             <LoadingLayout kind="ideas" label="Preparing capsule outfits" />

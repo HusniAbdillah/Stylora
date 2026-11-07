@@ -230,6 +230,7 @@ export function CapsuleCollection({
 
 export function CapsuleResults({
   result,
+  onEditBrief,
   onSaveCapsule,
   onPreview,
   onSaveAsLook,
@@ -237,6 +238,7 @@ export function CapsuleResults({
   onFindAddition,
 }: {
   result: CapsuleResult;
+  onEditBrief?: () => void;
   onSaveCapsule?: (id: string) => void;
   onPreview?: (id: string) => void;
   onSaveAsLook?: (id: string) => void;
@@ -263,7 +265,12 @@ export function CapsuleResults({
             piece are shown separately.
           </p>
         </div>
-        <div className="hidden md:block">
+        <div className="hidden items-center gap-2 md:flex">
+          {onEditBrief && (
+            <Button variant="quiet" onClick={onEditBrief}>
+              Edit brief
+            </Button>
+          )}
           <Button variant="primary" onClick={() => onSaveCapsule?.(result.id)}>
             Save capsule
           </Button>
@@ -374,7 +381,12 @@ export function CapsuleResults({
           </div>
         </section>
       )}
-      <div className="fixed inset-x-0 bottom-0 z-20 flex justify-end border-t border-stone bg-paper p-4 md:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-20 flex justify-between border-t border-stone bg-paper p-4 md:hidden">
+        {onEditBrief && (
+          <Button variant="quiet" onClick={onEditBrief}>
+            Edit brief
+          </Button>
+        )}
         <Button variant="primary" onClick={() => onSaveCapsule?.(result.id)}>
           Save capsule
         </Button>
