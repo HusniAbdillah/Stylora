@@ -285,7 +285,15 @@
   margin-left: auto;
 }
 .activityPanel li small {
+  overflow-wrap: anywhere;
   font-size: 12px;
+}
+.activityPanel li > div {
+  min-width: 0;
+  flex: 1;
+}
+.activityPanel li > span {
+  flex-shrink: 0;
 }
 .shellNotice {
   display: flex;

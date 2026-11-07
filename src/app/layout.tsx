@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
 import { InstallAppProvider } from "@/components/pwa/install-app";
 import "./globals.css";
+import { NotificationCenter } from "@/components/ui/notification-center";
 
 export const metadata: Metadata = {
   applicationName: "Stylora",
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <InstallAppProvider>
           {children}
           <RegisterServiceWorker />
+          <NotificationCenter />
         </InstallAppProvider>
       </body>
     </html>
