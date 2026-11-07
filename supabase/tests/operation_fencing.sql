@@ -6,6 +6,7 @@ DECLARE
   op public.workflow_operations; second_op public.workflow_operations; finished public.workflow_operations;
   avatar_op public.workflow_operations; snapshot uuid := gen_random_uuid(); image uuid := gen_random_uuid();
   capsule uuid := gen_random_uuid();
+  item uuid := gen_random_uuid(); preview_draft uuid := gen_random_uuid();
 BEGIN
   INSERT INTO public.workspaces(id, name) VALUES (ws, 'operation_test_' || ws), (foreign_ws, 'operation_test_' || foreign_ws);
   INSERT INTO public.workflow_drafts(id, workspace_id, feature_kind)
@@ -117,6 +118,16 @@ BEGIN
   DELETE FROM public.capsules WHERE workspace_id = ws AND id = capsule;
   finished := public.finish_workflow_operation(ws, op.id, 1, repeat('f',64), 'succeeded');
   IF finished.status <> 'superseded' THEN RAISE EXCEPTION 'Deleted capsule completion accepted'; END IF;
+  INSERT INTO public.wardrobe_items(id, workspace_id, name, category, inventory_status, source_type)
+    VALUES (item, ws, 'Synthetic preview shirt', 'top', 'owned', 'sample');
+  INSERT INTO public.workflow_drafts(id, workspace_id, feature_kind) VALUES (preview_draft, ws, 'preview');
+  op := public.start_workflow_operation(ws, 'preview_image', 'draft', preview_draft, 1, repeat('b',64),
+    jsonb_build_object('items', jsonb_build_array(jsonb_build_object('id', item, 'revision', 1)),
+      'preferences', jsonb_build_object('revision', 0), 'renderFingerprint', repeat('f',64)));
+  op := public.claim_workflow_operation(ws, op.id, 1);
+  UPDATE public.wardrobe_items SET revision = 2 WHERE workspace_id = ws AND id = item;
+  finished := public.complete_preview_operation(ws, op.id, 1, repeat('b',64), image, repeat('f',64));
+  IF finished.status <> 'superseded' THEN RAISE EXCEPTION 'Edited wardrobe image completion accepted'; END IF;
 END;
 $$;
 ROLLBACK;

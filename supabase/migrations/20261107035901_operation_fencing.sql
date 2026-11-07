@@ -245,6 +245,34 @@ BEGIN
     WHERE workspace_id = p_workspace_id AND id = v_operation.subject_id AND feature_kind = 'preview') THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'STYLORA_PREVIEW_DRAFT_REQUIRED';
   END IF;
+  IF p_kind = 'preview_image' AND v_operation.status IN ('running', 'partial') THEN
+    IF v_operation.input ->> 'renderFingerprint' IS DISTINCT FROM p_render_fingerprint THEN
+      RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'STYLORA_RENDER_FINGERPRINT_CONFLICT';
+    END IF;
+    IF p_attempt_count IS DISTINCT FROM v_operation.attempt_count OR p_input_fingerprint IS DISTINCT FROM v_operation.input_fingerprint
+      OR v_operation.lease_until <= clock_timestamp() THEN
+      RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'STYLORA_OPERATION_ATTEMPT_CONFLICT';
+    END IF;
+    IF jsonb_typeof(v_operation.input -> 'items') IS DISTINCT FROM 'array'
+      OR jsonb_array_length(v_operation.input -> 'items') < 1 THEN
+      RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'STYLORA_PREVIEW_INPUT_INVALID';
+    END IF;
+    PERFORM 1 FROM public.wardrobe_items WHERE workspace_id = p_workspace_id
+      AND id IN (SELECT (i ->> 'id')::uuid FROM jsonb_array_elements(v_operation.input -> 'items') i)
+      ORDER BY id FOR SHARE;
+    PERFORM 1 FROM public.user_preferences WHERE workspace_id = p_workspace_id FOR SHARE;
+    IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_operation.input -> 'items') i
+      LEFT JOIN public.wardrobe_items w ON w.workspace_id = p_workspace_id AND w.id = (i ->> 'id')::uuid
+      WHERE w.id IS NULL OR w.inventory_status <> 'owned' OR w.archived_at IS NOT NULL OR w.revision IS DISTINCT FROM (i ->> 'revision')::integer)
+      OR coalesce((SELECT revision FROM public.user_preferences WHERE workspace_id = p_workspace_id), 0)
+        IS DISTINCT FROM (v_operation.input #>> '{preferences,revision}')::integer THEN
+      UPDATE public.workflow_operations SET status = 'superseded', lease_until = NULL,
+        completed_at = clock_timestamp(), safe_error_code = 'INPUT_SUPERSEDED', result_ref = NULL
+        WHERE workspace_id = p_workspace_id AND id = p_operation_id RETURNING * INTO v_operation;
+      PERFORM public.stylora_record_operation_event(p_workspace_id, p_operation_id, 'superseded');
+      RETURN v_operation;
+    END IF;
+  END IF;
   PERFORM 1 FROM public.assets WHERE workspace_id = p_workspace_id AND id = p_output_asset_id
     AND bucket = 'previews' AND status = 'ready' AND mime_type = 'image/png' FOR SHARE;
   IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'STYLORA_MEDIA_ASSET_NOT_READY'; END IF;
