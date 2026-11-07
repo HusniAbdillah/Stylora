@@ -10,7 +10,7 @@ export type OutfitItem = {
   name: string;
   imageUrl?: string | null;
   category: string;
-  status: "owned" | "alternative" | "missing" | "candidate";
+  status: "owned" | "alternative" | "missing" | "candidate" | "unavailable";
 };
 
 export type ProductOffer = {
@@ -567,22 +567,31 @@ export function OutfitDetail({
                           ? "owned"
                           : item.status === "alternative"
                             ? "alternative"
-                            : item.status === "missing"
+                            : item.status === "missing" ||
+                                item.status === "unavailable"
                               ? "missing"
                               : "neutral"
                       }
                     >
-                      {item.status === "candidate"
-                        ? "Candidate, not owned"
-                        : item.status === "owned"
-                          ? "Owned"
-                          : item.status === "alternative"
-                            ? "Alternative"
-                            : "Missing"}
+                      {item.status === "unavailable"
+                        ? "Unavailable"
+                        : item.status === "candidate"
+                          ? "Candidate, not owned"
+                          : item.status === "owned"
+                            ? "Owned"
+                            : item.status === "alternative"
+                              ? "Alternative"
+                              : "Missing"}
                     </Badge>
                   </div>
                 ))}
               </div>
+              {active.items.some((item) => item.status === "unavailable") && (
+                <p className="mt-3 text-sm text-missing" role="status">
+                  An outfit piece is unavailable. Review the choice before
+                  saving; no substitute has been selected.
+                </p>
+              )}
             </section>
           </div>
           <aside className="order-2 rounded-2xl border border-stone bg-paper p-5 lg:col-start-2 lg:row-span-2 lg:row-start-1">

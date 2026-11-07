@@ -859,32 +859,44 @@ export function OutfitPage({
         detail?.option.concept ||
         "Results and choices are kept separately for each direction.",
       items:
-        detail?.slots.flatMap((slot) => {
-          const selected = choices.find(
-            (choice) => choice.slotId === slot.slotId,
-          )?.optionItemId;
+        detail?.slots.map((slot) => {
+          const proposed =
+            drafts[option.id]?.revision === detail.option.revision
+              ? drafts[option.id].choices?.find(
+                  (choice) => choice.slotId === slot.slotId,
+                )?.optionItemId
+              : undefined;
+          const remembered =
+            proposed ??
+            detail.selection?.choices.find(
+              (choice) => choice.slotId === slot.slotId,
+            )?.optionItemId;
+          const selected =
+            remembered ??
+            choices.find((choice) => choice.slotId === slot.slotId)
+              ?.optionItemId;
           const candidate = slot.candidates.find(
             (item) => item.optionItemId === selected,
           );
-          return candidate
-            ? [
-                {
-                  id: slot.slotId,
-                  name: text(candidate.name) || "Missing item",
-                  category: slot.category,
-                  imageUrl:
-                    typeof candidate.imageUrl === "string"
-                      ? candidate.imageUrl
-                      : null,
-                  status:
-                    candidate.kind === "owned" && candidate.owned === true
-                      ? ("owned" as const)
-                      : candidate.kind === "product"
-                        ? ("candidate" as const)
-                        : ("missing" as const),
-                },
-              ]
-            : [];
+          return {
+            id: slot.slotId,
+            name:
+              text(candidate?.name) ||
+              (remembered ? "Selected piece unavailable" : "Piece unavailable"),
+            category: slot.category,
+            imageUrl:
+              typeof candidate?.imageUrl === "string"
+                ? candidate.imageUrl
+                : null,
+            status:
+              !candidate || candidate.available !== true
+                ? ("unavailable" as const)
+                : candidate.kind === "owned" && candidate.owned === true
+                  ? ("owned" as const)
+                  : candidate.kind === "product"
+                    ? ("candidate" as const)
+                    : ("missing" as const),
+          };
         }) ?? [],
       reasons: sentences(explanation.reasons).length
         ? sentences(explanation.reasons)
