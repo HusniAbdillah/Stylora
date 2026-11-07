@@ -345,3 +345,31 @@ which data, code revision or provider behavior was verified.
   verified against the SIX ISO 4217 currency list. The focused provider suite
   passed all three tests, including a runtime-independent regression. CI rerun
   remains the final build gate; merge is held at the user's request.
+
+## Owner 3 frontend checkpoint: 7 November 2026, Asia/Jakarta
+
+- Branch: `codex/owner3-frontend`, based on `e9ae295` after pulling the capsule
+  draft update. Three isolated subagents implemented products, saved looks and
+  sharing; the coordinator owns route composition and the browser API helper.
+- Connected outfit details/shopping/save, saved collection/detail and reviewed
+  public sharing to the merged server APIs. The Figma desktop and mobile frames,
+  state behavior and remaining integrations are in `docs/OWNER-3-FRONTEND.md`.
+- Added the scoped media identity needed for explicit image approval and the
+  approved public expiry display field. No migration or image model was added.
+- Focused source review fixed unavailable-choice substitution, stale async
+  results, unavailable-tab focus, empty input-evidence labels and disappearing
+  unavailable slots. An explicit no-avatar share remains accessible while image
+  generation is pending; later images require another review.
+- Source formatting and whitespace checks passed. Initial integrated typecheck
+  passed; the final PR CI is the full lint, typecheck, test and production-build
+  gate. No per-agent test/build loops or provider calls were run.
+- Browser verification is still pending: repeated local browser navigation and
+  localhost HTTP requests timed out during slow Next development startup. A
+  webpack restart was attempted; no successful UI smoke is claimed here.
+- The disposable UI fixture is labeled `Frontend smoke fixture` in dev-owner-3,
+  contains owned sample rows and no uploaded Storage objects. Runtime writes are
+  enabled only in the local dev process; the ignored env file is unchanged.
+  No text/image model or additional SerpAPI call is part of this frontend check.
+- Owner 2's earlier Create screens and Owner 4's generation, preview and capsule
+  source adapters remain separate integration work. Their unavailable states are
+  explicit; these features are not reported as implemented by this frontend.

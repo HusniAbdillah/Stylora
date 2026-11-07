@@ -559,7 +559,8 @@ export function SavedLookDetail({
         {(onShare || shareAction) &&
           (look.mediaStatus !== "succeeded" || !look.avatarUrl) && (
             <p className="mt-2 text-xs text-secondary">
-              Sharing is available when the avatar is ready.
+              You can share the item composition now. Review and approve the
+              overview image separately when it is ready.
             </p>
           )}
       </div>

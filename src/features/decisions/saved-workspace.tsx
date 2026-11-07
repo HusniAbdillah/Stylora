@@ -107,10 +107,7 @@ export function SavedCollectionWorkspace({
         }
         onRetryImage={writesEnabled ? (id) => void retryImage(id) : undefined}
         renderShare={(look) =>
-          look.share?.active ||
-          (writesEnabled &&
-            look.mediaStatus === "succeeded" &&
-            look.avatarUrl) ? (
+          look.share?.active || writesEnabled ? (
             <ShareManager
               savedLookId={look.id}
               writesEnabled={writesEnabled}
@@ -217,8 +214,7 @@ export function SavedDetailWorkspace({
     }
   }
   const share = (label: string) =>
-    label === "Manage" ||
-    (writesEnabled && look.mediaStatus === "succeeded" && look.avatarUrl) ? (
+    label === "Manage" || writesEnabled ? (
       <ShareManager
         savedLookId={initial.id}
         writesEnabled={writesEnabled}

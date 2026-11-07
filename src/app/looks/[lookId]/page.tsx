@@ -24,7 +24,9 @@ export default async function LookPage({
     .object({
       lookId: z.uuid(),
       optionId: z.uuid().optional(),
-      step: z.enum(["upload", "review", "matches", "ideas", "details"]).optional(),
+      step: z
+        .enum(["upload", "review", "matches", "ideas", "details"])
+        .optional(),
     })
     .safeParse({ lookId, optionId: query.option_id, step: query.step });
   if (!parsed.success) notFound();
@@ -51,13 +53,19 @@ export default async function LookPage({
             details to continue choosing pieces or save this look.
           </StateNotice>
           <Button asChild>
-            <Link href={`/looks/${lookId}${data.activeOptionId ? `?option_id=${data.activeOptionId}` : ""}`}>
+            <Link
+              href={`/looks/${lookId}${data.activeOptionId ? `?option_id=${data.activeOptionId}` : ""}`}
+            >
               Return to outfit details
             </Link>
           </Button>
         </div>
       ) : (
-        <OutfitPage key={data.lookId} data={data} writesEnabled={writesEnabled} />
+        <OutfitPage
+          key={data.lookId}
+          data={data}
+          writesEnabled={writesEnabled}
+        />
       )}
     </WorkspaceShell>
   );
