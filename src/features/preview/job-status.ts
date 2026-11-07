@@ -15,7 +15,11 @@ export function previewJobStatus(status: string): PreviewJob["status"] {
   return statuses.get(status) ?? "failed";
 }
 export function isCurrentPreviewContext(
-  operation: { input: unknown; prompt_version: string; model: string },
+  operation: {
+    input: unknown;
+    prompt_version: string | null;
+    model: string | null;
+  },
   current: { renderFingerprint: string; promptVersion: string; model: string },
 ) {
   const input = z

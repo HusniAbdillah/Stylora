@@ -26,6 +26,7 @@ import {
   getAvatarRenderSettings,
 } from "./image";
 import { imageRenderSettingsSchema } from "@/features/ai/image-settings";
+import { buildAvatarVisualDirection } from "./visual-direction";
 import { previewSelectionSchema, slotForPreviewItem } from "./schema";
 import type { PreviewJob } from "./preview-studio";
 import { isCurrentPreviewContext, previewJobStatus } from "./job-status";
@@ -329,6 +330,10 @@ export async function generatePreviewImage(input: unknown) {
       preferences: current.preferences,
       renderFingerprint: current.renderFingerprint,
       renderSettings: current.renderSettings,
+      visualDirection: buildAvatarVisualDirection(
+        current.preferences,
+        current.items,
+      ),
       knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
     }),
     promptVersion: FASHION_PROMPT_VERSION,

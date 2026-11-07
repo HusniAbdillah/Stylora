@@ -39,6 +39,12 @@ describe("Preview selection integrity", () => {
     expect(isCurrentPreviewContext({ ...operation, input: {} }, current)).toBe(
       false,
     );
+    expect(
+      isCurrentPreviewContext(
+        { ...operation, prompt_version: null, model: null },
+        current,
+      ),
+    ).toBe(false);
   });
   it("restarts superseded inputs while keeping cancellation stopped", () => {
     expect(previewJobStatus("superseded")).toBe("idle");
