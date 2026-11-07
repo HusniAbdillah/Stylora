@@ -28,7 +28,21 @@
   `pnpm exec vitest run src/components/shell/navigation.test.tsx
   src/features/wardrobe/client.test.ts` passed 3 tests across 2 files. Editor
   diagnostics reported no errors in navigation, wardrobe collection and capsule
-  draft components. Final lint, typecheck and runtime evidence follow.
+  draft components. `make pr-ready` passed ESLint, Next route type generation
+  and TypeScript, then reported Lane B (270 changed lines at that checkpoint).
+- Live local checks: `/api/wardrobe` returned HTTP 200 with 45 items; one sample
+  image returned HTTP 200, image/webp, 83,718 bytes. Wardrobe, Capsules, Preview
+  and Saved looks returned HTTP 200. Initial HTML includes streamed fallback
+  markup, so raw HTML element counts are not treated as visible duplicate shells.
+- Following the user's copy correction, collection titles are `Wardrobe` and
+  `Capsules`, with short functional descriptions. Root breadcrumb labels are
+  omitted; nested breadcrumbs remain. Removed the second Capsule empty notice.
+- Headless Chromium rendered the updated Wardrobe with one visible h1 and no
+  root breadcrumb. A Wardrobe-to-Capsules transition kept the exact sidebar DOM
+  node mounted. Capsule layout at 390 px had no horizontal overflow. The observed
+  transition took 7,728 ms in this dev run; this is not evidence of a production
+  speed improvement or a before/after benchmark. API mutations were blocked in
+  browser checks, and no provider-backed path was exercised.
 - Runtime uses an isolated dev server at `http://127.0.0.1:3027`; root env values
   are passed through process environment without copying credential files into
   the worktree. No production deployment or provider-backed feature execution.

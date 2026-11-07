@@ -129,12 +129,9 @@ export function CapsuleCollection({
     <section>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="mt-2 font-serif text-4xl md:text-5xl">
-            Small sets, <em className="text-crimson">many outfits.</em>
-          </h1>
+          <h1 className="font-serif text-4xl md:text-5xl">Capsules</h1>
           <p className="mt-2 max-w-xl text-sm text-secondary">
-            A capsule is a few pieces you own that make several complete outfits
-            for one purpose.
+            Plan outfits from owned pieces for work, travel or everyday wear.
           </p>
         </div>
         <Button variant="primary" onClick={onNew}>
@@ -205,10 +202,9 @@ export function CapsuleCollection({
       ) : (
         <div className="mt-6 rounded-2xl border border-stone bg-paper p-8 text-center">
           <Icon name="layers" className="mx-auto size-8 text-crimson" />
-          <h2 className="mt-3 font-serif text-2xl">Build your first capsule</h2>
+          <h2 className="mt-3 font-serif text-2xl">No capsules yet</h2>
           <p className="mt-2 text-sm text-secondary">
-            Start with a visual template, then choose owned pieces for several
-            outfits.
+            Choose a template and select the pieces to include.
           </p>
         </div>
       )}

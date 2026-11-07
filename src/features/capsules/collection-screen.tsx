@@ -40,13 +40,6 @@ export function CapsuleCollectionScreen({
         onOpen={(id) => router.push(`/capsules/${id}`)}
         onDelete={(id) => void remove(id)}
       />
-      {!capsules.length && (
-        <div className="mt-6">
-          <StateNotice title="Start with a purpose">
-            Choose a template and owned pieces to build your first capsule.
-          </StateNotice>
-        </div>
-      )}
       {draft && (
         <div className="my-6">
           <StateNotice

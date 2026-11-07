@@ -237,7 +237,7 @@ export function WardrobeCollectionScreen({
           <div className={styles.archiveHeading}>
             <div>
               <h1 className={styles.title} id="archived-title">
-                Archived <em>pieces.</em>
+                Archived pieces
               </h1>
               <p className={styles.intro}>
                 These pieces stay here for reference and can be restored from
