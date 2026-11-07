@@ -198,11 +198,11 @@ below the latest one.
 
 ### Wardrobe main integration · 7 November 2026 (Asia/Bangkok)
 
-- The user explicitly authorized a new branch, all latest updates and publication of the completed Wardrobe work to main. This supplies the human authorization for the Lane B delivery described above.
-- Created isolated branch `o1/wardrobe-release` from fetched `origin/main` at `24f943e`, including PRs #35–#38. Carried forward exactly the four completed Wardrobe commits from `o1/wardrobe-backend`; all applied cleanly. Existing owner updates were preserved. No feature behavior was changed for this integration.
-- New verification on this integration branch: `pnpm install --offline --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`, and `pnpm test src/features/wardrobe/schema.test.ts src/features/wardrobe/client.test.ts` passed; the focused suite contains four cases. Diff review found zero conflict markers, credential literals or suppressed checks. The Windows equivalent of `make pr-ready` uses these fast commands and `node scripts/pr-check.mjs`.
-- Full `pnpm check` and `pnpm build` are delegated to the integration PR's CI and remain required before merge. The PR records their final result and the resulting main commit. Earlier hosted and provider evidence remains a dated implementation checkpoint; it was not rerun for Git delivery. This task performs no new database migration, seed, Storage write or provider call.
-- The release PR supersedes PR #34 after successful publication. Original worktrees, local configuration and the running Wardrobe test server are preserved.
+- The user explicitly authorized a new branch, all latest updates and publication of the completed Wardrobe work to main. Created isolated branch `o1/wardrobe-release` from fetched `origin/main` at `24f943e` and carried forward exactly the four completed Wardrobe commits. Existing owner updates were preserved.
+- New integration checks passed: `pnpm install --offline --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`, and `pnpm test src/features/wardrobe/schema.test.ts src/features/wardrobe/client.test.ts` (4 cases). Diff review found zero conflict markers, credential literals or suppressed checks. Windows used the equivalent fast commands and `node scripts/pr-check.mjs`.
+- During delivery, PR [#34](https://github.com/HusniAbdillah/Stylora/pull/34) merged concurrently into main as `3e8768c33b5d2866bf1b72e59890245bcc42a504`. A new `git diff` confirmed that its Wardrobe feature, route and script contents exactly match the completed work. This integration does not publish another implementation copy.
+- Merged subsequent main updates through `f634525` into the new branch. Only this progress report needed manual conflict resolution; all upstream report sections and generated types were preserved. Release PR [#42](https://github.com/HusniAbdillah/Stylora/pull/42) now contains this delivery record only; its CI and merge result are tracked there.
+- Earlier hosted and provider evidence remains a dated implementation checkpoint and was not rerun for Git delivery. This task performs no new database migration, seed, Storage write or provider call. Existing worktrees, local configuration and the running local Wardrobe server remain available.
 
 ### Component library checkpoint · 2026-11-07, Asia/Bangkok
 
@@ -411,6 +411,20 @@ below the latest one.
   general Wardrobe intake and Profile frontend persistence were not exercised
   by this Owner 4 smoke.
 
+
+### Owner 4 saved-avatar regeneration intent, 7 November 2026
+
+- Branch `o4/saved-avatar-intent` validates the leased operation's optional
+  regeneration intent and UUID request ID. Legacy empty input and saved-look
+  metadata continue to reuse existing images. Explicit regeneration disables
+  reuse while preserving model metadata updates and fenced completion.
+- `pnpm exec vitest run src/features/operations/schema.test.ts` passed all eight
+  tests in the managed Windows worktree. `make fast` passed lint and typecheck.
+  Tests cover legacy input, explicit regeneration, unknown intent and missing or
+  invalid request identity. The owned model fixture uses `gpt-image-1.5`.
+- This patch ran no hosted operations or provider calls. The report-only merge
+  resolution preserves the coordinator's complete integration report; local
+  checks were not repeated because worker code is unchanged. CI remains the gate.
 
 ### Owner 4 image Storage retry classification, 7 November 2026
 
@@ -748,3 +762,22 @@ which data, code revision or provider behavior was verified.
 - `pnpm exec vitest run src/lib/supabase/storage.test.ts` passed all 51 tests
   using synthetic SDK errors and in-memory image bytes. No hosted fixtures,
   database changes or provider requests were made. CI is the full build gate.
+
+## Owner 1 saved-media regeneration, 7 November 2026
+
+- Branch `o1/saved-media-regeneration`, O4.7 database contract. Added
+  `regenerate_saved_look_media(uuid,uuid,uuid,uuid)`, returning the complete
+  saved media row. A request UUID replays its original command before checking
+  the latest-media revision. Different commands cannot allocate concurrent work.
+- The transaction uses the existing retry and delete advisory lock, creates a
+  distinct saved-avatar operation and media version, and preserves the immutable
+  snapshot, prior image and approved share media. Operation input is exactly
+  `intent: regenerate` and `requestId`; rendering inputs remain unchanged.
+- `psql -v ON_ERROR_STOP=1 -f /tmp/stylora_regeneration_test.sql` passed as
+  `service_role` in isolated local database `stylora_operation_contract_v4`.
+  Synthetic fixtures rolled back. Cases cover foreign workspaces, queued and
+  completed replay, busy rejection, stale media, immutable data and denied
+  anon/authenticated execution. No provider calls or hosted fixtures were used.
+- Types were generated from the combined local schema with pinned Supabase CLI
+  3 and formatted with Prettier. Local `make fast` passed lint and typecheck; CI and hosted
+  schema application remain pending. Caller execution belongs to Owner 4.
