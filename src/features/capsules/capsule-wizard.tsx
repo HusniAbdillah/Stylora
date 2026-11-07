@@ -121,7 +121,7 @@ function StepHeading({
 }) {
   const titles = [
     <>
-      Start from a <em className="text-crimson">template.</em>
+      Start from a <em className="block text-crimson sm:inline">template.</em>
     </>,
     <>
       Where is this <em className="text-crimson">capsule going?</em>
@@ -180,7 +180,15 @@ export function CapsuleWizard({
   const [draft, setDraft] = useState<CapsuleDraft>(initialDraft);
   const [step, setStep] = useState<number>(initialStep);
   const [visited, setVisited] = useState<number>(initialVisited);
-  const [touched, setTouched] = useState(false);
+  const [touched, setTouched] = useState(() =>
+    Object.keys(EMPTY_CAPSULE_DRAFT).some((key) => {
+      const field = key as keyof CapsuleDraft;
+      return (
+        JSON.stringify(initialDraft[field]) !==
+        JSON.stringify(EMPTY_CAPSULE_DRAFT[field])
+      );
+    }),
+  );
   const [pendingTemplate, setPendingTemplate] = useState<
     CapsuleTemplateId | null | undefined
   >(undefined);
@@ -753,6 +761,7 @@ export function CapsuleWizard({
         </Button>
         <Button
           variant="primary"
+          className="lg:hidden"
           disabled={!canContinue || busy}
           onClick={nextStep}
         >

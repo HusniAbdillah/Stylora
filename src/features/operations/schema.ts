@@ -87,6 +87,7 @@ export function operationStatus(operation: Operation) {
     inputRevision: operation.input_revision,
     status: operation.status,
     attemptCount: operation.attempt_count,
+    leaseUntil: operation.lease_until,
     cancelRequested: operation.cancel_requested_at !== null,
     resultRef: operation.result_ref
       ? publicResultSchema.parse(operation.result_ref)

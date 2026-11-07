@@ -20,7 +20,10 @@ describe("runtime fashion source integrity", () => {
   });
 
   it("sends full runtime instructions and the correct task knowledge with source versions", () => {
-    const core = readFileSync(join("docs", "FASHION-PROMPT.md"), "utf8");
+    const core = readFileSync(
+      join("docs", "FASHION-PROMPT.md"),
+      "utf8",
+    ).replace(/\r\n/g, "\n");
     const description = buildFashionPrompt("inspiration_description");
     const matching = buildFashionPrompt("wardrobe_match");
     expect(description.instructions).toContain(core);
@@ -39,5 +42,22 @@ describe("runtime fashion source integrity", () => {
       createHash("sha256").update(core).digest("hex"),
     );
     expect(description.versions.schemaVersion).toBe("fashion-item.v1");
+  });
+
+  it("assembles Capsule and image directions with their own knowledge", () => {
+    const capsule = buildFashionPrompt("capsule_generation");
+    const image = buildFashionPrompt("preview_image");
+    expect(capsule.instructions).toContain("## 10. Capsule wardrobe expertise");
+    expect(capsule.instructions).toContain("## 8. Common explanation envelope");
+    expect(image.instructions).toContain(
+      "## 12. Avatar and visual preview direction",
+    );
+    expect(image.instructions).toContain(
+      "Create the requested illustrative image",
+    );
+    expect(image.instructions).not.toContain(
+      "Return only the supplied strict JSON schema",
+    );
+    expect(image.instructions.length).toBeLessThan(26000);
   });
 });

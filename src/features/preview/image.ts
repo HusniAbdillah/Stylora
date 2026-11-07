@@ -1,6 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { attributesSchema, categorySchema } from "@/lib/ai/fashion-schema";
+import { resolveEffectiveAttributes } from "@/features/matching/gates";
 import {
   generateFashionImage,
   IMAGE_MODEL,
@@ -20,36 +22,42 @@ import {
 export const avatarItemSchema = z.object({
   id: z.uuid().nullable(),
   name: z.string().min(1).max(160),
-  category: z.enum([
-    "top",
-    "bottom",
-    "dress",
-    "outerwear",
-    "shoes",
-    "accessory",
-  ]),
+  category: categorySchema,
   subcategory: z.string().nullable(),
   description: z.string().max(600),
-  attributes: z
-    .record(
-      z.string().min(1).max(80),
-      z.union([
-        z.string().max(600),
-        z.number().finite(),
-        z.boolean(),
-        z.null(),
-        z.array(z.string().max(120)).max(8),
-      ]),
-    )
-    .refine(
-      (attributes) =>
-        Buffer.byteLength(JSON.stringify(attributes), "utf8") <= 8192,
-    ),
+  attributes: attributesSchema,
   revision: z.number().int().positive(),
   asset_id: z.uuid().nullable(),
 });
 
 export type AvatarItem = z.infer<typeof avatarItemSchema>;
+export function normalizeAvatarItems(input: unknown[]) {
+  const captured = z
+    .array(
+      z
+        .object({
+          attributes: z.record(z.string(), z.unknown()),
+          inferred_attributes: z.record(z.string(), z.unknown()).optional(),
+          corrections: z.record(z.string(), z.unknown()).optional(),
+          provenance: z.record(z.string(), z.unknown()).optional(),
+        })
+        .passthrough(),
+    )
+    .min(1)
+    .max(20)
+    .parse(input);
+  return captured.map((item) =>
+    avatarItemSchema.parse({
+      ...item,
+      attributes: resolveEffectiveAttributes({
+        attributes: item.attributes,
+        inferredAttributes: item.inferred_attributes,
+        corrections: item.corrections,
+        provenance: item.provenance,
+      }),
+    }),
+  );
+}
 const pose =
   "Relaxed standing with a slight three-quarter turn, clothing and limbs clearly visible.";
 
@@ -95,7 +103,9 @@ export async function renderAndStoreAvatar(input: {
   reuse?: boolean;
   signal?: AbortSignal;
 }) {
-  const items = z.array(avatarItemSchema).min(1).max(16).parse(input.items);
+  const items = normalizeAvatarItems(input.items);
+  if (items.filter((item) => item.asset_id).length > 16)
+    throw new Error("AVATAR_IMAGE_REFERENCE_LIMIT");
   const knownIds = items.map((item) => item.id).filter((id) => id !== null);
   if (new Set(knownIds).size !== knownIds.length)
     throw new Error("AVATAR_DUPLICATE_ITEM");
