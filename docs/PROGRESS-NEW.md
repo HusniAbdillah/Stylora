@@ -1,5 +1,47 @@
 # Stylora shared progress reporting
 
+## Owner 2 backend checkpoint: 7 November 2026
+
+Owner 2 now owns the Profile and Preferences backend by explicit task assignment. The user also authorized the additive Owner 2 database contracts and hosted validation for the Create pipeline. Frontend and marketplace implementation are excluded from this task.
+
+- Branch: `o2/profile-preferences-backend`, based on upstream `4fd5aba`; latest shared UI catalog retained.
+- Implemented: scoped Profile and Preferences GET/PATCH APIs, canonical preference snapshots and fingerprints, revision-aware inspiration/preferences/profile drafts.
+- Contract: existing `PreferencesDraft` DTO; `expectedRevision` on saves; name changes preserve the styling fingerprint. Supabase access remains server-only with no client workspace input.
+- Local configuration: `OPENAI_MODEL=gpt-6-luna`; the existing model key is retained. Online tests override the original demo workspace with `dev-owner-2` and enable writes only in the test process.
+- Checks: `make fast` passed; `pnpm exec vitest run src/features/preferences/schema.test.ts src/features/operations/drafts-schema.test.ts` passed, 8 tests.
+- Hosted HTTP evidence: `node scripts/test-owner2-profile.mjs` passed save/reload of all preference groups, stale-write rejection, profile isolation, matching swatch validation, client workspace rejection, and draft create/restore/update/conflict/discard.
+- Fixture and cleanup: synthetic profile and selections in `dev-owner-2`; original values restored, test drafts deleted. Revisions advance normally during restoration.
+- Not run at this checkpoint: provider inference, Create pipeline E2E, production build, preview UI review. No frontend code changed. No inference success is claimed.
+- Delivery: Lane B; pull request requires human merge review. Create pipeline and explicit sample inventory adapter follow in a dependent branch. Marketplace integration remains pending.
+
+## Owner 1 operation contract, 7 November 2026
+
+- Branch `o1/operation-fencing` adds migration
+  `20261107035901_operation_fencing.sql` and SQL regression tests.
+- Completion checks attempt, fingerprint, active lease and current subject
+  revision. Terminal events commit with state. Discarded drafts and deleted
+  capsules can reach a terminal state. Preview and saved avatars share one
+  workspace image claim. Retry permits the agreed transient provider codes,
+  preserves safe retry metadata and honors the retry delay.
+- Image completion requires a scoped ready PNG asset in the previews bucket.
+  Saved-avatar media attachment and operation completion share one transaction.
+  Byte verification remains the server upload handler's responsibility.
+- Validation used separate local databases in the existing Docker PostgreSQL
+  container. The database's Storage bucket table was a schema fixture, so this
+  validates SQL integrity and grants rather than live Storage behavior.
+- Applied the baseline and additive migration with `psql -v ON_ERROR_STOP=1`.
+  `supabase/tests/foundation.sql` and `supabase/tests/operation_fencing.sql`
+  passed. Synthetic rows were rolled back. Cases include workspace rejection,
+  stale attempts and fingerprints, expired leases, cross-kind image quota,
+  retry delay, terminal errors, discarded and deleted subjects, and atomic
+  avatar attachment.
+- Supabase CLI 3 generates the database types from that isolated local schema.
+  Its output includes computed-field metadata and differs from the earlier
+  hosted generator format. No generated declarations were edited by hand.
+- Hosted migration application, hosted policy tests and real provider image
+  generation remain pending. The Capsule and studio-save transactions are a
+  separate additive contract.
+
 This is the reporting template for four owners and their coding agents. It is
 filled during the build, not a report in itself. Product requirements are in
 [PRD.md](PRD.md),
@@ -149,7 +191,7 @@ below the latest one.
 - Consumer integration: Owner 1 inventory and preferences; Owner 3 selected
   detail; Owner 4 worker; not assessed.
 - Verification evidence: Not run.
-- Real Muse evidence and input provenance: Not verified.
+- Real OpenAI evidence and input provenance: Not verified.
 - Unresolved work and next concrete action: Not reported.
 
 ## 6. Owner 3 report
@@ -294,3 +336,58 @@ which data, code revision or provider behavior was verified.
 - Delivery: Lane B (schema, generated types, storage and shared server code).
   The user explicitly authorized PR creation and merge after green checks,
   including resolving conflicts. No branch-protection bypass or deployment.
+
+## Owner 3 backend checkpoint: 7 November 2026, Asia/Jakarta
+
+- Branch: `codex/owner3-backend`, based on merged foundation `f78c002`.
+- Delivered: product search/cache/score/import and attach; per-option selection;
+  immutable save, saved filters/counts/detail/delete/media retry; reviewed public
+  shares, revocation and token-checked avatar/item bytes. Thin HTTP routes use
+  server workspace scope, Zod, the write gate and safe no-store responses.
+- Media generation belongs to Owner 4. Saved responses carry truthful queued,
+  running, failed and succeeded states and nullable image URLs for the Figma
+  placeholder. No generated image or autonomous worker is claimed.
+- Two additive MCP migrations applied to the authorized hosted project:
+  `20261107034005_owner3_backend_commands` and
+  `20261107034035_share_revocation_guard`. The original baseline is unchanged.
+  Types were regenerated from the applied schema.
+- Passed: shared HTTP 3 tests, sharing 2, decisions 3, product score 3 and
+  provider/import-boundary 15. Initial products tests required a Vitest alias
+  configuration; the affected 15 tests passed after that fix. Lint and integrated
+  typecheck passed. Local build not repeated; CI supplies the full build gate.
+- Hosted command smoke passed retry identity, list filters, irreversible revoke
+  after an image becomes unavailable, and atomic deletion. Fixtures rolled back.
+- Live HTTP smoke passed real scoped detail, one SerpAPI search, cached restore,
+  attach, selection, idempotent save with queued image operation, saved filters,
+  public projection, revoke returning 404, and saved deletion. Provider calls: 1.
+- Cleanup confirmed: synthetic look/saved records and Storage objects remaining: 0. Only the generated fixture and its unreferenced search products were removed.
+  Runtime configuration file remains ignored; credential scan found no values.
+- Not run: live candidate-image import, image generation, UI/browser comparison,
+  deployment and local Supabase. Pure image import boundary tests passed.
+- Handoff: `docs/OWNER-3-BACKEND.md` maps API data to D06, D14, D27, D15 and D16
+  and identifies the Owner 1/2/4 integration points. No shared executor is implied.
+- User authorized PR creation, conflict resolution and merge after green CI.
+- Integration update: merged `origin/main` at `4fd5aba` (shared UI and Storybook)
+  without conflicts. Frozen dependency install, lint and typecheck passed again.
+  These UI components remain presentation contracts; application wiring is not
+  claimed by the backend smoke.
+- Latest user instruction supersedes the earlier merge authorization: open the
+  PR and check CI, but leave the PR unmerged until explicitly requested.
+- A second main update, `532a463` (profile, preferences and workflow drafts),
+  also merged without conflicts. Its API routes use separate feature modules;
+  the combined revision is submitted to the PR CI gate.
+- PR #7 CI first passed lint/typecheck, then reported 67 passing tests and one
+  failing IDR normalization test on Linux. ICU currency display defaults differ
+  from Windows. Persisted IDR conversion now explicitly uses two minor digits,
+  verified against the SIX ISO 4217 currency list. The focused provider suite
+  passed all three tests, including a runtime-independent regression. CI rerun
+  remains the final build gate; merge is held at the user's request.
+
+## Owner 4 operation runner increment, 7 November 2026
+
+- Task O4.1. The server runner starts and claims scoped operations, awaits execution, and delegates result commit to an atomic feature callback. Attempt count and input fingerprints fence failure updates. The caller must use a 300-second request duration.
+- Source branch `o4/operation-runner`, core commit `06672fc`. Shared database contracts remain with Owner 1. No migrations or generated types were edited.
+- Checks in the managed Windows worktree. `pnpm install --frozen-lockfile` passed. `make fast` passed lint and typecheck. Focused Vitest passed two files and four tests for stable fingerprints, strict inputs, status projection and in-flight request deduplication.
+- Not run. Hosted database, Storage, provider calls, feature end-to-end journeys and local build. CI is the full build and test gate.
+- Integration pending. Owner 1 atomic completion, workspace image claim quota and retry/cancel contracts. Current failure updates use a scoped attempt and lease compare-and-set. This is request execution with lease recovery on revisit.
+- Client request store and operation HTTP controls are a following increment. No cloud data was changed.

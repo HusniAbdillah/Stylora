@@ -29,7 +29,7 @@ descriptions and recommendation explanations are distinct typed objects.
 | App        | Next.js App Router, React, strict TypeScript, deployed on Vercel                                                           |
 | Validation | Zod for every request, action, query parameter and provider output                                                         |
 | Data       | Hosted Supabase PostgreSQL and private Storage through the Supabase JS client, server only                                 |
-| AI         | Meta Model API: `muse-spark-1.3` for text and vision, `muse-image-1.0` for images; OpenAI-compatible SDK as transport      |
+| AI         | OpenAI API: `gpt-5-mini` for text and vision, `gpt-image-1.5` for images; server-only HTTP transport                       |
 | Shopping   | SerpAPI Google Shopping                                                                                                    |
 | UI         | Tailwind CSS with tokens from the Figma `Stylora / Light` collection, Radix primitives, Motion, Inter and Instrument Serif |
 | Checks     | ESLint, TypeScript, Vitest, Prettier; GitHub Actions on every pull request                                                 |
