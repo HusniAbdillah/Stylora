@@ -1387,6 +1387,8 @@ which data, code revision or provider behavior was verified.
   verified collection and detail metadata agree with the existing product's
   stored price, rating, source and URL. The temporary harness was removed.
   No model calls, database writes, migrations or env changes were used.
-- Local typecheck/lint and Storybook startup are pending. The initial browser
-  attempt received connection refused; no visual success is claimed yet. CI is
-  the complete build gate.
+- Local typecheck and lint passed before integrating latest main. Storybook
+  browser smoke then verified catalog facts, destination labels and retained
+  metadata after Mark as owned on desktop and 390 px mobile, without horizontal
+  overflow. The initial connection refusal cleared after startup. CI is the
+  complete build gate; paid image execution was not repeated.
