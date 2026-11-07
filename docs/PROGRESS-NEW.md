@@ -418,6 +418,19 @@ below the latest one.
 
 ## 7. Owner 4 report
 
+### Preview render settings, 7 November 2026
+
+- User-requested personalization improvements. Added validated server-side
+  `OPENAI_IMAGE_QUALITY` with the existing medium default and explicit low/high
+  alternatives. Both image edit and description-only generation use the same
+  settings contract. Render fingerprints now include quality, input fidelity,
+  dimensions, format and settings version.
+- Ten focused settings and operation tests passed. Invalid quality is rejected
+  before provider execution. One `make pr-ready` is running locally; CI remains
+  the full check/build gate. No provider calls or hosted mutations were made
+  for this settings increment. Visual comparison follows the integrated prompt
+  and preferences changes under a separate three-image ceiling.
+
 - Owner 4 coordinator, 7 November 2026. Tasks O4.1 through O4.7 and
   R37 through R44. Integration source `4b94bc5` includes the Capsule wizard,
   scoped reasoning and persistence, responsive Preview, automatic stable-input
