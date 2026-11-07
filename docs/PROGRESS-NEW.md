@@ -1,5 +1,19 @@
 # Stylora shared progress reporting
 
+## Owner 2 backend checkpoint: 7 November 2026
+
+Owner 2 now owns the Profile and Preferences backend by explicit task assignment. The user also authorized the additive Owner 2 database contracts and hosted validation for the Create pipeline. Frontend and marketplace implementation are excluded from this task.
+
+- Branch: `o2/profile-preferences-backend`, based on upstream `4fd5aba`; latest shared UI catalog retained.
+- Implemented: scoped Profile and Preferences GET/PATCH APIs, canonical preference snapshots and fingerprints, revision-aware inspiration/preferences/profile drafts.
+- Contract: existing `PreferencesDraft` DTO; `expectedRevision` on saves; name changes preserve the styling fingerprint. Supabase access remains server-only with no client workspace input.
+- Local configuration: `OPENAI_MODEL=gpt-6-luna`; the existing model key is retained. Online tests override the original demo workspace with `dev-owner-2` and enable writes only in the test process.
+- Checks: `make fast` passed; `pnpm exec vitest run src/features/preferences/schema.test.ts src/features/operations/drafts-schema.test.ts` passed, 8 tests.
+- Hosted HTTP evidence: `node scripts/test-owner2-profile.mjs` passed save/reload of all preference groups, stale-write rejection, profile isolation, matching swatch validation, client workspace rejection, and draft create/restore/update/conflict/discard.
+- Fixture and cleanup: synthetic profile and selections in `dev-owner-2`; original values restored, test drafts deleted. Revisions advance normally during restoration.
+- Not run at this checkpoint: provider inference, Create pipeline E2E, production build, preview UI review. No frontend code changed. No inference success is claimed.
+- Delivery: Lane B; pull request requires human merge review. Create pipeline and explicit sample inventory adapter follow in a dependent branch. Marketplace integration remains pending.
+
 This is the reporting template for four owners and their coding agents. It is
 filled during the build, not a report in itself. Product requirements are in
 [PRD.md](PRD.md),
@@ -140,7 +154,7 @@ below the latest one.
 - Consumer integration: Owner 1 inventory and preferences; Owner 3 selected
   detail; Owner 4 worker; not assessed.
 - Verification evidence: Not run.
-- Real Muse evidence and input provenance: Not verified.
+- Real OpenAI evidence and input provenance: Not verified.
 - Unresolved work and next concrete action: Not reported.
 
 ## 6. Owner 3 report
