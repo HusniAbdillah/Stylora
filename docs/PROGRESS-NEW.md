@@ -1,5 +1,40 @@
 # Stylora shared progress reporting
 
+## Owner 1 demo data enrichment: 7 November 2026
+
+- The user explicitly authorized richer seed data directly in hosted Supabase.
+  Target: Stylora project `imcqifydmrxotrbwfwme`, `demo` workspace only.
+  The initial audit found 47 wardrobe rows, 2 saved looks and 1 capsule.
+- Added 8 labeled sample saved looks, 8 completed Preview source snapshots,
+  and 5 Capsule planning briefs with 37 owned membership links. The outfits
+  use 32 item placements from 20 existing owned sample garments and their real
+  private Storage assets. Existing wardrobe data was already broad, so no
+  duplicate garments or fabricated catalog offers were added.
+- Contexts include relaxed work, city walks, gallery visits, coastal lunch,
+  dinner, activewear, weekend stripes and cool-day layering. Each saved look
+  records concrete styling reasons, differences and uncertainty. Capsules cover
+  all five templates and contain 6 to 9 existing pieces each. They remain
+  planning briefs; no generated outfit or image success is fabricated.
+- The seed uses stable IDs and snapshot import keys, checks workspace identity,
+  owned membership, canonical categories and ready scoped assets, and calls
+  `save_capsule_draft` for new Capsule rows. It does not replace active drafts.
+  A transaction compares full-row hashes of existing wardrobe, assets,
+  preferences, operations, saved looks, capsules and drafts before committing.
+- Hosted validation: full seed with ROLLBACK passed, COMMIT passed, then replay
+  with ROLLBACK passed. Production Capsule Zod schemas accepted all five briefs;
+  all eight combinations have distinct IDs, complete clothing coverage and
+  shoes. Read-only verification found 10 saved looks, 6 capsules, 47 wardrobe
+  rows, zero missing/foreign asset references and zero new operations.
+- Read-only HTTPS checks returned 200 for `https://stylora.ai.id/saved-looks`
+  and `/capsules`; the rendered HTML contained the new sample titles. Browser
+  interaction and visual layout were not tested. No provider calls, new public
+  shares, Storage uploads, schema changes, deployments or production setting
+  changes occurred. No cleanup is required: these requested samples remain.
+- Reproduction files: `data/demo/enrichment.json` and
+  `supabase/seeds/demo-enrichment.sql`. They contain sample content and IDs,
+  never credentials. Local `make fast` is pending for artifact delivery; full
+  tests and build were not run for this data-only operation.
+
 ## Owner 2 occasion and recovery follow-up: 7 November 2026
 
 - Delivery synchronization: pushed the feature first, pulled main `830dd70`, and merged it. The only conflict was concurrent progress reporting; both owners' reports were retained. Subsequently merged main `bae2d32` (Preview slot declarations) without conflicts. PR: https://github.com/HusniAbdillah/Stylora/pull/62. Human review required; no main merge or deployment performed.
