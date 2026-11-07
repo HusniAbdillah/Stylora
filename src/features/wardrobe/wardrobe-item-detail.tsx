@@ -125,7 +125,7 @@ export function WardrobeItemDetail({
           <h1 id="wardrobe-item-title" aria-label={item.name}>
             {onNameChange ? (
               <label className={styles.nameField} data-field-surface="">
-                <span className={styles.srOnly}>Item name</span>
+                <span className={styles.nameLabel}>Item name</span>
                 <input
                   aria-label="Item name"
                   value={item.name}
@@ -142,6 +142,7 @@ export function WardrobeItemDetail({
             <div className={styles.identityFields}>
               <SelectField
                 label="Category"
+                variant="outlined"
                 value={item.category}
                 disabled={busy}
                 onChange={(event) =>
