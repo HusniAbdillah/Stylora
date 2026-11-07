@@ -1,8 +1,8 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Badge, Button, Icon } from "@/components/ui";
+import { WardrobePreviewImage } from "./wardrobe-intake-storage";
 import {
   type WardrobeField,
   type WardrobeItemSummary,
@@ -28,6 +28,7 @@ export type WardrobeItemDetailProps = {
   onEdit?: () => void;
   onBack: () => void;
   onOpenSavedLook?: (lookId: string) => void;
+  editPanel?: ReactNode;
   busy?: boolean;
 };
 
@@ -58,6 +59,7 @@ export function WardrobeItemDetail({
   onEdit,
   onBack,
   onOpenSavedLook,
+  editPanel,
   busy = false,
 }: WardrobeItemDetailProps) {
   return (
@@ -68,17 +70,20 @@ export function WardrobeItemDetail({
       <div className={styles.columns}>
         <div className={styles.mediaColumn}>
           <div className={styles.heroImage}>
-            {item.imageUrl ? (
-              <img src={item.imageUrl} alt={item.name} />
-            ) : (
-              <span className={styles.imageFallback}>
-                <Icon name="image" size={32} /> Image unavailable
-              </span>
-            )}
+            <WardrobePreviewImage
+              imageKey={item.imageKey}
+              fallbackUrl={item.imageUrl}
+              alt={item.name}
+              retryable
+            />
           </div>
           <div className={styles.mediaActions}>
             {onReplacePhoto && (
-              <Button variant="secondary" onClick={onReplacePhoto}>
+              <Button
+                variant="secondary"
+                onClick={onReplacePhoto}
+                disabled={busy}
+              >
                 Replace photo
               </Button>
             )}
@@ -111,6 +116,7 @@ export function WardrobeItemDetail({
             </div>
           )}
           {item.archived && <Badge tone="neutral">Archived item</Badge>}
+          {item.isSample && <Badge tone="neutral">Sample item</Badge>}
           <h1 id="wardrobe-item-title">{item.name}</h1>
           <p className={styles.subtitle}>
             {wardrobeCategoryLabel(item.category)}
@@ -145,6 +151,7 @@ export function WardrobeItemDetail({
               </div>
             )}
           </dl>
+          {editPanel}
           {item.usedIn && item.usedIn.length > 0 && (
             <div className={styles.usedIn}>
               <h2>Used in</h2>
@@ -158,7 +165,11 @@ export function WardrobeItemDetail({
                 >
                   <span className={styles.lookImages}>
                     {look.imageUrls.slice(0, 3).map((url, index) => (
-                      <img key={`${url}-${index}`} src={url} alt="" />
+                      <WardrobePreviewImage
+                        key={`${url}-${index}`}
+                        fallbackUrl={url}
+                        alt=""
+                      />
                     ))}
                   </span>
                   <span>{look.title}</span>
@@ -169,17 +180,17 @@ export function WardrobeItemDetail({
           <div className={styles.detailActions}>
             {item.archived
               ? onRestore && (
-                  <Button variant="quiet" onClick={onRestore}>
+                  <Button variant="quiet" onClick={onRestore} disabled={busy}>
                     Restore item
                   </Button>
                 )
               : onArchive && (
-                  <Button variant="quiet" onClick={onArchive}>
+                  <Button variant="quiet" onClick={onArchive} disabled={busy}>
                     <Icon name="trash" size={16} /> Archive item
                   </Button>
                 )}
             {onEdit && (
-              <Button variant="secondary" onClick={onEdit}>
+              <Button variant="secondary" onClick={onEdit} disabled={busy}>
                 Edit details
               </Button>
             )}
@@ -197,8 +208,10 @@ export type WardrobeArchiveDialogProps = {
   open: boolean;
   itemName: string;
   itemImageUrl?: string | null;
+  itemImageKey?: string;
   savedLookCount?: number;
   busy?: boolean;
+  errorMessage?: string;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -207,8 +220,10 @@ export function WardrobeArchiveDialog({
   open,
   itemName,
   itemImageUrl,
+  itemImageKey,
   savedLookCount = 0,
   busy = false,
+  errorMessage,
   onCancel,
   onConfirm,
 }: WardrobeArchiveDialogProps) {
@@ -243,12 +258,17 @@ export function WardrobeArchiveDialog({
       }}
     >
       <div className={styles.archiveTitle}>
-        {itemImageUrl && <img src={itemImageUrl} alt="" />}
+        {(itemImageUrl || itemImageKey) && (
+          <WardrobePreviewImage
+            imageKey={itemImageKey}
+            fallbackUrl={itemImageUrl}
+            alt=""
+          />
+        )}
         <h2 id="wardrobe-archive-title">Archive {itemName}?</h2>
       </div>
       <p id="wardrobe-archive-description">
-        It leaves your active wardrobe and will not appear in new matches,
-        capsules or previews.
+        This item leaves your active wardrobe. You can restore it later.
       </p>
       <ul className={styles.archiveConsequences}>
         <li>
@@ -259,11 +279,12 @@ export function WardrobeArchiveDialog({
         <li>
           <Icon name="check" size={14} /> You can restore it from Archived items
         </li>
-        <li>
-          <Icon name="info" size={14} /> Current outfit ideas that use it will
-          refresh
-        </li>
       </ul>
+      {errorMessage && (
+        <p role="alert" className={styles.archiveError}>
+          {errorMessage}
+        </p>
+      )}
       <div className={styles.archiveActions}>
         <Button variant="secondary" data-safe-action onClick={onCancel}>
           Keep item

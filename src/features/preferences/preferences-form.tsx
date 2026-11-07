@@ -1,8 +1,8 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Badge, Button, Chip, Icon } from "@/components/ui";
+import { useState, type ReactNode } from "react";
+import { Badge, Button, Chip, ConfirmDialog, Icon } from "@/components/ui";
 import {
   type BodyIllustrationGroup,
   type IllustrationOption,
@@ -198,7 +198,7 @@ export type PreferencesFormProps = {
   bodyIllustrations?: Partial<
     Record<BodyIllustrationGroup, IllustrationOption[]>
   >;
-  status?: "idle" | "saving" | "saved" | "error";
+  status?: "idle" | "draftSaving" | "saving" | "saved" | "error";
   statusMessage?: string;
   onChange: (value: PreferencesDraft) => void;
   onSave: () => void;
@@ -219,21 +219,16 @@ export function PreferencesForm({
     useState<BodyIllustrationGroup | null>(null);
   const bodyGroup = bodyGroupOverride ?? value.bodyIllustrationGroup ?? "women";
   const [resetOpen, setResetOpen] = useState(false);
-  const resetRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = resetRef.current;
-    if (!dialog) return;
-    if (resetOpen && !dialog.open) {
-      dialog.showModal();
-      dialog.querySelector<HTMLButtonElement>("[data-safe-action]")?.focus();
-    } else if (!resetOpen && dialog.open) {
-      dialog.close();
-    }
-    return () => {
-      if (dialog.open) dialog.close();
-    };
-  }, [resetOpen]);
+  const saveStatusText =
+    status === "draftSaving"
+      ? "Saving draft…"
+      : status === "saving"
+        ? "Saving…"
+        : status === "saved"
+          ? (statusMessage ?? "Draft saved")
+          : status === "error"
+            ? (statusMessage ?? "Could not save")
+            : "";
 
   const update = <K extends keyof PreferencesDraft>(
     key: K,
@@ -264,18 +259,12 @@ export function PreferencesForm({
           <p className={styles.intro}>
             Tap pictures, not forms. Each choice shows where Stylora uses it.
             Nothing here is ever guessed from your photos, and you can skip any
-            section.
+            section. This sample profile stays in this browser.
           </p>
         </div>
         <div className={styles.saveTop}>
           <span className={styles.saveStatus} role="status">
-            {status === "saving"
-              ? "Saving…"
-              : status === "saved"
-                ? (statusMessage ?? "Draft saved")
-                : status === "error"
-                  ? (statusMessage ?? "Could not save")
-                  : ""}
+            {saveStatusText}
           </span>
           <Button
             variant="primary"
@@ -576,6 +565,9 @@ export function PreferencesForm({
         <Button variant="quiet" onClick={() => setResetOpen(true)}>
           Reset all preferences
         </Button>
+        <span className={styles.mobileSaveStatus} role="status">
+          {saveStatusText}
+        </span>
         <Button
           variant="primary"
           disabled={status === "saving"}
@@ -585,40 +577,18 @@ export function PreferencesForm({
         </Button>
       </footer>
 
-      <dialog
-        ref={resetRef}
-        className={styles.resetDialog}
-        aria-labelledby="preferences-reset-title"
-        aria-describedby="preferences-reset-description"
-        onCancel={(event) => {
-          event.preventDefault();
+      <ConfirmDialog
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        title="Reset all preferences?"
+        description="This clears saved style choices and the current draft in this browser. Wardrobe pieces stay in place."
+        confirmLabel="Reset preferences"
+        cancelLabel="Keep preferences"
+        onConfirm={() => {
           setResetOpen(false);
+          onReset();
         }}
-      >
-        <h2 id="preferences-reset-title">Reset all preferences?</h2>
-        <p id="preferences-reset-description">
-          This clears your saved style choices and any unsaved changes. Your
-          wardrobe, inspiration and saved looks stay in place.
-        </p>
-        <div>
-          <Button
-            variant="secondary"
-            data-safe-action
-            onClick={() => setResetOpen(false)}
-          >
-            Keep preferences
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              setResetOpen(false);
-              onReset();
-            }}
-          >
-            Reset preferences
-          </Button>
-        </div>
-      </dialog>
+      />
     </div>
   );
 }

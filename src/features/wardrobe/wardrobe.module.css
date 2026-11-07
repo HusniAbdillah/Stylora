@@ -17,6 +17,72 @@
   padding: 24px 0 48px;
 }
 
+.archiveHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.sampleCaption {
+  color: var(--color-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.archiveGrid {
+  margin-top: 18px;
+}
+
+.archiveLinkRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 1096px;
+  margin: -30px auto 40px;
+}
+
+.loadingHeading {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.loadingEyebrow,
+.loadingTitle,
+.loadingIntro,
+.loadingTabs,
+.loadingSearch {
+  display: block;
+  border-radius: 10px;
+  background: var(--color-sand);
+}
+
+.loadingEyebrow {
+  width: 110px;
+  height: 16px;
+}
+.loadingTitle {
+  width: min(400px, 80%);
+  height: 48px;
+}
+.loadingIntro {
+  width: min(660px, 95%);
+  height: 20px;
+}
+.loadingTabs {
+  width: min(730px, 100%);
+  height: 50px;
+  margin-bottom: 16px;
+}
+.loadingSearch {
+  width: 100%;
+  height: 46px;
+  margin-bottom: 16px;
+}
+
 .header {
   display: flex;
   align-items: flex-end;
@@ -322,6 +388,12 @@
   overflow-wrap: anywhere;
 }
 
+.sampleLabel {
+  color: var(--color-secondary);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
 .messageCard {
   display: flex;
   align-items: flex-start;
@@ -442,10 +514,6 @@
 }
 
 @media (max-width: 1100px) {
-  .wardrobe {
-    padding-inline: 24px;
-  }
-
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -460,8 +528,16 @@
 }
 
 @media (max-width: 600px) {
+  .archiveHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .archiveLinkRow {
+    margin-top: -22px;
+  }
   .wardrobe {
-    padding: 20px 16px 36px;
+    padding: 20px 0 36px;
   }
 
   .header {

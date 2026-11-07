@@ -67,6 +67,7 @@ export function WardrobeFilterControls({
         <input
           type="search"
           value={query}
+          maxLength={120}
           placeholder="Search by name, color or detail"
           onChange={(event) => onQueryChange(event.target.value)}
         />

@@ -1,4 +1,11 @@
 export { PreferencesForm, type PreferencesFormProps } from "./preferences-form";
+export { PreferencesLoading, PreferencesPage } from "./preferences-page";
+export {
+  preferencesPreviewStore,
+  usePreferenceRevision,
+  useSavedPreferences,
+  type PreferencesState,
+} from "./preferences-preview";
 export {
   fitIllustrations,
   menBodyIllustrations,

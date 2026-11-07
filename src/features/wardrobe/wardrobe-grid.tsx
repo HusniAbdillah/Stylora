@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Button, Icon } from "@/components/ui";
 import {
   WardrobeCategoryTabs,
@@ -29,6 +30,9 @@ export type WardrobeGridProps = {
   onOpenItem: (itemId: string) => void;
   onRetry?: () => void;
   onUseSample?: () => void;
+  hasAnyItems?: boolean;
+  renderItemImage?: (item: WardrobeItemSummary) => ReactNode;
+  localPreview?: boolean;
 };
 
 export function WardrobeGrid({
@@ -47,8 +51,12 @@ export function WardrobeGrid({
   onOpenItem,
   onRetry,
   onUseSample,
+  hasAnyItems,
+  renderItemImage,
+  localPreview = false,
 }: WardrobeGridProps) {
-  const showInitialEmpty = status === "ready" && totalCount === 0 && !query;
+  const showInitialEmpty =
+    status === "ready" && !(hasAnyItems ?? totalCount > 0) && !query;
 
   return (
     <section className={styles.wardrobe} aria-labelledby="wardrobe-title">
@@ -82,7 +90,11 @@ export function WardrobeGrid({
       </header>
 
       {showInitialEmpty ? (
-        <WardrobeEmptyState onAddItem={onAddItem} onUseSample={onUseSample} />
+        <WardrobeEmptyState
+          onAddItem={onAddItem}
+          onUseSample={onUseSample}
+          localPreview={localPreview}
+        />
       ) : (
         <>
           <WardrobeCategoryTabs
@@ -151,13 +163,18 @@ export function WardrobeGrid({
                   <Icon name="upload" size={24} />
                 </span>
                 <strong>Add with one photo</strong>
-                <span>AI writes the description</span>
+                <span>
+                  {localPreview
+                    ? "Add details in this workspace"
+                    : "AI writes the description"}
+                </span>
               </button>
               {items.map((item) => (
                 <WardrobeItemCard
                   key={item.id}
                   item={item}
                   onOpen={onOpenItem}
+                  renderImage={renderItemImage}
                 />
               ))}
             </div>
