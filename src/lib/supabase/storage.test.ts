@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
+import { StorageApiError } from "@supabase/supabase-js";
+import { apiRoute } from "@/lib/api";
 import { getWorkspaceDatabase, type WorkspaceDatabase } from "./server";
 import {
   createWorkspaceSignedRead,
   createWorkspaceSignedUpload,
   STORAGE_MAX_BYTES,
   STORAGE_READ_TTL_SECONDS,
+  StorageAssetError,
   type StorageUploadInput,
   verifyWorkspaceStorageAsset,
 } from "./storage";
@@ -77,6 +80,122 @@ async function pngFixture() {
 }
 
 beforeEach(() => vi.clearAllMocks());
+
+describe("Storage failure metadata", () => {
+  it.each([0, 408, 429, 500, 502, 503, 504])(
+    "preserves transient database transport status %s",
+    async (status) => {
+      const { query, storage } = setup();
+      query.maybeSingle.mockResolvedValue({
+        data: null,
+        error: { message: "private detail" },
+        status,
+      });
+      await expect(createWorkspaceSignedRead(assetId)).rejects.toMatchObject({
+        code: "STORAGE_ASSET_READ_FAILED",
+        upstreamStatus: status,
+        retryable: true,
+      });
+      expect(storage.createSignedUrl).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserves asset allocation failure status", async () => {
+    const { query, storage } = setup();
+    query.insert.mockResolvedValue({
+      error: { message: "private detail" },
+      status: 503,
+    });
+    await expect(
+      createWorkspaceSignedUpload({
+        bucket: "wardrobe",
+        mimeType: "image/png",
+        byteSize: 120,
+      }),
+    ).rejects.toMatchObject({ upstreamStatus: 503, retryable: true });
+    expect(storage.createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "createSignedUploadUrl",
+      () =>
+        createWorkspaceSignedUpload({
+          bucket: "wardrobe",
+          mimeType: "image/png",
+          byteSize: 120,
+        }),
+    ],
+    ["createSignedUrl", () => createWorkspaceSignedRead(assetId)],
+    ["download", () => verifyWorkspaceStorageAsset(assetId)],
+  ] as const)("preserves HTTP failure status for %s", async (method, run) => {
+    const { storage } = setup();
+    storage[method].mockResolvedValue({
+      data: null,
+      error: new StorageApiError("private detail", 502, "502"),
+    });
+    await expect(run()).rejects.toMatchObject({
+      upstreamStatus: 502,
+      retryable: true,
+    });
+  });
+
+  it("recognizes the SDK network wrapper without treating every unknown error as transient", async () => {
+    const { storage } = setup();
+    const network = Object.assign(new Error("private detail"), {
+      name: "StorageUnknownError",
+      originalError: new TypeError("fetch failed"),
+    });
+    storage.createSignedUrl.mockResolvedValue({ data: null, error: network });
+    await expect(createWorkspaceSignedRead(assetId)).rejects.toMatchObject({
+      upstreamStatus: 0,
+      retryable: true,
+    });
+    storage.createSignedUrl.mockResolvedValue({
+      data: null,
+      error: new Error("unknown"),
+    });
+    await expect(createWorkspaceSignedRead(assetId)).rejects.toMatchObject({
+      upstreamStatus: undefined,
+      retryable: false,
+    });
+  });
+
+  it.each([undefined, 400, 401, 403, 404, 409, 415, 422, 501, 505])(
+    "keeps unknown and terminal statuses terminal (%s)",
+    (status) => {
+      expect(
+        new StorageAssetError("STORAGE_SIGN_FAILED", "Safe error", status)
+          .retryable,
+      ).toBe(false);
+    },
+  );
+
+  it("keeps validation failures terminal even with transport-like metadata", () => {
+    expect(
+      new StorageAssetError("STORAGE_IMAGE_INVALID", "Safe error", 503)
+        .retryable,
+    ).toBe(false);
+  });
+
+  it.each([
+    [401, false],
+    [503, true],
+  ] as const)(
+    "preserves retry eligibility through the HTTP boundary for %s",
+    async (status, retryable) => {
+      const { storage } = setup();
+      storage.createSignedUrl.mockResolvedValue({
+        data: null,
+        error: new StorageApiError("private detail", status, String(status)),
+      });
+      const response = await apiRoute(() => createWorkspaceSignedRead(assetId));
+      const body = await response.json();
+      expect(body.error.retryable).toBe(retryable);
+      expect(JSON.stringify(body)).not.toContain("private detail");
+    },
+  );
+});
 
 describe("workspace Storage upload", () => {
   it.each(["inspiration", "wardrobe", "previews"] as const)(

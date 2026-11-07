@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { StorageApiError } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { z } from "zod";
 import {
@@ -52,6 +53,8 @@ type StorageStatus = StorageAsset["status"];
 export type StorageUploadInput = z.input<typeof uploadSchema>;
 
 export class StorageAssetError extends Error {
+  public readonly retryable: boolean;
+
   constructor(
     public readonly code:
       | "INVALID_STORAGE_UPLOAD"
@@ -62,10 +65,33 @@ export class StorageAssetError extends Error {
       | "STORAGE_DOWNLOAD_FAILED"
       | "STORAGE_IMAGE_INVALID",
     message: string,
+    public readonly upstreamStatus?: number,
   ) {
     super(message);
     this.name = "StorageAssetError";
+    this.retryable =
+      [
+        "STORAGE_ASSET_CREATE_FAILED",
+        "STORAGE_ASSET_READ_FAILED",
+        "STORAGE_SIGN_FAILED",
+        "STORAGE_DOWNLOAD_FAILED",
+      ].includes(code) &&
+      upstreamStatus !== undefined &&
+      [0, 408, 429, 500, 502, 503, 504].includes(upstreamStatus);
   }
+}
+
+function storageUpstreamStatus(error: unknown): number | undefined {
+  if (error instanceof StorageApiError) return error.status;
+  if (
+    error instanceof Error &&
+    error.name === "StorageUnknownError" &&
+    "originalError" in error &&
+    error.originalError instanceof TypeError
+  ) {
+    return 0;
+  }
+  return undefined;
 }
 
 function invalidAsset(): never {
@@ -98,7 +124,7 @@ async function readAsset(
 ) {
   if (!z.uuid().safeParse(assetId).success) invalidAsset();
 
-  const { data, error } = await context.client
+  const { data, error, status } = await context.client
     .from("assets")
     .select("id,workspace_id,bucket,storage_path,mime_type,byte_size,status")
     .eq("workspace_id", context.workspaceId)
@@ -110,6 +136,7 @@ async function readAsset(
     throw new StorageAssetError(
       "STORAGE_ASSET_READ_FAILED",
       "The image could not be loaded.",
+      status,
     );
   }
 
@@ -140,21 +167,24 @@ export async function createWorkspaceSignedUpload(input: StorageUploadInput) {
   requireWorkspaceWrites(context);
   const assetId = randomUUID();
   const storagePath = `${context.workspaceId}/${assetId}/${randomUUID()}.${extensionByMime[parsed.data.mimeType]}`;
-  const { error: assetError } = await context.client.from("assets").insert({
-    id: assetId,
-    workspace_id: context.workspaceId,
-    bucket: parsed.data.bucket,
-    storage_path: storagePath,
-    mime_type: parsed.data.mimeType,
-    byte_size: parsed.data.byteSize,
-    source_type: parsed.data.sourceType,
-    status: "pending",
-  });
+  const { error: assetError, status: assetStatus } = await context.client
+    .from("assets")
+    .insert({
+      id: assetId,
+      workspace_id: context.workspaceId,
+      bucket: parsed.data.bucket,
+      storage_path: storagePath,
+      mime_type: parsed.data.mimeType,
+      byte_size: parsed.data.byteSize,
+      source_type: parsed.data.sourceType,
+      status: "pending",
+    });
 
   if (assetError) {
     throw new StorageAssetError(
       "STORAGE_ASSET_CREATE_FAILED",
       "The image upload could not be prepared.",
+      assetStatus,
     );
   }
 
@@ -166,6 +196,7 @@ export async function createWorkspaceSignedUpload(input: StorageUploadInput) {
     throw new StorageAssetError(
       "STORAGE_SIGN_FAILED",
       "The image upload could not be prepared.",
+      storageUpstreamStatus(error),
     );
   }
 
@@ -188,6 +219,7 @@ export async function createWorkspaceSignedRead(assetId: string) {
     throw new StorageAssetError(
       "STORAGE_SIGN_FAILED",
       "The image could not be displayed.",
+      storageUpstreamStatus(error),
     );
   }
 
@@ -208,6 +240,7 @@ export async function verifyWorkspaceStorageAsset(assetId: string) {
     throw new StorageAssetError(
       "STORAGE_DOWNLOAD_FAILED",
       "The uploaded image could not be checked.",
+      storageUpstreamStatus(error),
     );
   }
 
