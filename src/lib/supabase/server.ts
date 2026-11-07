@@ -4,7 +4,8 @@ import { readDatabaseConfig } from "@/lib/config/server";
 
 export function getWorkspaceDatabase() {
   const config = readDatabaseConfig();
-  if (!config) throw new Error("Workspace database configuration is unavailable.");
+  if (!config)
+    throw new Error("Workspace database configuration is unavailable.");
 
   const client = createClient(config.url, config.secretKey, {
     auth: {
@@ -14,5 +15,9 @@ export function getWorkspaceDatabase() {
     },
   });
 
-  return { client, workspaceId: config.workspaceId, writesEnabled: config.writesEnabled };
+  return {
+    client,
+    workspaceId: config.workspaceId,
+    writesEnabled: config.writesEnabled,
+  };
 }

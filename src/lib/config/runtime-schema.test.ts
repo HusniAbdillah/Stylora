@@ -10,17 +10,25 @@ const fixture = {
 describe("database configuration", () => {
   it("defaults to read-only and enables writes only explicitly", () => {
     expect(parseDatabaseConfig(fixture)?.writesEnabled).toBe(false);
-    expect(parseDatabaseConfig({ ...fixture, DEMO_WRITES_ENABLED: "true" })?.writesEnabled).toBe(
-      true,
-    );
-    expect(parseDatabaseConfig({ ...fixture, DEMO_WRITES_ENABLED: "1" })).toBeNull();
+    expect(
+      parseDatabaseConfig({ ...fixture, DEMO_WRITES_ENABLED: "true" })
+        ?.writesEnabled,
+    ).toBe(true);
+    expect(
+      parseDatabaseConfig({ ...fixture, DEMO_WRITES_ENABLED: "1" }),
+    ).toBeNull();
   });
 
   it("rejects invalid database scope and credentials", () => {
     expect(parseDatabaseConfig({})).toBeNull();
-    expect(parseDatabaseConfig({ ...fixture, STYLORA_WORKSPACE_ID: "invalid" })).toBeNull();
     expect(
-      parseDatabaseConfig({ ...fixture, SUPABASE_SECRET_KEY: "sb_publishable_synthetic_fixture" }),
+      parseDatabaseConfig({ ...fixture, STYLORA_WORKSPACE_ID: "invalid" }),
+    ).toBeNull();
+    expect(
+      parseDatabaseConfig({
+        ...fixture,
+        SUPABASE_SECRET_KEY: "sb_publishable_synthetic_fixture",
+      }),
     ).toBeNull();
   });
 
