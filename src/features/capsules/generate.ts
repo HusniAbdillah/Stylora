@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { attributesSchema } from "@/lib/ai/fashion-schema";
+import { resolveEffectiveAttributes } from "@/features/matching/gates";
 import { ApiError } from "@/lib/api";
 import {
   getWorkspaceDatabase,
@@ -136,7 +137,9 @@ async function capsuleContext(id: string) {
   const { client, workspaceId } = getWorkspaceDatabase();
   const { data, error } = await client
     .from("active_owned_wardrobe")
-    .select("id,name,category,subcategory,description,attributes,revision")
+    .select(
+      "id,name,category,subcategory,description,attributes,inferred_attributes,corrections,provenance,revision",
+    )
     .eq("workspace_id", workspaceId)
     .in("id", capsule.brief.includedItemIds)
     .order("id");
@@ -156,10 +159,24 @@ async function capsuleContext(id: string) {
         subcategory: z.string().max(120).nullable(),
         description: z.string().max(600),
         revision: z.number().int().positive(),
-        attributes: attributesSchema,
+        attributes: z.record(z.string(), z.unknown()),
+        inferred_attributes: z.record(z.string(), z.unknown()),
+        corrections: z.record(z.string(), z.unknown()),
+        provenance: z.record(z.string(), z.unknown()),
       }),
     )
-    .parse(data);
+    .parse(data)
+    .map(({ inferred_attributes, ...item }) => ({
+      ...item,
+      attributes: attributesSchema.parse(
+        resolveEffectiveAttributes({
+          attributes: item.attributes,
+          inferredAttributes: inferred_attributes,
+          corrections: item.corrections,
+          provenance: item.provenance,
+        }),
+      ),
+    }));
   if (items.length !== capsule.brief.includedItemIds.length)
     throw new ApiError(
       "capsule_items_changed",
