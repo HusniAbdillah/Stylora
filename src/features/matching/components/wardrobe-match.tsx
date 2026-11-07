@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Badge, Button, Icon } from "@/components/ui";
 import styles from "./matching.module.css";
 
@@ -127,14 +128,14 @@ export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
           className={`${styles.thumbnail} ${owned ? "bg-sand" : "bg-[var(--color-missing-bg)]"}`}
         >
           {owned && match.wardrobeItem?.imageUrl ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={match.wardrobeItem.imageUrl}
-                alt={match.wardrobeItem.name}
-                className="size-full object-cover"
-              />
-            </>
+            <Image
+              src={match.wardrobeItem.imageUrl}
+              alt={match.wardrobeItem.name}
+              width={132}
+              height={132}
+              unoptimized
+              className="size-full object-contain"
+            />
           ) : (
             <div
               className={`text-center text-xs ${owned ? "text-secondary" : "text-[var(--color-missing)]"}`}
@@ -221,36 +222,49 @@ export function WardrobeMatchCard({ match }: { match: WardrobeMatch }) {
           )}
         </div>
         {match.rejectedCandidates?.length ? (
-          <div className={`${styles.candidateRows} space-y-1.5`}>
-            {match.rejectedCandidates.map((candidate, index) => (
-              <div
-                key={`${candidate.name ?? "excluded"}-${index}`}
-                className="flex items-center gap-2 rounded-xl bg-porcelain px-2 py-1.5 text-xs leading-5 text-secondary"
-              >
-                {candidate.imageUrl ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+          <details className={styles.candidateRows}>
+            <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-medium text-crimson">
+              {match.rejectedCandidates.length} excluded{" "}
+              {match.rejectedCandidates.length === 1
+                ? "candidate"
+                : "candidates"}
+              <Icon name="chevron-down" className="size-3.5" />
+            </summary>
+            <ul
+              className={styles.candidateList}
+              aria-label="Excluded wardrobe candidates"
+              tabIndex={0}
+            >
+              {match.rejectedCandidates.map((candidate, index) => (
+                <li
+                  key={`${candidate.name ?? "excluded"}-${index}`}
+                  className="flex items-center gap-2 rounded-xl bg-porcelain px-2 py-1.5 text-xs leading-5 text-secondary"
+                >
+                  {candidate.imageUrl ? (
+                    <Image
                       src={candidate.imageUrl}
                       alt={candidate.name ?? "Excluded wardrobe candidate"}
-                      className="size-9 shrink-0 rounded-lg object-cover"
+                      width={36}
+                      height={36}
+                      unoptimized
+                      className="size-9 shrink-0 rounded-lg object-contain"
                     />
-                  </>
-                ) : (
-                  <Icon
-                    name="x"
-                    className="size-4 shrink-0 text-[var(--color-missing)]"
-                  />
-                )}
-                <span>
-                  {candidate.name
-                    ? `${candidate.name} rejected: `
-                    : "Excluded: "}
-                  {candidate.reason}
-                </span>
-              </div>
-            ))}
-          </div>
+                  ) : (
+                    <Icon
+                      name="x"
+                      className="size-4 shrink-0 text-[var(--color-missing)]"
+                    />
+                  )}
+                  <span>
+                    {candidate.name
+                      ? `${candidate.name} rejected: `
+                      : "Excluded: "}
+                    {candidate.reason}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
         ) : null}
         {Boolean(
           match.reasons?.length ||

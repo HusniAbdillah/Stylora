@@ -434,16 +434,19 @@ export async function requestFashion<T extends z.ZodType>(
       "Create a persisted analysis operation before starting the provider.",
       503,
       false,
+      { providerCode: "operation_scope_missing" },
     );
   }
   const key =
     process.env.OPENAI_API_KEY?.trim() || process.env.MODEL_API_KEY?.trim();
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
   if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,119}$/.test(model)) {
-    throw new ApiError(
+    throw diagnosticError(
       "provider_unavailable",
       "Fashion analysis is not configured yet. Try again after setup.",
       503,
+      false,
+      { providerCode: "configuration_missing" },
     );
   }
   const context = JSON.stringify(request.context);
@@ -451,10 +454,14 @@ export async function requestFashion<T extends z.ZodType>(
     typeof context !== "string" ||
     Buffer.byteLength(context, "utf8") > 300_000
   ) {
-    throw new ApiError(
+    throw diagnosticError(
       "provider_unavailable",
       "The analysis context is too large. Narrow the item selection and retry.",
       422,
+      false,
+      {
+        providerCode: `context_bytes_${typeof context === "string" ? Buffer.byteLength(context, "utf8") : 0}`,
+      },
     );
   }
   if (
@@ -463,10 +470,12 @@ export async function requestFashion<T extends z.ZodType>(
       request.imageDataUrl,
     )
   ) {
-    throw new ApiError(
+    throw diagnosticError(
       "provider_unavailable",
       "The analysis image has not been verified.",
       422,
+      false,
+      { providerCode: "image_unverified" },
     );
   }
   const { instructions, versions } = buildFashionPrompt(request.task);

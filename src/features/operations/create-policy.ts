@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Json } from "@/types/database";
 
-export const CREATE_RUNTIME_VERSION = "owner2-create.v4";
+export const CREATE_RUNTIME_VERSION = "owner2-create.v5";
 export const createKindSchema = z.enum([
   "inspiration_description",
   "inspiration_confidence",

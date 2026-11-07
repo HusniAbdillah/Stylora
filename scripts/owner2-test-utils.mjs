@@ -46,7 +46,12 @@ export async function startTestServer(
       "--port",
       String(port),
     ],
-    { env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
+    {
+      env,
+      cwd: process.env.STYLORA_TEST_APP_DIR || new URL("../", import.meta.url),
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    },
   );
   // Keep server diagnostics in memory so failed checks cannot expose request data.
   let diagnostics = "";

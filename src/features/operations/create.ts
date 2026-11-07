@@ -27,8 +27,11 @@ import {
 import { buildFashionPrompt } from "@/prompts/fashion";
 import type { Database, Json } from "@/types/database";
 import {
-  CREATE_RUNTIME_VERSION, createKindSchema, createInputSnapshot,
-  createOperationFingerprint, createOperationPolicy,
+  CREATE_RUNTIME_VERSION,
+  createKindSchema,
+  createInputSnapshot,
+  createOperationFingerprint,
+  createOperationPolicy,
 } from "./create-policy";
 
 type Operation = Database["public"]["Tables"]["workflow_operations"]["Row"];
@@ -118,7 +121,11 @@ async function operationInput(
 ) {
   const { look, pieces } = await getLookContext(lookId);
   if (!look.occasion?.trim())
-    throw new ApiError("occasion_required", "Choose an occasion before starting analysis.", 409);
+    throw new ApiError(
+      "occasion_required",
+      "Choose an occasion before starting analysis.",
+      409,
+    );
   const { client, workspaceId } = getWorkspaceDatabase();
   if (!look.inspiration_asset_id)
     throw new ApiError(
@@ -150,12 +157,26 @@ async function operationInput(
       "Wait for complete garment descriptions before continuing.",
       409,
     );
-  const personalization = kind !== "inspiration_description"
-    ? await getPersonalizationSnapshot() : undefined;
-  const inventory = ["wardrobe_match", "outfit_options", "option_regeneration"].includes(kind)
-    ? await listInventory(inventoryMode) : undefined;
-  const input = createInputSnapshot({ kind, look, pieces, inventoryMode,
-    personalization, inventory, optionType });
+  const personalization =
+    kind !== "inspiration_description"
+      ? await getPersonalizationSnapshot()
+      : undefined;
+  const inventory = [
+    "wardrobe_match",
+    "outfit_options",
+    "option_regeneration",
+  ].includes(kind)
+    ? await listInventory(inventoryMode)
+    : undefined;
+  const input = createInputSnapshot({
+    kind,
+    look,
+    pieces,
+    inventoryMode,
+    personalization,
+    inventory,
+    optionType,
+  });
   return { look, input };
 }
 
@@ -165,25 +186,39 @@ async function projectOperation(op: Operation) {
   const kind = kindSchema.safeParse(op.kind);
   if (captured.success && kind.success) {
     try {
-      const { look, input } = await operationInput(captured.data.lookId, kind.data,
-        captured.data.inventoryMode, captured.data.optionType);
+      const { look, input } = await operationInput(
+        captured.data.lookId,
+        kind.data,
+        captured.data.inventoryMode,
+        captured.data.optionType,
+      );
       let subjectId = look.id;
       let revision = look.revision;
       if (captured.data.optionType) {
         const { client, workspaceId } = getWorkspaceDatabase();
-        const current = await client.from("outfit_options").select("id,revision")
-          .eq("workspace_id", workspaceId).eq("look_id", look.id)
-          .eq("option_type", captured.data.optionType).eq("is_current", true)
-          .eq("source_revision", look.revision).maybeSingle();
+        const current = await client
+          .from("outfit_options")
+          .select("id,revision")
+          .eq("workspace_id", workspaceId)
+          .eq("look_id", look.id)
+          .eq("option_type", captured.data.optionType)
+          .eq("is_current", true)
+          .eq("source_revision", look.revision)
+          .maybeSingle();
         if (current.error || !current.data) return toOperation(op);
         subjectId = current.data.id;
         revision = current.data.revision;
       }
       if (captured.data.intentId) input.intentId = captured.data.intentId;
-      if (look.source_type !== "sample") fingerprint = createOperationFingerprint({
-        kind: kind.data, input, versions: buildFashionPrompt(kind.data).versions,
-        model: process.env.OPENAI_MODEL || "gpt-6-luna", subjectId, revision,
-      });
+      if (look.source_type !== "sample")
+        fingerprint = createOperationFingerprint({
+          kind: kind.data,
+          input,
+          versions: buildFashionPrompt(kind.data).versions,
+          model: process.env.OPENAI_MODEL || "gpt-6-luna",
+          subjectId,
+          revision,
+        });
     } catch {
       // Unavailable current inputs disable recovery controls without hiding saved operation state.
     }
@@ -246,8 +281,14 @@ export async function startLookOperation(
   }
   const prompt = buildFashionPrompt(parsed.kind);
   const model = process.env.OPENAI_MODEL || "gpt-6-luna";
-  const fingerprint = createOperationFingerprint({ kind: parsed.kind, input,
-    versions: prompt.versions, model, subjectId, revision });
+  const fingerprint = createOperationFingerprint({
+    kind: parsed.kind,
+    input,
+    versions: prompt.versions,
+    model,
+    subjectId,
+    revision,
+  });
   const { data, error } = await context.client.rpc("start_workflow_operation", {
     p_workspace_id: context.workspaceId,
     p_kind: parsed.kind,
@@ -261,7 +302,9 @@ export async function startLookOperation(
     p_model: model,
   });
   if (error) throw sqlFailure(error);
-  return parsed.execute ? executeOperation(data.id) : toOperation(data, fingerprint);
+  return parsed.execute
+    ? executeOperation(data.id)
+    : toOperation(data, fingerprint);
 }
 
 export async function startDraftOperation(draftId: string, input: unknown) {
@@ -301,8 +344,15 @@ export async function executeOperation(id: string) {
   requireWorkspaceWrites(context);
   const pending = await readOperation(id);
   const pendingInput = snapshotSchema.safeParse(pending.input);
-  if (!pendingInput.success || pendingInput.data.runtimeVersion !== CREATE_RUNTIME_VERSION)
-    throw new ApiError("operation_runtime_changed", "This analysis uses an older runtime. Start a new analysis for the current inputs.", 409);
+  if (
+    !pendingInput.success ||
+    pendingInput.data.runtimeVersion !== CREATE_RUNTIME_VERSION
+  )
+    throw new ApiError(
+      "operation_runtime_changed",
+      "This analysis uses an older runtime. Start a new analysis for the current inputs.",
+      409,
+    );
   if (!kindSchema.safeParse(pending.kind).success)
     throw new ApiError(
       "operation_not_supported",
@@ -677,6 +727,8 @@ export async function executeOperation(id: string) {
             safe_error_code: safe.code,
             result_ref: asJson({
               retryable: safe.retryable,
+              safeMessage:
+                safe.code === "provider_unavailable" ? safe.message : null,
               metadata,
               provider: safeProviderError(failure),
             }),
@@ -698,15 +750,16 @@ export async function controlOperation(id: string, action: "retry" | "cancel") {
   const operation = await readOperation(id);
   if (action === "retry") {
     const policy = await projectOperation(operation);
-    if (!policy.canRetry) throw new ApiError(
-      "operation_retry_unavailable",
-      policy.canRestart
-        ? "The analysis inputs or runtime changed. Start a new analysis instead."
-        : policy.retryBlockedReason === "non_retryable"
-          ? "This analysis did not pass validation and cannot be retried unchanged. Change the input or adopt valid pieces manually."
-          : "This analysis has no eligible retry remaining. Check its status before continuing.",
-      409,
-    );
+    if (!policy.canRetry)
+      throw new ApiError(
+        "operation_retry_unavailable",
+        policy.canRestart
+          ? "The analysis inputs or runtime changed. Start a new analysis instead."
+          : policy.retryBlockedReason === "non_retryable"
+            ? "This analysis did not pass validation and cannot be retried unchanged. Change the input or adopt valid pieces manually."
+            : "This analysis has no eligible retry remaining. Check its status before continuing.",
+        409,
+      );
   }
   const { data, error } = await context.client.rpc("control_create_operation", {
     p_workspace_id: context.workspaceId,
