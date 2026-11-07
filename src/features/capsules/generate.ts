@@ -73,46 +73,54 @@ export async function prepareCapsule(input: unknown) {
       503,
       true,
     );
-  if (
+  const unchanged = Boolean(
     existing &&
     JSON.stringify(capsuleBriefSchema.parse(existing.brief)) ===
-      JSON.stringify(brief)
-  )
-    return { capsuleId: existing.id };
-  if (existing && existing.revision !== draft.capsuleRevision)
+      JSON.stringify(brief),
+  );
+  if (existing && !unchanged && existing.revision !== draft.capsuleRevision)
     throw new ApiError(
       "capsule_revision_conflict",
       "This capsule changed in another session. Your draft is kept.",
       409,
     );
-  const { data, error } = await context.client.rpc("save_capsule_draft", {
-    p_workspace_id: context.workspaceId,
-    p_capsule_id: capsuleId,
-    p_expected_revision: draft.capsuleRevision ?? 0,
-    p_title:
-      CAPSULE_TEMPLATES.find((template) => template.id === brief.templateId)
-        ?.name ?? "Custom capsule",
-    p_brief: brief,
-    p_item_ids: brief.includedItemIds,
-  });
-  if (error || !data)
-    throw new ApiError(
-      "capsule_save_failed",
-      "Your capsule could not be prepared. Your draft is kept.",
-      409,
-      true,
-    );
-  const { error: linkError } = await context.client
+  let capsuleRevision = existing?.revision ?? 0;
+  if (!unchanged) {
+    const { data, error } = await context.client.rpc("save_capsule_draft", {
+      p_workspace_id: context.workspaceId,
+      p_capsule_id: capsuleId,
+      p_expected_revision: draft.capsuleRevision ?? 0,
+      p_title:
+        CAPSULE_TEMPLATES.find((template) => template.id === brief.templateId)
+          ?.name ?? "Custom capsule",
+      p_brief: brief,
+      p_item_ids: brief.includedItemIds,
+    });
+    if (error || !data)
+      throw new ApiError(
+        "capsule_save_failed",
+        "Your capsule could not be prepared. Your draft is kept.",
+        409,
+        true,
+      );
+    capsuleRevision = z
+      .object({ id: z.uuid(), revision: z.number().int().positive() })
+      .parse(data).revision;
+  }
+  const { data: linked, error: linkError } = await context.client
     .from("workflow_drafts")
     .update({
       capsule_id: capsuleId,
-      payload: { brief, capsuleRevision: (existing?.revision ?? 0) + 1 },
+      payload: { brief, capsuleRevision },
+      revision: draft.revision + 1,
     })
     .eq("workspace_id", context.workspaceId)
     .eq("id", draft.id)
     .eq("feature_kind", "capsules")
-    .eq("revision", draft.revision);
-  if (linkError)
+    .eq("revision", draft.revision)
+    .select("id")
+    .maybeSingle();
+  if (linkError || !linked)
     throw new ApiError(
       "capsule_draft_link_failed",
       "Your capsule is saved. Retry to reconnect its draft.",

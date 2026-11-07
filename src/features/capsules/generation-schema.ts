@@ -89,7 +89,7 @@ export function validateCapsuleGeneration(
     additions.size !== output.additions.length
   )
     throw new Error("capsule_output_invalid");
-  output.outfits.forEach((outfit) => {
+  output.outfits.forEach((outfit, outfitIndex) => {
     if (
       new Set(outfit.itemIds).size !== outfit.itemIds.length ||
       new Set(outfit.additionKeys).size !== outfit.additionKeys.length ||
@@ -99,7 +99,10 @@ export function validateCapsuleGeneration(
           !inventory.has(id) ||
           draft.excludedItemIds.includes(id),
       ) ||
-      outfit.additionKeys.some((key) => !additions.has(key)) ||
+      outfit.additionKeys.some(
+        (key) =>
+          !additions.get(key)?.unlockedOutfitIndices.includes(outfitIndex),
+      ) ||
       outfit.inputsUsed.some((signal) => !signals.includes(signal)) ||
       outfit.whyThis.some((reason) =>
         reason.evidenceItemIds.some((id) => !outfit.itemIds.includes(id)),
