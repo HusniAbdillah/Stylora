@@ -1,6 +1,11 @@
 import "server-only";
 import { z } from "zod";
 import { buildFashionPrompt, getFashionVersions } from "@/prompts/fashion";
+import {
+  getImageRenderSettings,
+  imageRenderSettingsSchema,
+  type ImageRenderSettings,
+} from "./image-settings";
 
 export const FASHION_SCHEMA_VERSION = "fashion-item.v1";
 export const FASHION_KNOWLEDGE_VERSION =
@@ -152,6 +157,7 @@ export async function generateFashionImage(input: {
   preferences: unknown;
   pose?: string;
   allowDescriptionOnly?: boolean;
+  renderSettings?: ImageRenderSettings;
   signal?: AbortSignal;
   images: {
     bytes: Uint8Array;
@@ -165,13 +171,16 @@ export async function generateFashionImage(input: {
   ) {
     throw new OpenAIUnavailableError("OPENAI_IMAGE_INPUT_INVALID");
   }
+  const settings = imageRenderSettingsSchema.parse(
+    input.renderSettings ?? getImageRenderSettings(),
+  );
   const body = new FormData();
   body.set("model", IMAGE_MODEL);
-  body.set("size", "1024x1536");
-  body.set("quality", "medium");
-  body.set("output_format", "png");
+  body.set("size", settings.size);
+  body.set("quality", settings.quality);
+  body.set("output_format", settings.format);
   body.set("n", "1");
-  body.set("input_fidelity", "high");
+  body.set("input_fidelity", settings.inputFidelity);
   body.set(
     "prompt",
     [
@@ -208,9 +217,9 @@ export async function generateFashionImage(input: {
         JSON.stringify({
           model: IMAGE_MODEL,
           prompt: `${prompt}\nThis saved-outfit task permits illustrative rendering from canonical descriptions. Missing reference images remain uncertain.`,
-          size: "1024x1536",
-          quality: "medium",
-          output_format: "png",
+          size: settings.size,
+          quality: settings.quality,
+          output_format: settings.format,
           n: 1,
         }),
         230000,

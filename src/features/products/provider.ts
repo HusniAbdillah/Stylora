@@ -3,6 +3,11 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { ApiError } from "@/lib/http";
 import { offerSchema, type Category } from "./schema";
+import {
+  isShopeeSource,
+  matchesShoppingTarget,
+  type ShoppingTarget,
+} from "./search-context";
 
 const categoryPatterns: [Category, RegExp][] = [
   ["dress", /\b(dress|gaun|jumpsuit|romper|overalls)\b/i],
@@ -24,7 +29,7 @@ const categoryPatterns: [Category, RegExp][] = [
   ],
   [
     "top",
-    /\b(t[ -]?shirt|shirt|blouse|kemeja|kaos|jersey|sweater|hoodie|polo|tunic|camisole|tank|sweatshirt)\b/i,
+    /\b(t[ -]?shirt|shirt|blouse|blus|baju|atasan|kemeja|kaos|jersey|sweater|hoodie|polo|tunic|tunik|camisole|tank|sweatshirt)\b/i,
   ],
 ];
 
@@ -61,11 +66,20 @@ export function publicHttpsUrl(
   }
 }
 
-export function normalizeOffer(raw: unknown, category: Category) {
+export function normalizeOffer(
+  raw: unknown,
+  category: Category,
+  target: ShoppingTarget = null,
+) {
   const parsed = offerSchema.safeParse(raw);
   if (!parsed.success) return null;
   const offer = parsed.data;
-  if (supportedCategory(offer.title) !== category) return null;
+  if (
+    !isShopeeSource(offer.source) ||
+    !matchesShoppingTarget(offer.title, target) ||
+    supportedCategory(offer.title) !== category
+  )
+    return null;
   const productUrl =
     publicHttpsUrl(offer.link) ?? publicHttpsUrl(offer.product_link);
   if (!productUrl) return null;
@@ -200,8 +214,9 @@ export async function searchSerpApi(
   workspaceId: string,
   query: string,
   apiKey: string,
+  contextKey: string,
 ): Promise<ProviderResult> {
-  const key = `${workspaceId}:${query.toLowerCase()}`;
+  const key = `${workspaceId}:${contextKey}:${query.toLowerCase()}`;
   const previous = queryCache.get(key);
   if (previous && previous.expires > Date.now()) return previous.promise;
   const promise = withSearchCapacity(async () => {

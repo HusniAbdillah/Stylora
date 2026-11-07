@@ -19,6 +19,13 @@ import {
   verifyWorkspaceStorageAsset,
 } from "@/lib/supabase/storage";
 import { avatarIoError } from "./image-errors";
+import {
+  getImageRenderSettings,
+  imageRenderSettingsSchema,
+  type ImageRenderSettings,
+} from "@/features/ai/image-settings";
+
+export { getImageRenderSettings as getAvatarRenderSettings } from "@/features/ai/image-settings";
 
 export const avatarItemSchema = z.object({
   id: z.uuid().nullable(),
@@ -75,6 +82,7 @@ function stableJson(value: unknown): string {
 export function avatarRenderFingerprint(
   items: AvatarItem[],
   preferences: unknown,
+  renderSettings: ImageRenderSettings = getImageRenderSettings(),
 ) {
   return createHash("sha256")
     .update(
@@ -90,8 +98,7 @@ export function avatarRenderFingerprint(
         promptVersion: FASHION_PROMPT_VERSION,
         schemaVersion: FASHION_SCHEMA_VERSION,
         knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
-        format: "png",
-        size: "1024x1536",
+        renderSettings: imageRenderSettingsSchema.parse(renderSettings),
       }),
     )
     .digest("hex");
@@ -103,8 +110,12 @@ export async function renderAndStoreAvatar(input: {
   allowIllustrativeItems?: boolean;
   reuse?: boolean;
   signal?: AbortSignal;
+  renderSettings?: ImageRenderSettings;
 }) {
   const items = normalizeAvatarItems(input.items);
+  const renderSettings = imageRenderSettingsSchema.parse(
+    input.renderSettings ?? getImageRenderSettings(),
+  );
   if (items.filter((item) => item.asset_id).length > 16)
     throw new Error("AVATAR_IMAGE_REFERENCE_LIMIT");
   const knownIds = items.map((item) => item.id).filter((id) => id !== null);
@@ -118,7 +129,11 @@ export async function renderAndStoreAvatar(input: {
   const context = getWorkspaceDatabase();
   const { client, workspaceId } = context;
   requireWorkspaceWrites(context);
-  const renderFingerprint = avatarRenderFingerprint(items, input.preferences);
+  const renderFingerprint = avatarRenderFingerprint(
+    items,
+    input.preferences,
+    renderSettings,
+  );
   const {
     data: prior,
     error: reuseError,
@@ -203,6 +218,7 @@ export async function renderAndStoreAvatar(input: {
     pose,
     signal: input.signal,
     allowDescriptionOnly: input.allowIllustrativeItems,
+    renderSettings,
   });
   const asset = await createWorkspaceSignedUpload({
     bucket: "previews",

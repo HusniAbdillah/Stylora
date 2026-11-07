@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { WorkspaceShell } from "@/components/shell";
 import { ApiError } from "@/lib/http";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
 import { getSavedLook } from "@/features/decisions/server";
@@ -27,23 +26,13 @@ export default async function SavedLookPage({
   }
   const backHref = savedReturnHref((await searchParams).returnTo);
   return (
-    <WorkspaceShell
-      activeHref="/saved-looks"
-      displayName="Studio guest"
-      activity={[]}
-      breadcrumbs={[
-        { label: "Saved looks", href: backHref },
-        { label: saved.title },
-      ]}
-    >
-      <div className="pb-28 md:pb-8">
-        <SavedDetailWorkspace
-          key={saved.id}
-          initial={saved}
-          backHref={backHref}
-          writesEnabled={getWorkspaceDatabase().writesEnabled}
-        />
-      </div>
-    </WorkspaceShell>
+    <div className="pb-28 md:pb-8">
+      <SavedDetailWorkspace
+        key={saved.id}
+        initial={saved}
+        backHref={backHref}
+        writesEnabled={getWorkspaceDatabase().writesEnabled}
+      />
+    </div>
   );
 }

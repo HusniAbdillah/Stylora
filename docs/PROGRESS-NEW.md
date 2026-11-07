@@ -418,6 +418,19 @@ below the latest one.
 
 ## 7. Owner 4 report
 
+### Preview render settings, 7 November 2026
+
+- User-requested personalization improvements. Added validated server-side
+  `OPENAI_IMAGE_QUALITY` with the existing medium default and explicit low/high
+  alternatives. Both image edit and description-only generation use the same
+  settings contract. Render fingerprints now include quality, input fidelity,
+  dimensions, format and settings version.
+- Ten focused settings and operation tests passed. Invalid quality is rejected
+  before provider execution. One `make pr-ready` is running locally; CI remains
+  the full check/build gate. No provider calls or hosted mutations were made
+  for this settings increment. Visual comparison follows the integrated prompt
+  and preferences changes under a separate three-image ceiling.
+
 - Owner 4 coordinator, 7 November 2026. Tasks O4.1 through O4.7 and
   R37 through R44. Integration source `4b94bc5` includes the Capsule wizard,
   scoped reasoning and persistence, responsive Preview, automatic stable-input
@@ -564,6 +577,19 @@ below the latest one.
 - Covered concurrent active claims, request deduplication, queued resubmission, healthy lease polling without another execution request, completed output reaching commit, failure RPC fences, stable fingerprints, status projection and read-only RPC readiness.
 - Not run. Hosted migrations, database or Storage commands, paid provider calls, browser end-to-end journeys and local build. CI remains the full build and suite gate.
 - Limits. The app must be open for the bounded client pump. Server crashes need a later visit and lease recovery. Provider availability, Storage and end-to-end image completion still require the coordinator’s approved integration smoke. No cloud data was changed.
+
+### Owner 4 Preview preference return, 7 November 2026
+
+- Task O4.6 and R01, R36, R41. Editing preferences waits for queued Preview
+  selection saves and returns to the exact draft and category. Failed saves keep
+  the local choices on Preview with Retry save. The preferences return validator
+  also retains Create drafts and selected outfit IDs through allowlisted routes.
+- Verification: nine pure return-destination tests passed in 5.52 seconds.
+  Fixtures are in memory; external URLs are rejection cases. `git diff --check`
+  passed. The pre-PR gate and full CI results are recorded on the pull request.
+- Not run: hosted writes, provider calls, browser journeys and local build.
+  Preference revision invalidation and preserved previous images follow in a
+  separate increment using the coordinated Preview status contract.
 
 ### Owner 4 saved image recovery and regeneration, 7 November 2026
 
@@ -931,3 +957,50 @@ which data, code revision or provider behavior was verified.
   No generated declarations were edited manually. Follow-up `make fast` is
   running; CI remains the full gate. No provider calls, shared fixtures or
   production environment settings were changed.
+
+## Owner 4 Preview personalization validation harness, 7 November 2026
+
+- Added `scripts/verify-preview-personalization.mjs` for root-operated A, B and
+  high-quality comparisons on port 3114 and the `dev-owner-4` sample fixture.
+  Two sample garment references remain constant. Preferences use the real API
+  with revision checks, and each single image POST is reserved in the external
+  smoke journal before execution. Reserved cases cannot submit again.
+- The script requires server `avatar-render.v2` settings before paid work,
+  verifies operation inputs and ready private PNG bytes, and saves external
+  images with metadata marked pending visual review. Preference restoration
+  checks the last written values and revision before using the API.
+- Local syntax check, dry-run, scoped ESLint and guards rejecting port 3104
+  and paths inside a Git checkout passed. No application HTTP request, hosted
+  data change or provider call ran in this task. Full checks and visual review
+  remain with CI and the coordinating root session, respectively.
+
+## Owner 3 marketplace and sharing polish, 7 November 2026
+
+- Branch `codex/owner3-marketplace-polish`. Integrated Owner 2 Create navigation
+  from `origin/main` at `10f0dd6`, then navigation fix `a78c9ac`, without
+  conflicts. Saved Looks uses the same
+  live workspace layout during collection, detail, loading and recovery states.
+- Saved Looks uses skeletons without temporary zero counts. Read-only hints sit
+  beside unavailable actions; server and client write gates remain enforced.
+- Google Shopping queries use the existing body illustration Men/Women group,
+  fit and selected styles, and append Shopee. Seller, category and explicit
+  gender contradictions are filtered. Cache identity includes used preferences,
+  revision and query; score-weight changes reuse results. Catalog destinations
+  remain labeled as catalog links. No new preference field was introduced.
+- New share links remain active until revoked. Existing finite links retain
+  their expiry. Share review replaces the checklist with an editable public
+  look description from existing public text or saved item names, without an
+  additional model call. Approved media and immutable publication checks remain.
+- Applied additive migration `20261107063306_permanent_share_links.sql` to
+  hosted project `imcqifydmrxotrbwfwme` through Supabase MCP under the user's
+  production authorization. Regenerated complete database types from MCP.
+  Hosted rollback SQL passed permanent/future/expired link counts, revocation,
+  immutable expiry, irreversible revocation, foreign workspace rejection and
+  denied direct anon access. Synthetic fixtures were rolled back.
+- Root `corepack pnpm exec vitest run src/features/products/provider.test.ts
+  src/features/products/search-context.test.ts` passed seven tests. Sharing
+  schema tests passed four tests. `corepack pnpm typecheck` and
+  `corepack pnpm lint` passed (the fast-gate equivalent; Make is unavailable
+  locally). CI remains the full build gate. PR #49 contains the integrated work.
+  No additional paid provider calls were made for this implementation. Browser
+  verification has not passed; prior local browser attempts timed out.
