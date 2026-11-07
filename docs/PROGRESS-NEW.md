@@ -277,6 +277,8 @@ below the latest one.
   src/features/preview/generation.ts:262 because complete_preview_operation is
   missing from the generated RPC types. That file and the generated types are
   unchanged from main. Full check and build are delegated to the PR CI gate.
+- Upstream 4971f04 supplied the missing RPC types while this branch was being
+  prepared. Rebased onto that update and reran typecheck successfully.
 - Formatted the task's new files with the current project formatter. Git delivery
   uses a pull request to main so the normal merge checks and protections apply.
 
