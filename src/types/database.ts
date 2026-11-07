@@ -335,7 +335,9 @@ export type Database = {
           created_at: string
           explanation: Json
           id: string
+          input_metadata: Json
           inputs_used: Json
+          is_current: boolean
           look_id: string
           preference_revision: number | null
           source_revision: number
@@ -347,7 +349,9 @@ export type Database = {
           created_at?: string
           explanation: Json
           id?: string
+          input_metadata?: Json
           inputs_used?: Json
+          is_current?: boolean
           look_id: string
           preference_revision?: number | null
           source_revision: number
@@ -359,7 +363,9 @@ export type Database = {
           created_at?: string
           explanation?: Json
           id?: string
+          input_metadata?: Json
           inputs_used?: Json
+          is_current?: boolean
           look_id?: string
           preference_revision?: number | null
           source_revision?: number
@@ -654,6 +660,7 @@ export type Database = {
           explanation: Json
           id: string
           inputs_used: Json
+          is_current: boolean
           look_id: string
           option_type: string
           provider_metadata: Json
@@ -673,6 +680,7 @@ export type Database = {
           explanation?: Json
           id?: string
           inputs_used?: Json
+          is_current?: boolean
           look_id: string
           option_type: string
           provider_metadata?: Json
@@ -692,6 +700,7 @@ export type Database = {
           explanation?: Json
           id?: string
           inputs_used?: Json
+          is_current?: boolean
           look_id?: string
           option_type?: string
           provider_metadata?: Json
@@ -1281,7 +1290,10 @@ export type Database = {
           created_at: string
           differences: Json
           evidence_coverage: number | null
+          explanation: Json
           id: string
+          input_metadata: Json
+          is_current: boolean
           look_id: string
           match_type: string
           piece_id: string
@@ -1298,7 +1310,10 @@ export type Database = {
           created_at?: string
           differences?: Json
           evidence_coverage?: number | null
+          explanation?: Json
           id?: string
+          input_metadata?: Json
+          is_current?: boolean
           look_id: string
           match_type: string
           piece_id: string
@@ -1315,7 +1330,10 @@ export type Database = {
           created_at?: string
           differences?: Json
           evidence_coverage?: number | null
+          explanation?: Json
           id?: string
+          input_metadata?: Json
+          is_current?: boolean
           look_id?: string
           match_type?: string
           piece_id?: string
@@ -1483,6 +1501,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1506,6 +1526,8 @@ export type Database = {
           lease_until?: string | null
           model?: string | null
           prompt_version?: string | null
+          provider_call_count?: number
+          provider_inflight?: number
           provider_request_id?: string | null
           result_ref?: Json | null
           safe_error_code?: string | null
@@ -1529,6 +1551,8 @@ export type Database = {
           lease_until?: string | null
           model?: string | null
           prompt_version?: string | null
+          provider_call_count?: number
+          provider_inflight?: number
           provider_request_id?: string | null
           result_ref?: Json | null
           safe_error_code?: string | null
@@ -1677,6 +1701,99 @@ export type Database = {
       }
     }
     Functions: {
+      append_create_event: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_payload?: Json
+          p_type: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          event_type: string
+          id: string
+          operation_id: string
+          payload: Json
+          sequence: number
+          source_revision: number
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operation_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      attach_inspiration_upload: {
+        Args: {
+          p_asset_id: string
+          p_draft_id: string
+          p_expected_revision: number
+          p_occasion?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          inspiration_asset_id: string | null
+          notes: string
+          occasion: string | null
+          provider_metadata: Json
+          revision: number
+          selected_option_id: string | null
+          source_type: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "looks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      attach_product_candidate: {
+        Args: {
+          p_expected_option_revision: number
+          p_look_id: string
+          p_option_id: string
+          p_option_item_id: string
+          p_product_id: string
+          p_search_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          candidate_position: number
+          category: string
+          created_at: string
+          id: string
+          item_kind: string
+          look_id: string
+          missing_brief: Json | null
+          option_id: string
+          piece_id: string | null
+          position: number
+          product_id: string | null
+          rationale: string
+          requested_brief: string | null
+          requested_category: string | null
+          revision: number
+          slot_id: string
+          updated_at: string
+          wardrobe_item_id: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "outfit_option_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       claim_workflow_operation: {
         Args: {
           p_input_revision: number
@@ -1697,6 +1814,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1710,6 +1829,163 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      control_create_operation: {
+        Args: {
+          p_action: string
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: Json
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      delete_saved_look: {
+        Args: { p_saved_look_id: string; p_workspace_id: string }
+        Returns: string
+      }
+      finish_create_operation: {
+        Args: {
+          p_attempt: number
+          p_metadata: Json
+          p_operation_id: string
+          p_result: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: Json
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      list_saved_looks: {
+        Args: {
+          p_cursor_created_at?: string
+          p_cursor_id?: string
+          p_filter?: string
+          p_limit?: number
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      release_create_provider_call: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      reserve_create_provider_call: {
+        Args: {
+          p_attempt: number
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      retry_saved_look_media: {
+        Args: { p_saved_look_id: string; p_workspace_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          operation_id: string
+          output_asset_id: string | null
+          preference_snapshot_hash: string
+          saved_look_id: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "saved_look_media"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_inspiration_pieces: {
+        Args: {
+          p_expected_revision: number
+          p_look_id: string
+          p_pieces: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          inspiration_asset_id: string | null
+          notes: string
+          occasion: string | null
+          provider_metadata: Json
+          revision: number
+          selected_option_id: string | null
+          source_type: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "looks"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1801,6 +2077,8 @@ export type Database = {
           lease_until: string | null
           model: string | null
           prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
           provider_request_id: string | null
           result_ref: Json | null
           safe_error_code: string | null
@@ -1958,3 +2236,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
