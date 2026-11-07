@@ -10,17 +10,17 @@ not authorize cloud changes, deployments or paid usage by itself.
 
 ## 1. Decisions to lock in the first fifteen minutes
 
-| Decision             | Recommendation                                                                                                      | Owner          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------- |
-| Names to owners      | Write the four names next to Owner 1 to 4 in TASK.md before anyone codes                                            | Team           |
-| Repository           | New repository, Next.js app scaffold, CI and PR template created at 00:00 by Owner 1 (README setup steps)           | Owner 1        |
-| Database target      | One new hosted Supabase project in the Singapore region is the only runtime database                                | Owner 1        |
-| Data isolation       | One `STYLORA_WORKSPACE_ID` per developer plus `demo` and `preview` workspaces in the same project                   | Owner 1        |
-| Background execution | Option A in section 5 for the build, Option B only if Owner 4 is ahead at the 04:00 checkpoint                      | Owners 2 and 4 |
-| Streaming strategy   | Try provider streaming for 20 minutes; if strict JSON streaming fails, switch to manifest plus per-piece calls      | Owner 2        |
-| Merge windows        | Fixed windows in section 3, squash merge, main always deployable                                                    | Owner 1        |
-| Provider budget      | Cap per developer: 150 Muse text calls, 20 image calls, 100 SerpAPI searches; cache everything by input fingerprint | Team           |
-| Demo safety          | Sample look path, pre-seeded demo wardrobe and a recorded backup video ready by 06:30                               | Team           |
+| Decision             | Recommendation                                                                                                        | Owner          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------- |
+| Names to owners      | Write the four names next to Owner 1 to 4 in TASK.md before anyone codes                                              | Team           |
+| Repository           | New repository, Next.js app scaffold, CI and PR template created at 00:00 by Owner 1 (README setup steps)             | Owner 1        |
+| Database target      | One new hosted Supabase project in the Singapore region is the only runtime database                                  | Owner 1        |
+| Data isolation       | One `STYLORA_WORKSPACE_ID` per developer plus `demo` and `preview` workspaces in the same project                     | Owner 1        |
+| Background execution | Option A in section 5 for the build, Option B only if Owner 4 is ahead at the 04:00 checkpoint                        | Owners 2 and 4 |
+| Streaming strategy   | Try provider streaming for 20 minutes; if strict JSON streaming fails, switch to manifest plus per-piece calls        | Owner 2        |
+| Merge windows        | Fixed windows in section 3, squash merge, main always deployable                                                      | Owner 1        |
+| Provider budget      | Cap per developer: 150 OpenAI text calls, 20 image calls, 100 SerpAPI searches; cache everything by input fingerprint | Team           |
+| Demo safety          | Sample look path, pre-seeded demo wardrobe and a recorded backup video ready by 06:30                                 | Team           |
 
 ## 2. Environments: hosted Supabase, not a local stack
 
@@ -282,7 +282,7 @@ pick the next one.
 - [ ] 03:00 One AI flowchart per owner (task, inputs, prompt files, schema,
       parallel calls, failure state) for the architecture slide.
 - [ ] 04:30 Slides: problem with persona, solution with all features, live
-      demo, architecture with Codex and the Muse and SerpAPI models plus data
+      demo, architecture with Codex and the OpenAI models and SerpAPI plus data
       governance, business impact and model, roadmap, closing. Header with
       logo and app name left, event logo right; footer with slide number and
       title.
@@ -368,12 +368,12 @@ Speed first. CI is the real gate: it runs `pnpm check` and `pnpm build` on every
 pull request, so local checks only need to catch obvious mistakes before the
 push. Do not duplicate CI locally.
 
-| Tier | When                          | Command                                | Target time |
-| ---- | ----------------------------- | -------------------------------------- | ----------- |
-| 0    | Per commit                    | Nothing                                | 0           |
-| 1    | Once before opening the PR    | `make fast` (lint and typecheck)       | under 1 min |
-| 2    | CI on the pull request        | `pnpm check` and `pnpm build`          | automatic   |
-| 3    | UI changes, one pass          | Click the changed flow once on preview | 2 to 5 min  |
+| Tier | When                       | Command                                | Target time |
+| ---- | -------------------------- | -------------------------------------- | ----------- |
+| 0    | Per commit                 | Nothing                                | 0           |
+| 1    | Once before opening the PR | `make fast` (lint and typecheck)       | under 1 min |
+| 2    | CI on the pull request     | `pnpm check` and `pnpm build`          | automatic   |
+| 3    | UI changes, one pass       | Click the changed flow once on preview | 2 to 5 min  |
 
 - Run `make test` before the PR only when the diff touches code that already has
   a test file, for example config, schemas, scoping or matching gates.
@@ -412,9 +412,9 @@ comparison in section 4 and the definition of done, not repeated here.
 
 ### 10.6 Merge lanes
 
-| Lane | Scope                                                                                                                                                                                                                                                            | Merge rule                                                                                  |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| A    | The owner's own feature folders and thin routes, tests for them, PROGRESS-NEW.md, TODO.md; no new dependency; about 400 lines or fewer                                                                                                                          | The agent may squash-merge after the Lane A conditions below                                |
+| Lane | Scope                                                                                                                                                                                                                                                                                                                                                                         | Merge rule                                                                                   |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| A    | The owner's own feature folders and thin routes, tests for them, PROGRESS-NEW.md, TODO.md; no new dependency; about 400 lines or fewer                                                                                                                                                                                                                                        | The agent may squash-merge after the Lane A conditions below                                 |
 | B    | `src/app/globals.css`, `src/app/layout.tsx`, shell and shared UI primitives, `package.json`, lockfile, `.env.example`, `supabase/**`, generated types, `.github/**`, `Makefile`, `src/prompts`, security, storage and workspace-scoping code, public sharing and media, governing specs (PRD, TDD, DESIGN, TASK, RULES, FASHION*), cross-owner contracts, more than 400 lines | The agent opens the pull request, reports it and stops. A human reviewer approves and merges |
 
 When in doubt, treat the change as Lane B. A pull request that mixes lanes is

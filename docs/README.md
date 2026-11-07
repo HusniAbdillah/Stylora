@@ -58,7 +58,7 @@ desktop and mobile frames for every page and state.
 | UI         | Tailwind CSS with Figma tokens, Radix primitives, Motion, Inter and Instrument Serif |
 | Validation | Zod                                                                                  |
 | Data       | Hosted Supabase PostgreSQL and private Storage, server-side access only              |
-| AI         | Meta Model API with `muse-spark-1.3` (text and vision) and `muse-image-1.0`          |
+| AI         | OpenAI API with `gpt-5-mini` (text and vision) and `gpt-image-1.5`                   |
 | Shopping   | SerpAPI                                                                              |
 | Quality    | ESLint, TypeScript, Vitest, Prettier, GitHub Actions                                 |
 
@@ -85,7 +85,7 @@ configuration and contract validation.
 | `SUPABASE_SECRET_KEY`   | Server-only privileged access             |
 | `STYLORA_WORKSPACE_ID`  | Workspace used by every server query      |
 | `DEMO_WRITES_ENABLED`   | Shared write gate, defaults to false      |
-| `MODEL_API_KEY`         | Muse model access on the server           |
+| `MODEL_API_KEY`         | OpenAI API access on the server           |
 | `SERPAPI_API_KEY`       | Marketplace search on the server          |
 | `SUPABASE_PROJECT_ID`   | CLI project selection and type generation |
 | `SUPABASE_ACCESS_TOKEN` | CLI-only credential                       |

@@ -140,7 +140,7 @@ below the latest one.
 - Consumer integration: Owner 1 inventory and preferences; Owner 3 selected
   detail; Owner 4 worker; not assessed.
 - Verification evidence: Not run.
-- Real Muse evidence and input provenance: Not verified.
+- Real OpenAI evidence and input provenance: Not verified.
 - Unresolved work and next concrete action: Not reported.
 
 ## 6. Owner 3 report
