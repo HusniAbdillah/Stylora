@@ -740,5 +740,5 @@ which data, code revision or provider behavior was verified.
   completed replay, busy rejection, stale media, immutable data and denied
   anon/authenticated execution. No provider calls or hosted fixtures were used.
 - Types were generated from the combined local schema with pinned Supabase CLI
-  3 and formatted with Prettier. Local `make fast` is running; CI and hosted
+  3 and formatted with Prettier. Local `make fast` passed lint and typecheck; CI and hosted
   schema application remain pending. Caller execution belongs to Owner 4.
