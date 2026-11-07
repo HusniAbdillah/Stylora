@@ -3,6 +3,7 @@ type Context = {
   revision: number;
   preferenceRevision: number;
   epoch: number;
+  renderFingerprint: string | null;
 };
 
 export function isCurrentPreviewResponse(
@@ -22,6 +23,7 @@ export function isCurrentPreviewResponse(
     current.preferenceRevision === requested.preferenceRevision &&
     response.preferenceRevision >= current.preferenceRevision &&
     current.epoch === requested.epoch &&
+    current.renderFingerprint === requested.renderFingerprint &&
     response.revision >= requested.revision &&
     (current.revision === requested.revision ||
       (!!pendingRender && response.renderRequestId === pendingRender))

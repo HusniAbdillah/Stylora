@@ -7,8 +7,18 @@ describe("Preview response fencing", () => {
     revision: 3,
     preferenceRevision: 4,
     epoch: 0,
+    renderFingerprint: "current-context",
   };
   const response = { draftId: "draft", revision: 3, preferenceRevision: 4 };
+  it("rejects an in-flight response after render quality or manifest changes", () => {
+    expect(
+      isCurrentPreviewResponse(
+        { ...requested, renderFingerprint: "new-quality-or-manifest" },
+        requested,
+        response,
+      ),
+    ).toBe(false);
+  });
   it("accepts the current context and rejects responses from an earlier preference or navigation check", () => {
     expect(isCurrentPreviewResponse(requested, requested, response)).toBe(true);
     expect(

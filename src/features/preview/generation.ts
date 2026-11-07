@@ -262,6 +262,7 @@ export async function previewImageStatus(draftId: string) {
     job,
     renderRequestId: payload.renderRequestId,
     preferenceRevision,
+    renderFingerprint: inputs?.renderFingerprint ?? null,
     imageOutdated,
     staleNotice: outdated
       ? "Your wardrobe or preferences changed. The previous image is shown."

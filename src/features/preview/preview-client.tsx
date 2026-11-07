@@ -29,6 +29,10 @@ const statusResponse = z.object({
     operationId: z.uuid().nullable(),
     renderRequestId: z.uuid().optional(),
     preferenceRevision: z.number().int().nonnegative(),
+    renderFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable(),
     imageOutdated: z.boolean(),
     staleNotice: z.string().optional(),
     renderSettings: imageRenderSettingsSchema,
@@ -76,6 +80,7 @@ export function PreviewClient({
   const activeCategory = useRef(category);
   const [selectedCategory, setSelectedCategory] = useState(category);
   const preferenceRevision = useRef(initial.preferenceRevision);
+  const renderFingerprint = useRef(initial.renderFingerprint);
   const refreshPreferences = useRef(false);
   const contextEpoch = useRef(0);
   const refreshVersion = useRef(0);
@@ -106,6 +111,7 @@ export function PreviewClient({
   const launch = useCallback(
     async function executePreview(
       mode: "resume" | "regenerate" | "retry",
+      resumedOperationId?: string | null,
     ): Promise<void> {
       if (
         !draft.current.draftId ||
@@ -115,7 +121,7 @@ export function PreviewClient({
           latestSelection.current !== persistedSelection.current)
       )
         return;
-      const launchKey = `${draft.current.draftId}:${draft.current.revision}:${preferenceRevision.current}:${mode}`;
+      const launchKey = `${draft.current.draftId}:${draft.current.revision}:${preferenceRevision.current}:${renderFingerprint.current}:${mode}`;
       if (pendingLaunches.current.has(launchKey)) return;
       pendingLaunches.current.add(launchKey);
       setJob((previous) => ({ ...previous, status: "queued" }));
@@ -124,6 +130,7 @@ export function PreviewClient({
         ...draft.current,
         preferenceRevision: preferenceRevision.current,
         epoch: contextEpoch.current,
+        renderFingerprint: renderFingerprint.current,
       };
       const renderSelection = latestSelection.current;
       let superseded = false;
@@ -141,7 +148,8 @@ export function PreviewClient({
           mode === "retry" && operationId
             ? await retryOperationRequest(operationId, "/api/previews", body)
             : await requestOperation(
-                `preview:${JSON.stringify(body)}`,
+                resumedOperationId ??
+                  `preview:${current.preferenceRevision}:${current.renderFingerprint}:${JSON.stringify(body)}`,
                 "/api/previews",
                 body,
               );
@@ -171,6 +179,11 @@ export function PreviewClient({
           return;
         }
         const result = statusResponse.parse(await response.json()).data;
+        if (result.renderFingerprint !== renderFingerprint.current) {
+          setImageOutdated(true);
+          refreshStatus.current();
+          return;
+        }
         if (
           latestSelection.current !== renderSelection ||
           !isCurrentPreviewResponse(
@@ -178,6 +191,7 @@ export function PreviewClient({
               ...draft.current,
               preferenceRevision: preferenceRevision.current,
               epoch: contextEpoch.current,
+              renderFingerprint: renderFingerprint.current,
             },
             current,
             result,
@@ -223,7 +237,7 @@ export function PreviewClient({
   useEffect(() => {
     if (
       resumed.current ===
-        `${initial.draftId}:${initial.revision}:${initial.preferenceRevision}` ||
+        `${initial.draftId}:${initial.revision}:${initial.preferenceRevision}:${initial.renderFingerprint}` ||
       !initial.draftId ||
       !initial.writesEnabled ||
       !Object.keys(initial.selection).length ||
@@ -235,12 +249,14 @@ export function PreviewClient({
       initial.job.status === "cancelled"
     )
       return;
-    resumed.current = `${initial.draftId}:${initial.revision}:${initial.preferenceRevision}`;
-    void launch("resume");
+    resumed.current = `${initial.draftId}:${initial.revision}:${initial.preferenceRevision}:${initial.renderFingerprint}`;
+    void launch("resume", initial.operationId);
   }, [
     initial.draftId,
     initial.revision,
     initial.preferenceRevision,
+    initial.renderFingerprint,
+    initial.operationId,
     initial.writesEnabled,
     initial.selection,
     initial.job.status,
@@ -270,7 +286,11 @@ export function PreviewClient({
         return;
       const preferencesChanged =
         result.preferenceRevision !== preferenceRevision.current ||
+        result.renderFingerprint !== renderFingerprint.current ||
         refreshPreferences.current;
+      if (result.renderFingerprint !== renderFingerprint.current)
+        contextEpoch.current += 1;
+      renderFingerprint.current = result.renderFingerprint;
       preferenceRevision.current = result.preferenceRevision;
       setStatusFailed(false);
       if (preferencesChanged) setImageOutdated(true);
@@ -296,12 +316,12 @@ export function PreviewClient({
           router.refresh();
         }
         if (
-          result.job.superseded &&
+          (result.job.superseded || result.job.status === "queued") &&
           initial.writesEnabled &&
           initial.job.status !== "unavailable" &&
           Object.keys(selection).length
         )
-          void launch("resume");
+          void launch("resume", result.operationId);
       }
     }
     const check = () => {
