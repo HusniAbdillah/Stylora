@@ -4,7 +4,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Stylora",
-  description: "A fashion studio for turning outfit inspiration into everyday decisions.",
+  description:
+    "A fashion studio for turning outfit inspiration into everyday decisions.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

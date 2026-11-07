@@ -1,0 +1,30 @@
+# Disposable local tooling. Application environments use the hosted project.
+project_id = "stylora"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+auto_expose_new_tables = false
+
+[db]
+port = 54322
+shadow_port = 54320
+# Match the approved hosted database before migration testing.
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+
+[auth]
+enabled = false
+
+[storage]
+enabled = true

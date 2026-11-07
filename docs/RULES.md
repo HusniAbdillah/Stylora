@@ -147,9 +147,12 @@ flows.
 ## 8. Collaboration and evidence
 
 Respect TASK.md ownership and coordinate shared files before editing. Preserve
-unrelated files and local data. Do not commit, push, deploy, provision services
-or mutate remote data without task authorization. A documentation-only task does
-not authorize implementation or verification that changes application state.
+unrelated files and local data. Agents may commit, push their own branch, open
+pull requests and merge Lane A changes as defined in
+[WORKFLOW.md](WORKFLOW.md) section 10 and [AGENTS.md](../AGENTS.md). Deployment,
+paid services and remote data changes still need task authorization. A
+documentation-only task does not authorize implementation or verification that
+changes application state.
 
 Record actual results in PROGRESS-NEW.md, including commands not run and why.
 Respect an explicit instruction to skip tests or build. Builds and unit tests do
