@@ -24,18 +24,6 @@ function errorMessage(error: unknown) {
     : "The saved look could not be updated. Try again.";
 }
 
-function WritesNotice({ enabled }: { enabled: boolean }) {
-  return enabled ? null : (
-    <p
-      role="status"
-      className="mb-5 rounded-xl border border-stone bg-paper p-4 text-sm text-secondary"
-    >
-      Changes are turned off for this shared workspace. You can still browse
-      saved looks.
-    </p>
-  );
-}
-
 export function SavedCollectionWorkspace({
   initial,
   filter,
@@ -89,7 +77,6 @@ export function SavedCollectionWorkspace({
   }
   return (
     <>
-      <WritesNotice enabled={writesEnabled} />
       {failure && (
         <p
           role="alert"
@@ -128,9 +115,12 @@ export function SavedCollectionWorkspace({
               onChanged={() => router.refresh()}
             />
           ) : (
-            <Button variant="quiet" disabled>
-              Share
-            </Button>
+            <span className="flex items-center gap-2">
+              <Button variant="quiet" disabled>
+                Share
+              </Button>
+              <span className="text-xs text-secondary">Read-only</span>
+            </span>
           )
         }
       />
@@ -298,7 +288,6 @@ export function SavedDetailWorkspace({
     );
   return (
     <>
-      <WritesNotice enabled={writesEnabled} />
       {failure && (
         <p
           role="alert"
