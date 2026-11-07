@@ -8,7 +8,7 @@ DECLARE
   outfit1 uuid := gen_random_uuid(); outfit2 uuid := gen_random_uuid(); outfit3 uuid := gen_random_uuid();
   draft uuid := gen_random_uuid(); capsule_draft uuid := gen_random_uuid(); image uuid := gen_random_uuid();
   item_ids uuid[]; extra_ids uuid[]; brief jsonb; outfits jsonb; oversized_outfits jsonb; additions jsonb; current_draft jsonb;
-  op public.workflow_operations; saved jsonb; preview_saved jsonb; second_saved jsonb;
+  op public.workflow_operations; queued_op public.workflow_operations; saved jsonb; preview_saved jsonb; second_saved jsonb;
 BEGIN
   INSERT INTO public.workspaces(id,name) VALUES (ws,'studio_test_' || ws),(foreign_ws,'studio_test_' || foreign_ws);
   INSERT INTO public.wardrobe_items(id,workspace_id,name,category,inventory_status,source_type) VALUES
@@ -136,10 +136,23 @@ BEGIN
   op := public.claim_workflow_operation(ws,op.id,4);
   current_draft := public.save_capsule_draft(ws,capsule,4,'Synthetic capsule',brief || '{"notes":"Changed"}',item_ids);
   IF current_draft ->> 'revision' <> '5' OR EXISTS (SELECT 1 FROM public.capsule_outfits WHERE workspace_id = ws AND capsule_id = capsule)
-    OR NOT EXISTS (SELECT 1 FROM public.workflow_operations WHERE workspace_id = ws AND id = op.id AND status = 'cancelled') THEN
-    RAISE EXCEPTION 'Draft edit retained stale outputs or active work';
+    OR NOT EXISTS (SELECT 1 FROM public.workflow_operations WHERE workspace_id = ws AND id = op.id
+      AND status = 'running' AND cancel_requested_at IS NOT NULL AND lease_until > clock_timestamp()) THEN
+    RAISE EXCEPTION 'Draft edit did not invalidate outputs and request cancellation';
   END IF;
+  op := public.finish_workflow_operation(ws,op.id,1,repeat('b',64),'succeeded','{}');
+  IF op.status <> 'cancelled' THEN RAISE EXCEPTION 'Worker did not acknowledge cancellation after revision changed'; END IF;
+  op := public.start_workflow_operation(ws,'capsule_generation','capsule',capsule,5,repeat('e',64));
+  op := public.claim_workflow_operation(ws,op.id,5);
+  queued_op := public.start_workflow_operation(ws,'capsule_generation','capsule',capsule,5,repeat('f',64));
   PERFORM public.delete_capsule(ws,capsule,5);
+  IF NOT EXISTS (SELECT 1 FROM public.workflow_operations WHERE workspace_id = ws AND id = queued_op.id AND status = 'cancelled')
+    OR NOT EXISTS (SELECT 1 FROM public.workflow_operations WHERE workspace_id = ws AND id = op.id
+      AND status = 'running' AND cancel_requested_at IS NOT NULL AND lease_until > clock_timestamp()) THEN
+    RAISE EXCEPTION 'Delete did not preserve active lease and cancel queued work';
+  END IF;
+  op := public.finish_workflow_operation(ws,op.id,1,repeat('e',64),'succeeded','{}');
+  IF op.status <> 'cancelled' THEN RAISE EXCEPTION 'Worker did not acknowledge cancellation after parent deletion'; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.saved_look_snapshots WHERE workspace_id = ws AND id = (saved ->> 'savedLookId')::uuid) THEN
     RAISE EXCEPTION 'Source deletion removed saved snapshot';
   END IF;
