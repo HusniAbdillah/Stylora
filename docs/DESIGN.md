@@ -41,7 +41,7 @@ The mark is one ribbon of cloth folding into an S, with a small cut swatch at
 its shoulder: the piece you already own, finding its place in a new look. The
 lockup pairs the mark with the lowercase `stylora` wordmark in Instrument
 Serif. The master SVG is the 1108 by 1420 two-path file filled with `#73091D`;
-keep it in `design-assets/` and in the Figma components `Logo / Lockup` (tones
+keep it in `assets/` and in the Figma components `Logo / Lockup` (tones
 Crimson, Paper, Night) and `Logo / Mark`.
 
 - Default: Crimson lockup on Porcelain or Paper.
@@ -394,8 +394,8 @@ variant):
 | Four posed avatars, swatches 02 to 06   | Generated in Figma, labeled illustrative                                                                    | Landing, Preview, Saved looks, Share    |
 | Three trench coat product shots         | Generated in Figma as marketplace stand-ins                                                                 | Details marketplace mockup only         |
 | About flat-lay and five template boards | Generated in Figma                                                                                          | Landing About, Capsule templates, Style |
-| Logo SVG, mark, lockups                 | `design-assets/stylora-mark-*.svg`, Figma `Logo / Lockup` and `Logo / Mark`                                 | Every page, share page                  |
-| App icons                               | `design-assets/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `favicon-32.png`, `icon-maskable.svg` | Favicon, PWA manifest                   |
+| Logo SVG, mark, lockups                 | `assets/stylora-mark-*.svg`, Figma `Logo / Lockup` and `Logo / Mark`                                 | Every page, share page                  |
+| App icons                               | `assets/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `favicon-32.png`, `icon-maskable.svg` | Favicon, PWA manifest                   |
 | 34 line icons, 24 px, 1.75 stroke       | Figma `Icon / *` components, lucide-style paths                                                             | Navigation, status, actions             |
 | Body shape and fit silhouettes          | Figma SVG illustrations on Preferences                                                                      | Preferences, Upload preference summary  |
 

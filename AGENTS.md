@@ -2,23 +2,26 @@
 
 ## Read first and resolve authority
 
-Read `PRD.md`, `TDD.md`, `DESIGN.md`, `TASK.md`, `RULES.md`,
-`FASHION-STRUCTURE.md`, `FASHION-PROMPT.md`, and the relevant sections of
-`FASHION.md` before changing a feature. These specifications govern required
+All specifications live in `docs/`; this file stays at the repository root.
+Read `docs/PRD.md`, `docs/TDD.md`, `docs/DESIGN.md`, `docs/TASK.md`,
+`docs/RULES.md`, `docs/FASHION-STRUCTURE.md`, `docs/FASHION-PROMPT.md`, and the
+relevant sections of `docs/FASHION.md` before changing a feature. For Owner 3
+work also read `docs/DATABASE.md`. These specifications govern required
 product behavior; once the build starts, its migrations and generated types
 govern the executable database contract. Report and resolve any gap rather than
 treating a specification as implemented code.
 
-Use `WORKFLOW.md` for environments, branch and merge rhythm and the per-owner
-TODO, and the Figma file named in `DESIGN.md` (pages 03 to 05) as the visual
-source; implement frames through the shared primitives and tokens rather than
-pasting generated layout code. Use `PROGRESS-NEW.md` for structured owner
-reports. Never report an unverified result as evidence.
+Use `docs/WORKFLOW.md` for environments, branch and merge rhythm and the
+per-owner TODO, and the Figma file named in `docs/DESIGN.md` (pages 03 to 05) as
+the visual source; implement frames through the shared primitives and tokens
+rather than pasting generated layout code. Logo and icon files are in `assets/`.
+Use `docs/PROGRESS-NEW.md` for structured owner reports. Never report an
+unverified result as evidence.
 
 ## Language and scope
 
 English is the project language for documents, code comments, UI copy, commits,
-and review notes. Root specification filenames use uppercase names with the
+and review notes. Specification filenames in `docs/` use uppercase names with the
 `.md` extension. User-facing copy uses sentence case and avoids slash-separated
 labels. Code identifiers, paths and literal catalog data retain their valid
 form.
@@ -63,8 +66,8 @@ them. Do not stage unrelated local files, images or caches.
   types. Create new migrations using the CLI; never edit an applied migration or
   hand-edit generated database types.
 - Do not add ORM, state library, queue, SDK or empty service layers without a
-  demonstrated requirement. Background execution follows TDD.md section 8 and
-  WORKFLOW.md section 5.
+  demonstrated requirement. Background execution follows docs/TDD.md section 8 and
+  docs/WORKFLOW.md section 5.
 
 ## State and asynchronous work
 
@@ -91,8 +94,8 @@ and image-generation success are separate states.
 ## Fashion and AI integrity
 
 Every fashion analysis, recommendation, regeneration and image-direction request
-includes the contents of `FASHION-PROMPT.md`, relevant `FASHION.md` knowledge
-and the appropriate `FASHION-STRUCTURE.md` schema. Record versions. Do not claim
+includes the contents of `docs/FASHION-PROMPT.md`, relevant `docs/FASHION.md` knowledge
+and the appropriate `docs/FASHION-STRUCTURE.md` schema. Record versions. Do not claim
 a prompt file is used merely because it exists.
 
 Use canonical item attributes throughout the app. Keep user facts, inferred
@@ -115,7 +118,7 @@ limitations.
 
 ## Design and accessibility
 
-Use DESIGN.md tokens and component behavior. Paper text on Crimson primary buttons;
+Use docs/DESIGN.md tokens and component behavior. Paper text on Crimson primary buttons;
 light selected option tabs with readable dark labels. Support long content,
 keyboard, focus, labels, touch targets, reduced motion, and loading, empty,
 partial, error and retry states. Real wardrobe matches show real wardrobe
@@ -128,7 +131,7 @@ limitations note is enough.
 
 ## Ownership and collaboration
 
-Follow TASK.md. Owner 1 coordinates shared shell, root CSS, package and
+Follow docs/TASK.md. Owner 1 coordinates shared shell, root CSS, package and
 lockfile, env examples, migrations and generated types. Other owners submit a
 contract change with fields, constraints, access pattern, callers and migration
 needs before editing shared areas. Agents stay within assigned scope; do not
@@ -147,7 +150,7 @@ change shared data; check what they do before running and stay within
 authorization.
 
 Record actual commands, environment, result, fixture source, cleanup,
-limitations and integration evidence in PROGRESS-NEW.md. A route, unit test or
+limitations and integration evidence in docs/PROGRESS-NEW.md. A route, unit test or
 build does not prove an end-to-end feature. Do not label unrun checks passed.
 
 Do not commit, push, deploy, provision paid services or modify the remote

@@ -38,9 +38,9 @@ selection rather than separate single and combination modes.
 | [REVISION-FLOW.md](REVISION-FLOW.md)                                                       | Team design decisions traced to requirements and Figma frames        |
 | [PROGRESS-NEW.md](PROGRESS-NEW.md)                                                         | Progress and evidence template                                       |
 | [RULES.md](RULES.md)                                                                       | Product, engineering and integrity rules                             |
-| [AGENTS.md](AGENTS.md)                                                                     | Instructions for coding agents                                       |
-| [Owner-3-Supabase-Backend-Technical-Guide.md](Owner-3-Supabase-Backend-Technical-Guide.md) | Owner 3 backend brief                                                |
-| `design-assets/`                                                                           | Logo SVGs and app icons                                              |
+| [AGENTS.md](../AGENTS.md)                                                                     | Instructions for coding agents                                       |
+| [DATABASE.md](DATABASE.md) | Owner 3 backend brief                                                |
+| `../assets/` | Logo SVGs and app icons                                              |
 
 The visual source is the
 [Stylora Design System](https://www.figma.com/design/ta9JYu4Q7fLWeuu0PJgWhp/Stylora-Design-System)
