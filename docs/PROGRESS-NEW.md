@@ -387,6 +387,19 @@ below the latest one.
   by this Owner 4 smoke.
 
 
+### Owner 4 image Storage retry classification, 7 November 2026
+
+- Task O4.1 and R04–R06. Feature-owned image I/O now preserves transient
+  upstream status as existing operation retry codes. Missing images, denied
+  access, invalid bytes and invalid Storage metadata remain terminal.
+- The classifier consumes Owner 1's optional `upstreamStatus` and default-false
+  `retryable` Storage error contract. It does not change shared Storage code,
+  SQL retry rules, operation fences or provider execution.
+- `pnpm exec vitest run src/features/preview/image-errors.test.ts` passed all
+  17 cases using in-memory errors. `make fast` passed lint and typecheck.
+  No hosted reads, writes, fixtures or model calls were run for this change.
+  CI remains the full suite and build gate.
+
 ### Owner 4 operation controls increment, 7 November 2026
 
 - Task O4.1 and R01, R04–R06. Branch `o4/operation-controls`, based on merged runner and Owner 1 typed operation RPC contracts.
