@@ -59,6 +59,11 @@ describe("Wardrobe contracts", () => {
         sourceReference: { kind: "wardrobe", id },
       });
       expect(canonical.attributes).toEqual(item.attributes);
+      if (item === manifest.items[0]) {
+        expect(() =>
+          toCanonicalWardrobeItem({ ...row, attributes: null }),
+        ).toThrow();
+      }
     }
   });
   it("keeps original values and inference when edits are repeated or cleared", () => {
