@@ -5,6 +5,7 @@ import { Button } from "@/components/ui";
 import { BrowserApiError, requestData } from "@/lib/browser-api";
 import type { getSavedLook } from "@/features/decisions/server";
 import type { createShare, listShares } from "./server";
+import { initialLookDescription } from "./schema";
 import {
   ShareReviewDialog,
   ShareRevocationDialog,
@@ -28,10 +29,10 @@ function message(error: unknown) {
     : "Sharing could not be updated. Try again.";
 }
 
-function expiry(value: string) {
+function formatTime(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
-    ? "Expiry unavailable"
+    ? "Date unavailable"
     : new Intl.DateTimeFormat("en", {
         dateStyle: "medium",
         timeStyle: "short",
@@ -59,6 +60,8 @@ function SharingSession({
   const [error, setError] = useState<string | null>(null);
   const [revokeError, setRevokeError] = useState<string | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
+  const [description, setDescription] = useState("");
+  const descriptionInitialized = useRef(false);
   const [published, setPublished] = useState<{
     id: string;
     url: string;
@@ -89,6 +92,15 @@ function SharingSession({
       if (current !== session.current) return;
       setSaved(look);
       setShares(page.shares);
+      if (!descriptionInitialized.current) {
+        setDescription(
+          initialLookDescription(
+            look.items,
+            page.shares.find((share) => share.catchphrase.trim())?.catchphrase,
+          ),
+        );
+        descriptionInitialized.current = true;
+      }
       setHasMore(page.shares.length === page.limit);
     } catch (failure) {
       if (current === session.current) setError(message(failure));
@@ -138,7 +150,7 @@ function SharingSession({
     }
   }
 
-  async function publish(values: { catchphrase: string; expiryHours: number }) {
+  async function publish(values: { catchphrase: string }) {
     if (mutation.current || !writesEnabled || !saved) return;
     mutation.current = true;
     setBusy(true);
@@ -151,7 +163,6 @@ function SharingSession({
           method: "POST",
           body: JSON.stringify({
             catchphrase: values.catchphrase,
-            expiresInHours: values.expiryHours,
             approvedMediaIds: selectedMedia,
           }),
         },
@@ -251,6 +262,8 @@ function SharingSession({
         loading={loading}
         busy={busy}
         canPublish={writesEnabled}
+        catchphrase={description}
+        onCatchphraseChange={setDescription}
         error={error}
         onClose={close}
         onPublish={(values) => void publish(values)}
@@ -346,8 +359,10 @@ function SharingSession({
                   </p>
                   <p className="mt-1 text-xs text-secondary">
                     {share.revokedAt
-                      ? `Turned off ${expiry(share.revokedAt)}`
-                      : `${share.status === "expired" ? "Expired" : "Expires"} ${expiry(share.expiresAt)}`}
+                      ? `Turned off ${formatTime(share.revokedAt)}`
+                      : share.expiresAt
+                        ? `${share.status === "expired" ? "Expired" : "Expires"} ${formatTime(share.expiresAt)}`
+                        : "Active until you turn it off"}
                   </p>
                   {share.catchphrase && (
                     <p className="mt-1 break-words text-xs text-secondary">
