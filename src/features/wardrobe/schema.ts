@@ -138,7 +138,11 @@ export type ItemValues = z.infer<typeof itemValuesSchema>;
 export type DraftPayload = z.infer<typeof draftPayloadSchema>;
 export type WardrobeRow = Database["public"]["Tables"]["wardrobe_items"]["Row"];
 
-export function toCanonicalWardrobeItem(row: WardrobeRow) {
+type WardrobeReadRow =
+  | WardrobeRow
+  | Database["public"]["Functions"]["wardrobe_item_command"]["Returns"];
+
+export function toCanonicalWardrobeItem(row: WardrobeReadRow) {
   const values = itemValuesSchema.parse({
     name: row.name,
     category: row.category,
