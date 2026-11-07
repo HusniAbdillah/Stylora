@@ -75,7 +75,9 @@ export function LandingHeader({
 export function LandingFooter() {
   return (
     <footer className={styles.footer}>
-      <Logo tone="paper" />
+      <Link href="/" aria-label="Stylora home">
+        <Logo tone="paper" />
+      </Link>
       <p>Shared demo workspace. Please use non-sensitive outfit images.</p>
       <p>Dress with intention.</p>
     </footer>
