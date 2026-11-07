@@ -524,3 +524,43 @@ which data, code revision or provider behavior was verified.
   acknowledgment or lease expiry. Queued cancellation remains immediate.
   Updated operation, Studio and foundation suites all passed against the
   combined local schema. Local lint and typecheck passed; CI is the build gate.
+
+### Hosted rollout, 7 November 2026
+
+- Human approval was verified from the Owner 4 coordination chat's explicit
+  migration and smoke-test response. PR #21 merged as `4971f04` after GitHub
+  CI and Vercel Preview checks passed.
+- Applied the committed SQL through Supabase MCP in one transaction, recording
+  the exact source versions `20261107035901`, `20261107042133` and
+  `20261107043614`. Their stored SQL hashes match the committed files.
+  The five existing migration entries remain present.
+- Owner 2 and Owner 3 prerequisite migrations were already hosted. The Owner 2
+  `finish_create_operation` and `control_create_operation` definition hashes
+  stayed unchanged across this rollout.
+- Read-only verification passed. Hosted REST OpenAPI returned HTTP 200 with
+  all 13 expected operation, image, Capsule and Studio RPCs. Each permits
+  service-role execution and denies anon and authenticated execution.
+  All 25 application tables retain RLS and deny direct anon and authenticated
+  SELECT, INSERT, UPDATE and DELETE privileges.
+- Security advisors returned 25 informational no-policy notices, consistent
+  with the specified deny-direct access model.
+  [Advisor reference](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+- This rollout made schema and migration-history changes only. Provider calls,
+  fixture seeding and connected browser smoke remain with the Owner 4
+  coordinator under the approved budget. Local application checks were not
+  repeated for this documentation-only checkpoint.
+
+### Hosted type parity and bag selection correction
+
+- Regenerated `src/types/database.ts` directly from the hosted Supabase MCP
+  generator. Verified that Owner 2, Owner 3, workflow, image and Studio RPCs
+  remain declared. Main already contained the workflow RPC names before this
+  regeneration.
+- The Preview UI and mapper classify purses, satchels, duffels, briefcases,
+  crossbody bags and messenger bags as bag slots. The earlier Studio SQL used
+  a shorter exact-match list. Additive migration
+  `20261107045847_preview_bag_subcategories.sql` uses the same classification
+  expression as the UI and mapper.
+- Local `preview_bag_subcategories.sql` passed as `service_role`, covering ten
+  supported subtypes, wrong-slot rejection and fixture rollback. Hosted
+  application of this correction follows its CI gate.
