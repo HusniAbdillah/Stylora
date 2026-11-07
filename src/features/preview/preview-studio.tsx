@@ -35,7 +35,7 @@ const CATEGORIES: { key: PreviewCategory; label: string }[] = [
 
 function slotForItem(item: PreviewItem): PreviewCategory {
   if (item.category !== "accessory") return item.category;
-  return /bag|tote|clutch|backpack|handbag/i.test(item.subcategory ?? "")
+  return /bag|tote|clutch|backpack|purse|satchel|duffel|briefcase|crossbody|messenger/i.test(item.subcategory ?? "")
     ? "bags"
     : "accessories";
 }

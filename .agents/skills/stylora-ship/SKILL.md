@@ -28,16 +28,16 @@ git commit -m "feat(inspiration): stream complete garment pieces" -m "O2.4, D03"
 ## Before the pull request (about 2 minutes)
 
 1. Run `stylora-antislop` on your diff.
-2. `make fast` once. Add `make test` only if you touched code with an existing
-   test file. Fix and rerun at most twice.
+2. `make pr-ready` once (runs `make fast`, then reports diff size, lane and time
+   window). Add `make test` only if you touched code with an existing test file.
+   Fix and rerun at most twice.
 3. Add or update your `docs/PROGRESS-NEW.md` row with the checks actually run and
    the ones not run.
 
 ## Open the pull request
 
 ```
-git push -u origin oN/<slug>
-gh pr create --fill --base main
+make open-pr    # pr-ready, push the branch, gh pr create --fill --base main
 ```
 
 Use `.github/pull_request_template.md`. Keep it near 400 changed lines or less.
@@ -46,8 +46,9 @@ Rebase only if GitHub shows a conflict.
 ## Pick the lane
 
 - Lane A (own feature folders, thin routes, own tests, TODO and PROGRESS rows, no
-  new dependency): run
-  `gh pr merge --squash --auto --delete-branch`, then start the next task.
+  new dependency): run `make automerge` (it verifies the lane, then runs
+  `gh pr merge --squash --auto --delete-branch`), then start the next task.
+  `make ship` runs open-pr and automerge together.
   Fallback if auto-merge is off: `gh pr checks --watch`, then
   `gh pr merge --squash --delete-branch`.
 - Lane B (shared files, `supabase/**`, generated types, lockfile, `.github/**`,
