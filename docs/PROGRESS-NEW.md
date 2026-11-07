@@ -316,3 +316,9 @@ which data, code revision or provider behavior was verified.
 - Handoff: `docs/OWNER-3-BACKEND.md` maps API data to D06, D14, D27, D15 and D16
   and identifies the Owner 1/2/4 integration points. No shared executor is implied.
 - User authorized PR creation, conflict resolution and merge after green CI.
+- Integration update: merged `origin/main` at `4fd5aba` (shared UI and Storybook)
+  without conflicts. Frozen dependency install, lint and typecheck passed again.
+  These UI components remain presentation contracts; application wiring is not
+  claimed by the backend smoke.
+- Latest user instruction supersedes the earlier merge authorization: open the
+  PR and check CI, but leave the PR unmerged until explicitly requested.
