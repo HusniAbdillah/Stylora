@@ -4,7 +4,7 @@ import {
   getWorkspaceDatabase,
   requireWorkspaceWrites,
 } from "@/lib/supabase/server";
-import { createWorkspaceSignedRead } from "@/lib/supabase/storage";
+import { createWorkspaceSignedReads } from "@/lib/supabase/storage";
 import {
   capsuleBriefSchema,
   categorySchema,
@@ -78,32 +78,18 @@ export async function getCapsuleInventory(): Promise<CapsuleItem[]> {
       }),
     )
     .parse(data);
-  const items: CapsuleItem[] = [];
-  for (let index = 0; index < rows.length; index += 8) {
-    const batch = await Promise.all(
-      rows.slice(index, index + 8).map(async (row) => {
-        let imageUrl: string | null = null;
-        if (row.asset_id) {
-          try {
-            imageUrl = (await createWorkspaceSignedRead(row.asset_id))
-              .signedUrl;
-          } catch {
-            imageUrl = null;
-          }
-        }
-        return {
-          id: row.id,
-          revision: row.revision,
-          name: row.name,
-          category: row.category,
-          inventoryStatus: "owned" as const,
-          imageUrl,
-        };
-      }),
-    );
-    items.push(...batch);
-  }
-  return items;
+  // One bulk signing call replaces a lookup and a signature per garment.
+  const imageUrls = await createWorkspaceSignedReads(
+    rows.flatMap((row) => (row.asset_id ? [row.asset_id] : [])),
+  ).catch(() => new Map<string, string>());
+  return rows.map((row): CapsuleItem => ({
+    id: row.id,
+    revision: row.revision,
+    name: row.name,
+    category: row.category,
+    inventoryStatus: "owned",
+    imageUrl: row.asset_id ? (imageUrls.get(row.asset_id) ?? null) : null,
+  }));
 }
 
 export async function saveCapsuleDraft(id: string, input: unknown) {

@@ -21,6 +21,7 @@ type Props = {
   label?: string;
   onChanged?: () => void;
   writesEnabled?: boolean;
+  mode?: "create" | "manage";
 };
 
 function message(error: unknown) {
@@ -49,8 +50,10 @@ function SharingSession({
   label = "Share this look",
   onChanged,
   writesEnabled = true,
+  mode = "create",
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [managing, setManaging] = useState(mode === "manage");
   const [saved, setSaved] = useState<SavedLook | null>(null);
   const [shares, setShares] = useState<ShareMetadata[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,7 +62,6 @@ function SharingSession({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revokeError, setRevokeError] = useState<string | null>(null);
-  const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
   const [description, setDescription] = useState("");
   const descriptionInitialized = useRef(false);
   const [published, setPublished] = useState<{
@@ -81,7 +83,6 @@ function SharingSession({
     setLoading(true);
     setError(null);
     setSaved(null);
-    setSelectedMedia([]);
     try {
       const [look, page] = await Promise.all([
         requestData<SavedLook>(`/api/saved-looks/${savedLookId}`),
@@ -120,6 +121,7 @@ function SharingSession({
   }
 
   async function openManager() {
+    setManaging(mode === "manage");
     setOpen(true);
     setPublished(null);
     setRevoking(null);
@@ -151,7 +153,7 @@ function SharingSession({
   }
 
   async function publish(values: { catchphrase: string }) {
-    if (mutation.current || !writesEnabled || !saved) return;
+    if (mutation.current || !writesEnabled || !saved || managing) return;
     mutation.current = true;
     setBusy(true);
     setError(null);
@@ -163,7 +165,7 @@ function SharingSession({
           method: "POST",
           body: JSON.stringify({
             catchphrase: values.catchphrase,
-            approvedMediaIds: selectedMedia,
+            approvedMediaIds: readyMediaId ? [readyMediaId] : [],
           }),
         },
       );
@@ -229,13 +231,8 @@ function SharingSession({
   const look: PublicLook | null = saved
     ? {
         title: saved.title,
-        avatarUrl:
-          readyMediaId && selectedMedia.includes(readyMediaId)
-            ? saved.media.imageUrl
-            : null,
-        avatarNotice: readyMediaId
-          ? "Select the completed avatar to include it."
-          : "No completed avatar is included. The saved items can still be shared.",
+        avatarUrl: readyMediaId ? saved.media.imageUrl : null,
+        avatarNotice: "No completed avatar yet. Your saved items are included.",
         items: saved.items.map((item, index) => ({
           id: String(index),
           name:
@@ -249,6 +246,7 @@ function SharingSession({
     <>
       <Button
         variant="secondary"
+        className="min-w-24 justify-center"
         disabled={busy}
         aria-busy={busy}
         onClick={() => void openManager()}
@@ -262,6 +260,8 @@ function SharingSession({
         loading={loading}
         busy={busy}
         canPublish={writesEnabled}
+        managing={managing}
+        onCreateNew={() => setManaging(false)}
         catchphrase={description}
         onCatchphraseChange={setDescription}
         error={error}
@@ -295,77 +295,46 @@ function SharingSession({
             Retry loading
           </Button>
         )}
-        {saved && (
-          <fieldset
-            className="mt-4"
-            disabled={busy || !!published || !writesEnabled}
-          >
-            <legend className="text-sm font-medium">
-              Avatar for this link
-            </legend>
-            {readyMediaId ? (
-              <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-stone p-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selectedMedia.includes(readyMediaId)}
-                  onChange={(event) =>
-                    setSelectedMedia(event.target.checked ? [readyMediaId] : [])
-                  }
-                  className="size-4 accent-crimson"
-                />
-                Include the completed avatar shown in the preview
-              </label>
-            ) : (
-              <>
-                <p className="mt-2 text-xs leading-relaxed text-secondary">
-                  No completed avatar is available to approve. You can share the
-                  saved items without one.
-                </p>
-                <Button
-                  variant="quiet"
-                  disabled={busy || !!published}
-                  onClick={() => void load()}
-                >
-                  Refresh image status
-                </Button>
-              </>
-            )}
-          </fieldset>
+        {saved && !published && shares.length === 0 && managing && (
+          <p className="mt-4 text-sm text-secondary">
+            No shared links for this look.
+          </p>
         )}
-        {saved && (
-          <section className="mt-5" aria-label="Existing share links">
-            <h3 className="text-sm font-medium">Existing links</h3>
-            <p className="mt-1 text-xs leading-relaxed text-secondary">
-              Full links are shown only when created. To copy a new link, review
-              this look and create another.
-            </p>
-            {!shares.length && (
-              <p className="mt-3 text-sm text-secondary">
-                No links have been created for this look.
-              </p>
-            )}
+        {saved && !published && shares.length > 0 && (
+          <details open={managing} className="mt-5 border-t border-stone pt-3">
+            <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crimson">
+              {managing ? "Published links" : "Previous links"} ({shares.length}
+              {hasMore ? "+" : ""})
+            </summary>
             <ul className="mt-3 space-y-2">
               {shares.map((share) => (
                 <li
                   key={share.id}
-                  className="rounded-xl border border-stone p-3"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-porcelain px-3 py-2"
                 >
-                  <p className="text-xs font-medium">
-                    {share.status === "revoked"
-                      ? "Turned off"
-                      : share.status === "expired"
-                        ? "Expired"
-                        : "Active"}
-                  </p>
-                  <p className="mt-1 text-xs text-secondary">
-                    {share.revokedAt
-                      ? `Turned off ${formatTime(share.revokedAt)}`
-                      : share.expiresAt
-                        ? `${share.status === "expired" ? "Expired" : "Expires"} ${formatTime(share.expiresAt)}`
-                        : "Active until you turn it off"}
-                  </p>
-                  {share.catchphrase && (
-                    <p className="mt-1 break-words text-xs text-secondary">
+                  <div className="min-w-0">
+                    {managing && (
+                      <p className="mb-1 break-words text-sm font-medium">
+                        {share.publicSnapshot.title}
+                      </p>
+                    )}
+                    <p className="text-xs font-medium">
+                      {share.status === "revoked"
+                        ? "Turned off"
+                        : share.status === "expired"
+                          ? "Expired"
+                          : "Active"}
+                    </p>
+                    <p className="mt-1 text-xs text-secondary">
+                      {share.revokedAt
+                        ? `Turned off ${formatTime(share.revokedAt)}`
+                        : share.expiresAt
+                          ? `${share.status === "expired" ? "Expired" : "Expires"} ${formatTime(share.expiresAt)}`
+                          : `Created ${formatTime(share.createdAt)}`}
+                    </p>
+                  </div>
+                  {managing && share.catchphrase && (
+                    <p className="order-last w-full whitespace-pre-wrap break-words pb-1 text-sm text-secondary">
                       {share.catchphrase}
                     </p>
                   )}
@@ -393,7 +362,7 @@ function SharingSession({
                 {loadingMore ? "Loading links…" : "Load more links"}
               </Button>
             )}
-          </section>
+          </details>
         )}
       </ShareReviewDialog>
       <ShareRevocationDialog

@@ -5,6 +5,7 @@ import { apiRoute } from "@/lib/api";
 import { getWorkspaceDatabase, type WorkspaceDatabase } from "./server";
 import {
   createWorkspaceSignedRead,
+  createWorkspaceSignedReads,
   createWorkspaceSignedUpload,
   STORAGE_MAX_BYTES,
   STORAGE_READ_TTL_SECONDS,
@@ -384,5 +385,92 @@ describe("uploaded image byte verification", () => {
     await expect(verifyWorkspaceStorageAsset(assetId)).rejects.toMatchObject({
       code: "STORAGE_IMAGE_INVALID",
     });
+  });
+});
+
+describe("createWorkspaceSignedReads", () => {
+  const otherId = "0d7c6f24-1111-4a52-9f5e-3b3c2c9f1a10";
+  function bulkSetup(
+    signed: { path: string; signedUrl: string | null; error: unknown }[],
+  ) {
+    const rows = [
+      assetFixture(),
+      assetFixture({
+        id: otherId,
+        storage_path: `${workspaceId}/${otherId}/${objectId}.png`,
+      }),
+    ];
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockResolvedValue({ data: rows, error: null }),
+    };
+    const storage = {
+      createSignedUrls: vi
+        .fn()
+        .mockResolvedValue({ data: signed, error: null }),
+    };
+    const client = {
+      from: vi.fn().mockReturnValue(query),
+      storage: { from: vi.fn().mockReturnValue(storage) },
+    };
+    vi.mocked(getWorkspaceDatabase).mockReturnValue({
+      client,
+      workspaceId,
+      writesEnabled: true,
+    } as unknown as WorkspaceDatabase);
+    return { rows, query, storage, client };
+  }
+
+  it("signs every ready asset in one scoped lookup and one signing call", async () => {
+    const { rows, query, storage } = bulkSetup([]);
+    storage.createSignedUrls.mockResolvedValue({
+      data: rows.map((row) => ({
+        path: row.storage_path,
+        signedUrl: `https://example.supabase.co/${row.id}`,
+        error: null,
+      })),
+      error: null,
+    });
+    const urls = await createWorkspaceSignedReads([assetId, otherId, assetId]);
+    expect(urls.get(assetId)).toBe(`https://example.supabase.co/${assetId}`);
+    expect(urls.get(otherId)).toBe(`https://example.supabase.co/${otherId}`);
+    expect(query.eq).toHaveBeenCalledWith("workspace_id", workspaceId);
+    expect(query.eq).toHaveBeenCalledWith("status", "ready");
+    expect(query.in).toHaveBeenCalledTimes(1);
+    expect(storage.createSignedUrls).toHaveBeenCalledTimes(1);
+    expect(storage.createSignedUrls).toHaveBeenCalledWith(
+      rows.map((row) => row.storage_path),
+      STORAGE_READ_TTL_SECONDS,
+    );
+  });
+
+  it("leaves out assets that fail to sign and ignores invalid ids", async () => {
+    const { rows } = bulkSetup([]);
+    bulkSetup([
+      {
+        path: rows[0].storage_path,
+        signedUrl: null,
+        error: { message: "unavailable" },
+      },
+      {
+        path: rows[1].storage_path,
+        signedUrl: "https://example.supabase.co/ok",
+        error: null,
+      },
+    ]);
+    const urls = await createWorkspaceSignedReads([
+      assetId,
+      otherId,
+      "not-a-uuid",
+    ]);
+    expect(urls.has(assetId)).toBe(false);
+    expect(urls.get(otherId)).toBe("https://example.supabase.co/ok");
+  });
+
+  it("skips the database when no valid ids are supplied", async () => {
+    const { client } = bulkSetup([]);
+    expect((await createWorkspaceSignedReads(["bad"])).size).toBe(0);
+    expect(client.from).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { Button } from "@/components/ui";
 import {
-  WardrobeArchiveDialog,
+  WardrobeDeleteDialog,
   WardrobeItemDetail,
   type WardrobeItemDetailData,
   type WardrobeItemDetailProps,
@@ -73,8 +74,17 @@ const candidate: WardrobeItemDetailData = {
 };
 
 function DetailDemo(props: WardrobeItemDetailProps) {
-  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const [saved, setSaved] = useState(props.item);
   const [item, setItem] = useState(props.item);
+  if (deleted)
+    return (
+      <section className="p-8">
+        <p>Item deleted.</p>
+        <Button onClick={() => setDeleted(false)}>Reset example</Button>
+      </section>
+    );
   return (
     <>
       <WardrobeItemDetail
@@ -83,17 +93,33 @@ function DetailDemo(props: WardrobeItemDetailProps) {
         onMarkOwned={() =>
           setItem((current) => ({ ...current, inventoryStatus: "owned" }))
         }
-        onArchive={() => setArchiveOpen(true)}
+        onNameChange={(name) => setItem((current) => ({ ...current, name }))}
+        onCategoryChange={(category) =>
+          setItem((current) => ({ ...current, category }))
+        }
+        onSubcategoryChange={(subcategory) =>
+          setItem((current) => ({ ...current, subcategory }))
+        }
+        onFieldChange={(key, value) =>
+          setItem((current) => ({
+            ...current,
+            fields: current.fields.map((field) =>
+              field.key === key ? { ...field, value, source: "user" } : field,
+            ),
+          }))
+        }
+        onSave={() => setSaved(item)}
+        saveDisabled={JSON.stringify(item) === JSON.stringify(saved)}
+        onDelete={() => setDeleteOpen(true)}
       />
-      <WardrobeArchiveDialog
-        open={archiveOpen}
+      <WardrobeDeleteDialog
+        open={deleteOpen}
         itemName={item.name}
         itemImageUrl={item.imageUrl}
-        savedLookCount={item.usedIn?.length ?? 0}
-        onCancel={() => setArchiveOpen(false)}
+        onCancel={() => setDeleteOpen(false)}
         onConfirm={() => {
-          setItem((current) => ({ ...current, archived: true }));
-          setArchiveOpen(false);
+          setDeleted(true);
+          setDeleteOpen(false);
         }}
       />
     </>
@@ -107,9 +133,8 @@ const meta = {
   args: {
     item: shirt,
     onBack: () => undefined,
-    onReplacePhoto: () => undefined,
     onPreview: () => undefined,
-    onEdit: () => undefined,
+    onSave: () => undefined,
     onOpenSavedLook: () => undefined,
   },
 } satisfies Meta<typeof WardrobeItemDetail>;
@@ -122,16 +147,12 @@ export const SavedCandidate: Story = {
   args: { item: candidate },
   render: (args) => <DetailDemo {...args} />,
 };
-export const ArchivedPiece: Story = {
-  args: { item: { ...shirt, archived: true }, onRestore: () => undefined },
-};
-export const ArchiveConfirmation: Story = {
+export const DeleteConfirmation: Story = {
   render: () => (
-    <WardrobeArchiveDialog
+    <WardrobeDeleteDialog
       open
       itemName={shirt.name}
       itemImageUrl={shirt.imageUrl}
-      savedLookCount={1}
       onCancel={() => undefined}
       onConfirm={() => undefined}
     />

@@ -9,7 +9,6 @@ export type ProfileStats = {
   capsules?: number | null;
   activeShareLinks?: number | null;
   savedCandidates?: number;
-  archivedItems?: number;
 };
 
 export type ProfileOverviewProps = {
@@ -188,9 +187,6 @@ export function ProfileOverview({
           Wardrobe counts active owned pieces.
           {stats.savedCandidates != null && (
             <> Saved candidates: {stats.savedCandidates}.</>
-          )}
-          {stats.archivedItems != null && (
-            <> Archived pieces: {stats.archivedItems}.</>
           )}
           {(stats.wardrobeItems == null ||
             stats.savedLooks == null ||

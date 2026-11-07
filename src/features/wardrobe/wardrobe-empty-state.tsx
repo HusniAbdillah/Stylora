@@ -35,7 +35,7 @@ export function WardrobeEmptyState({
           <li>
             <Icon name="layers" />{" "}
             {localPreview
-              ? "Edit, archive or restore pieces later"
+              ? "Edit or delete pieces later"
               : "Use it in matches, capsules and previews"}
           </li>
         </ul>

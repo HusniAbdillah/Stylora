@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   applyUserEdit,
   draftPayloadSchema,
+  deleteItemSchema,
   itemValuesSchema,
   mutationSchema,
   toCanonicalWardrobeItem,
@@ -200,5 +201,22 @@ describe("Wardrobe contracts", () => {
         workspaceId: id,
       }).success,
     ).toBe(false);
+  });
+  it("validates permanent delete revisions and rejects the removed archive actions", () => {
+    expect(deleteItemSchema.safeParse({ expectedRevision: 1 }).success).toBe(
+      true,
+    );
+    expect(deleteItemSchema.safeParse({ expectedRevision: 0 }).success).toBe(
+      false,
+    );
+    expect(
+      deleteItemSchema.safeParse({ expectedRevision: 1, workspaceId: id })
+        .success,
+    ).toBe(false);
+    for (const action of ["archive", "restore"]) {
+      expect(
+        mutationSchema.safeParse({ action, expectedRevision: 1 }).success,
+      ).toBe(false);
+    }
   });
 });

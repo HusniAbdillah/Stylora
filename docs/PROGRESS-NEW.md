@@ -1,5 +1,40 @@
 # Stylora shared progress reporting
 
+## Owner 1 demo data enrichment: 7 November 2026
+
+- The user explicitly authorized richer seed data directly in hosted Supabase.
+  Target: Stylora project `imcqifydmrxotrbwfwme`, `demo` workspace only.
+  The initial audit found 47 wardrobe rows, 2 saved looks and 1 capsule.
+- Added 8 labeled sample saved looks, 8 completed Preview source snapshots,
+  and 5 Capsule planning briefs with 37 owned membership links. The outfits
+  use 32 item placements from 20 existing owned sample garments and their real
+  private Storage assets. Existing wardrobe data was already broad, so no
+  duplicate garments or fabricated catalog offers were added.
+- Contexts include relaxed work, city walks, gallery visits, coastal lunch,
+  dinner, activewear, weekend stripes and cool-day layering. Each saved look
+  records concrete styling reasons, differences and uncertainty. Capsules cover
+  all five templates and contain 6 to 9 existing pieces each. They remain
+  planning briefs; no generated outfit or image success is fabricated.
+- The seed uses stable IDs and snapshot import keys, checks workspace identity,
+  owned membership, canonical categories and ready scoped assets, and calls
+  `save_capsule_draft` for new Capsule rows. It does not replace active drafts.
+  A transaction compares full-row hashes of existing wardrobe, assets,
+  preferences, operations, saved looks, capsules and drafts before committing.
+- Hosted validation: full seed with ROLLBACK passed, COMMIT passed, then replay
+  with ROLLBACK passed. Production Capsule Zod schemas accepted all five briefs;
+  all eight combinations have distinct IDs, complete clothing coverage and
+  shoes. Read-only verification found 10 saved looks, 6 capsules, 47 wardrobe
+  rows, zero missing/foreign asset references and zero new operations.
+- Read-only HTTPS checks returned 200 for `https://stylora.ai.id/saved-looks`
+  and `/capsules`; the rendered HTML contained the new sample titles. Browser
+  interaction and visual layout were not tested. No provider calls, new public
+  shares, Storage uploads, schema changes, deployments or production setting
+  changes occurred. No cleanup is required: these requested samples remain.
+- Reproduction files: `data/demo/enrichment.json` and
+  `supabase/seeds/demo-enrichment.sql`. They contain sample content and IDs,
+  never credentials. Local `make fast` is pending for artifact delivery; full
+  tests and build were not run for this data-only operation.
+
 ## Owner 2 occasion and recovery follow-up: 7 November 2026
 
 - Delivery synchronization: pushed the feature first, pulled main `830dd70`, and merged it. The only conflict was concurrent progress reporting; both owners' reports were retained. Subsequently merged main `bae2d32` (Preview slot declarations) without conflicts. PR: https://github.com/HusniAbdillah/Stylora/pull/62. Human review required; no main merge or deployment performed.
@@ -316,6 +351,10 @@ below the latest one.
 
 ### Owner 1 workspace frontend · 7 November 2026, Asia/Bangkok
 
+- Item details visual refinement gives Item name and Category outlined surfaces through the shared SelectField variant. Desktop navigation uses a top-corner chevron, Preview uses the image icon, and Profile uses the user icon. Fixed collapsed rail intrinsic sizing and hidden profile text. Chrome passed sidebar checks at 1440, 850 and 390 px and live field checks at 1440, 390 and 360 px on port 3011, with mutations blocked. `pnpm check` passed 243 tests with two opt-in hosted tests skipped.
+- Wardrobe item details now edit name, category, description, attributes and notes inline, with Save changes and a browser draft that survives reload. Permanent deletion replaces archive and restore. The detail photo replacement control was removed. Fixed editor draft validation by projecting canonical items onto the editable fields before strict parsing.
+- Applied `20261107065738_wardrobe_permanent_delete.sql` to the hosted Stylora project. Four legacy archived items were permanently deleted under the user's explicit instruction. The command validates workspace/revision, invalidates live dependencies and capsule drafts, and preserves saved snapshots and their ready image assets. Rollback SQL passed scoping, stale-revision, dependency, snapshot and deleted-proposal replay assertions. Both hosted Wardrobe integration tests passed and cleaned their temporary fixtures.
+- Local verification passed `pnpm check` (189 tests, two opt-in hosted tests skipped in that command), `pnpm build` and `pnpm build:storybook --quiet`. Isolated Chrome checks at 1440 and 390 px verified inline edits without draft creation on visit, draft reload, explicit PATCH fields, save success, 409 draft preservation, delete cancellation and confirmed DELETE navigation. Browser mutations were intercepted. Hosted security advisors returned the existing server-only RLS informational notice.
 - Shared workspace controls (D08, D22, D30, M14 and M15). Chrome at 1440, 850 and 390 px exercised sidebar toggling, persistence and navigation. At desktop and phone widths, the Wardrobe intake field outline covered the padded control and the category picker opened from its padding. A local test draft verified that clicking the confirmation backdrop or pressing Escape kept the draft and restored focus. `pnpm check` passed with 183 tests. The two opt-in hosted Wardrobe tests were skipped.
 - Wardrobe Add Item (D08, M15) uses the eight desktop fields on both screen sizes. Existing drafts keep their color, fabric and fit values under the updated labels. Extra notes from earlier drafts are retained in the saved item. `pnpm check` passed with 112 tests.
 - Work branch `o1/workspace-frontend`, base `4fd5aba`. Requirements R33–R36 and work packages O1.3–O1.6. The four application routes under `src/app/(workspace)` compose the shared shell, Wardrobe, Preferences and Profile.
@@ -454,6 +493,14 @@ below the latest one.
   prepared. Rebased onto that update and reran typecheck successfully.
 - Formatted the task's new files with the current project formatter. Git delivery
   uses a pull request to main so the normal merge checks and protections apply.
+
+### Avatar mannequin consistency and faster references, 7 November 2026
+
+- Branch `o1/avatar-image-prompt`. Code written; not verified against the live provider.
+- Change: the image prompt now has a fixed figure block (matte mannequin with a featureless oval head, never a face, never headless) mirrored in `docs/FASHION-PROMPT.md` and `src/prompts`. The avatar prompt version is `avatar-4`, so cached renders from `avatar-3` are not reused.
+- Speed: garment references load in parallel and are resized to at most 1024 px on the longest side as JPEG before upload. Up to 16 loads run at once; the existing 16 image cap bounds it.
+- Checks: `vitest` on `src/features/ai`, `src/prompts`, `src/features/preview`, `src/features/outfits` passed (90 tests); eslint on changed folders and `pnpm typecheck` clean.
+- Not run: any provider image call, so head consistency and the speed gain are unmeasured. `OPENAI_IMAGE_QUALITY` and `input_fidelity` are unchanged; lowering either needs an A/B on real outfits within the provider budget.
 
 ## 5. Owner 2 report
 
@@ -1189,6 +1236,10 @@ which data, code revision or provider behavior was verified.
 
 ## Owner 1 PWA and app icons, 7 November 2026
 
+- Conflict follow-up: merged main `bfc40a6` into the PR #67 branch, retaining
+  both the PWA and sharing UI reports. Only this report file conflicted.
+  Focused PWA/navigation tests and `make fast` were started; results are
+  recorded on the pull request. No hosted or provider operations were run.
 - PR #67: https://github.com/HusniAbdillah/Stylora/pull/67. Rebased onto
   `a924ac4` after GitHub reported a conflict in concurrent progress appends;
   retained both reports. Shared-shell changes merged without conflicts.
@@ -1237,3 +1288,26 @@ which data, code revision or provider behavior was verified.
   The local unconfigured Profile state is not database integration evidence.
   CI remains the full test gate. No deployment, hosted write or provider call
   was performed; human review is required before merging this Lane B change.
+
+## Owner 3 sharing and saved-look UI cleanup, 7 November 2026
+
+- Branch `codex/share-dialog-cleanup`. Separated share review, new-link copy
+  success and read-only link management. Manage has no edit fields; Create new
+  link starts a fresh review. Existing publications remain immutable.
+- Removed the avatar checkbox as requested. The completed avatar appears in
+  review and its exact ID is included on publication, with existing server-side
+  media validation. No completed image still permits sharing the item snapshot.
+- Removed unavailable Add to capsule actions and their explanatory notice.
+  Saved collection card footers align Share and Manage despite different title
+  and description lengths. Narrow cards stack thumbnails above the action.
+- Share loading and Preview save progress use skeletons. Capsule Save as look
+  reserves the destination detail skeleton until navigation, deduplicates an
+  in-flight save and restores retry on failure.
+- Storybook browser smoke passed review, create-to-copy state, Copied feedback,
+  loading skeleton and read-only Manage-to-new-review transitions using labeled
+  sample assets. Checked desktop and 390 px mobile layouts; mixed-length card
+  Share and Manage buttons had matching vertical positions and no mobile
+  horizontal overflow. This verifies components, not a live publication.
+- Local `corepack pnpm typecheck` and `corepack pnpm lint` passed after the final
+  Manage revision. CI is the complete build gate. No provider calls,
+  database writes, migrations, environment or dependency changes were needed.

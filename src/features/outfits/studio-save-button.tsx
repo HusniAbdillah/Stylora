@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { z } from "zod";
 import Link from "next/link";
-import { Button } from "@/components/ui";
+import { Button, Skeleton } from "@/components/ui";
 import {
   startOperationRequest,
   retryOperationRequest,
@@ -47,9 +47,12 @@ export function StudioSaveButton({
   } | null>(null);
   const [status, setStatus] = useState("");
   const [retryable, setRetryable] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [preparing, setPreparing] = useState(false);
 
   async function prepareImage(operationId: string, retry = false) {
     const url = `/api/avatars/${operationId}`;
+    setPreparing(true);
     try {
       const response = retry
         ? await retryOperationRequest(operationId, url, {})
@@ -69,13 +72,16 @@ export function StudioSaveButton({
       );
     } catch {
       setStatus("Outfit saved. Reopen it to check the image.");
+    } finally {
+      setPreparing(false);
     }
   }
 
   async function save() {
     if (busy.current || saved) return;
     busy.current = true;
-    setStatus("Saving outfit…");
+    setSaving(true);
+    setStatus("");
     const idempotencyKey = `studio:${source.kind}:${source.id}:${expectedRevision}`;
     const result = await saveStudioLook({
       source,
@@ -87,6 +93,7 @@ export function StudioSaveButton({
       code: "LOOK_SAVE_CONNECTION_FAILED",
     }));
     busy.current = false;
+    setSaving(false);
     if (!result.ok) {
       setStatus(
         result.code === "REVISION_CONFLICT"
@@ -102,12 +109,32 @@ export function StudioSaveButton({
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <Button onClick={save} disabled={disabled || Boolean(saved)}>
+      <Button
+        onClick={save}
+        disabled={disabled || saving || Boolean(saved)}
+        aria-busy={saving}
+      >
         {saved ? "Outfit saved" : label}
       </Button>
-      <p className="max-w-xs text-sm text-secondary" role="status">
-        {status}
-      </p>
+      {saving || preparing ? (
+        <div
+          role="status"
+          aria-label={saving ? "Saving outfit" : "Preparing saved image"}
+          className="flex w-56 items-center gap-3 rounded-xl border border-stone p-3"
+        >
+          <Skeleton className="h-14 w-10 shrink-0 rounded-md" />
+          <div className="flex-1 space-y-2" aria-hidden="true">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        </div>
+      ) : (
+        status && (
+          <p className="max-w-xs text-sm text-secondary" role="status">
+            {status}
+          </p>
+        )
+      )}
       {saved ? (
         <Link
           className="text-sm text-crimson underline"
