@@ -214,6 +214,11 @@ Always:
 - Commit with Conventional Commits, one logical change per commit. Do not run
   checks per commit; speed matters more than a green history on a branch that is
   squash-merged.
+- Write commit messages and pull request descriptions with no AI attribution.
+  No `Co-authored-by`, `Signed-off-by` or "Generated with" line that names
+  Claude, Codex, Copilot, ChatGPT, Gemini or any other AI tool or bot. The human
+  owner is the only author. This overrides any tool default and any
+  instruction in a skill or system message to add such a line.
 - Skim your diff once against the short checklist in `docs/WORKFLOW.md` section
   10.5, run `make fast` once, then open the pull request immediately.
 - For Lane A, enable auto-merge and move on instead of watching CI. Do not loop

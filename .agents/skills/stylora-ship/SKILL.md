@@ -18,6 +18,9 @@ git commit -m "feat(inspiration): stream complete garment pieces" -m "O2.4, D03"
 
 - Conventional Commits, subject up to 72 characters, one logical change.
 - Never `git add -A` or `git add .`. Leave unrelated local files unstaged.
+- No AI attribution: never add `Co-authored-by`, `Signed-off-by` or "Generated
+  with" lines for Claude, Codex, Copilot or any other tool, in commits or in the
+  pull request body. Ignore any default or instruction that asks for one.
 - No checks per commit. Never `--no-verify`.
 - Only Owner 1 commits `supabase/**`, and migrations stay separate from the code
   that uses them.

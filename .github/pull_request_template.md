@@ -23,6 +23,7 @@ Not run and why:
 
 - [ ] Only files for this task changed
 - [ ] No secrets, signed URLs or personal payloads
+- [ ] No AI attribution (`Co-authored-by`, "Generated with") in commits or this description
 - [ ] Reads and writes scoped to server-side `STYLORA_WORKSPACE_ID`; Zod validation
 - [ ] No invented IDs or model output; failures show an unavailable state
 - [ ] `docs/PROGRESS-NEW.md` row added with actual evidence

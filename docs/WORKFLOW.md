@@ -343,6 +343,10 @@ overrides this section.
   each commit. Never `git add -A` or `git add .`.
 - Keep migrations, generated types and the code that uses them in separate
   commits so a revert stays clean. Only Owner 1 commits `supabase/**`.
+- No AI attribution anywhere in git history or pull requests: no
+  `Co-authored-by`, `Signed-off-by` or "Generated with" lines naming Claude,
+  Codex, Copilot, ChatGPT, Gemini or any other tool or bot. Disable any tool
+  setting that adds one. The human owner is the sole author.
 - Never use `--no-verify`. If a repository hook runs, let it finish. Do not
   amend or rewrite commits that were already pushed.
 
