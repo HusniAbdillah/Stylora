@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { previewJobStatus } from "./job-status";
+import { isCurrentPreviewContext, previewJobStatus } from "./job-status";
 import {
   previewSelectionSchema,
   slotForPreviewItem,
@@ -9,6 +9,43 @@ import {
 const id = "00000000-0000-4000-8000-000000000001";
 
 describe("Preview selection integrity", () => {
+  it("invalidates image context when preferences, render settings or prompt versions change", () => {
+    const operation = {
+      input: { renderFingerprint: "captured" },
+      prompt_version: "avatar-v1",
+      model: "image-model",
+    };
+    const current = {
+      renderFingerprint: "captured",
+      promptVersion: "avatar-v1",
+      model: "image-model",
+    };
+    expect(isCurrentPreviewContext(operation, current)).toBe(true);
+    expect(
+      isCurrentPreviewContext(operation, {
+        ...current,
+        renderFingerprint: "new-settings-or-preferences",
+      }),
+    ).toBe(false);
+    expect(
+      isCurrentPreviewContext(operation, {
+        ...current,
+        promptVersion: "avatar-v2",
+      }),
+    ).toBe(false);
+    expect(
+      isCurrentPreviewContext(operation, { ...current, model: "new-model" }),
+    ).toBe(false);
+    expect(isCurrentPreviewContext({ ...operation, input: {} }, current)).toBe(
+      false,
+    );
+    expect(
+      isCurrentPreviewContext(
+        { ...operation, prompt_version: null, model: null },
+        current,
+      ),
+    ).toBe(false);
+  });
   it("restarts superseded inputs while keeping cancellation stopped", () => {
     expect(previewJobStatus("superseded")).toBe("idle");
     expect(previewJobStatus("cancelled")).toBe("cancelled");
