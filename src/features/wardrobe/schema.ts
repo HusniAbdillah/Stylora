@@ -130,6 +130,18 @@ const correctionSchema = z.strictObject({
   revision: revisionSchema,
 });
 export const provenanceSchema = z.record(z.string().max(160), evidenceSchema);
+// Earlier marketplace imports omitted confidence and catalog evidence text.
+const importedProvenanceSchema = z.record(
+  z.string().max(160),
+  z.union([
+    evidenceSchema,
+    evidenceSchema.extend({
+      source: z.enum(["catalog", "derived"]),
+      confidence: evidenceSchema.shape.confidence.default(null),
+      evidence: evidenceSchema.shape.evidence.default(""),
+    }),
+  ]),
+);
 export const correctionsSchema = z.record(
   z.string().max(160),
   correctionSchema,
@@ -161,7 +173,10 @@ export function toCanonicalWardrobeItem(row: WardrobeReadRow) {
     inventoryStatus: z
       .enum(["owned", "saved_candidate"])
       .parse(row.inventory_status),
-    provenance: provenanceSchema.parse(row.provenance),
+    provenance: (row.source_product_id
+      ? importedProvenanceSchema
+      : provenanceSchema
+    ).parse(row.provenance),
     corrections: correctionsSchema.parse(row.corrections),
     inferredAttributes: attributesSchema.parse(row.inferred_attributes),
     confidence: z.number().min(0).max(1).nullable().parse(row.confidence),
