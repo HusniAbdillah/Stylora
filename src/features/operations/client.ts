@@ -15,8 +15,25 @@ const nestedSchema = z.object({
   data: z.object({ operation: statusSchema }).passthrough(),
 });
 const flatSchema = z.object({ data: statusSchema });
+const previewSchema = z.object({
+  data: z
+    .object({
+      draftId: z.uuid(),
+      operationId: z.uuid(),
+      job: z.object({ status: operationStatusSchema }).passthrough(),
+    })
+    .passthrough(),
+});
 
-async function responseOperation(response: Response) {
+type RequestSnapshot = {
+  operation: z.infer<typeof statusSchema>;
+  envelope?: z.infer<typeof nestedSchema>["data"];
+  previewDraftId?: string;
+};
+
+async function responseOperation(
+  response: Response,
+): Promise<RequestSnapshot | undefined> {
   const body: unknown = await response
     .clone()
     .json()
@@ -29,6 +46,15 @@ async function responseOperation(response: Response) {
     };
   const flat = flatSchema.safeParse(body);
   if (flat.success) return { operation: flat.data.data, envelope: undefined };
+  const preview = previewSchema.safeParse(body);
+  if (preview.success)
+    return {
+      operation: {
+        id: preview.data.data.operationId,
+        status: preview.data.data.job.status,
+      },
+      previewDraftId: preview.data.data.draftId,
+    };
 }
 
 async function executeRequest(
@@ -48,6 +74,7 @@ async function executeRequest(
   let operationId =
     snapshot?.operation.id ?? (knownId.success ? knownId.data : undefined);
   let envelope = snapshot?.envelope;
+  let previewDraftId = snapshot?.previewDraftId;
   if (!operationId || (!response.ok && response.status !== 409))
     return response;
 
@@ -92,7 +119,14 @@ async function executeRequest(
         return response;
       operationId = snapshot.operation.id;
       envelope = snapshot.envelope ?? envelope;
+      previewDraftId = snapshot.previewDraftId ?? previewDraftId;
     }
+  }
+  if (previewDraftId && !snapshot?.previewDraftId) {
+    return fetch(
+      `/api/previews?draftId=${encodeURIComponent(previewDraftId)}`,
+      { method: "GET", cache: "no-store" },
+    );
   }
   if (envelope && snapshot) {
     return Response.json(

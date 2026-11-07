@@ -3,9 +3,17 @@ import { apiRoute } from "@/lib/api";
 import { operationResponse } from "./http";
 import { readOperation, type Operation } from "./server";
 
-const studioKinds = new Set(["capsule_generation", "preview_image", "saved_avatar"]);
+const studioKinds = new Set([
+  "capsule_generation",
+  "preview_image",
+  "saved_avatar",
+]);
 
-export async function dispatchOperation(operationId: string, studio: (operation: Operation) => Promise<unknown>, legacy: () => Promise<unknown>): Promise<Response> {
+export async function dispatchOperation(
+  operationId: string,
+  studio: (operation: Operation) => Promise<unknown>,
+  legacy: () => Promise<unknown>,
+): Promise<Response> {
   let operation: Operation;
   try {
     operation = await readOperation(operationId);

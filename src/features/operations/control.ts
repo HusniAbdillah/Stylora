@@ -52,6 +52,7 @@ async function controlOperation(
 }
 
 export async function retryOperation(operationId: string) {
+  requireWorkspaceWrites(getWorkspaceDatabase());
   const operation = await readOperation(operationId);
   if (
     ["queued", "running", "partial"].includes(operation.status) &&
