@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { savedMediaState } from "./media";
+import { regenerateMediaSchema, savedMediaState } from "./media";
 import { saveInputSchema, selectionInputSchema } from "./schemas";
 
 const optionId = "3f9b6f84-5379-4d39-8ea0-82b2e3cbd653";
@@ -9,6 +9,47 @@ const assetId = "c83d6d9c-f37d-47c1-85c7-f24c9016829e";
 const mediaId = "2b69cebf-fce6-418d-b317-0bdb79bec823";
 
 describe("decision contracts", () => {
+  it("requires a media revision and UUID request identity for regeneration", () => {
+    const input = { expectedMediaId: mediaId, idempotencyKey: operationId };
+    expect(regenerateMediaSchema.safeParse(input).success).toBe(true);
+    expect(
+      regenerateMediaSchema.safeParse({ ...input, workspaceId: optionId })
+        .success,
+    ).toBe(false);
+    expect(
+      regenerateMediaSchema.safeParse({ ...input, idempotencyKey: "new-image" })
+        .success,
+    ).toBe(false);
+  });
+
+  it.each(["queued", "failed", "cancelled"])(
+    "keeps the prior ready image while the latest operation is %s",
+    (status) => {
+      const media = {
+        id: mediaId,
+        status: status === "cancelled" ? "failed" : status,
+        operation_id: operationId,
+        output_asset_id: null,
+      };
+      const result = savedMediaState(
+        media,
+        { status, attempt_count: 1 },
+        false,
+        null,
+        true,
+        { id: optionId, assetId, imageUrl: "https://example.com/previous.png" },
+      );
+      expect(result).toMatchObject({
+        id: mediaId,
+        status,
+        operationId,
+        readyMediaId: optionId,
+        assetId,
+        imageUrl: "https://example.com/previous.png",
+      });
+      if (status === "cancelled") expect(result.canRetry).toBe(false);
+    },
+  );
   it("rejects duplicate slots and client-supplied workspace IDs", () => {
     const input = {
       optionId,
@@ -62,7 +103,11 @@ describe("decision contracts", () => {
     expect(
       savedMediaState(
         { ...media, status: "failed" },
-        { status: "failed", attempt_count: 1 },
+        {
+          status: "failed",
+          attempt_count: 1,
+          safe_error_code: "PROVIDER_TIMEOUT",
+        },
         false,
         null,
         true,
@@ -73,6 +118,20 @@ describe("decision contracts", () => {
       operationId,
       canRetry: true,
     });
+    expect(
+      savedMediaState(
+        { ...media, status: "failed" },
+        {
+          status: "failed",
+          attempt_count: 1,
+          safe_error_code: "PROVIDER_TIMEOUT",
+          retryable: false,
+        },
+        false,
+        null,
+        true,
+      ).canRetry,
+    ).toBe(false);
     expect(
       savedMediaState(
         { ...media, status: "failed" },

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui";
 import { BrowserApiError, requestData } from "@/lib/browser-api";
 import { ShareManager } from "@/features/sharing/share-manager";
+import { startOperationRequest } from "@/features/operations/client";
+import { mediaCommandSchema } from "./media";
 import { SavedLookDetail, SavedLooksGallery } from "./saved-looks";
 import {
   savedCollectionHref,
@@ -52,10 +54,14 @@ export function SavedCollectionWorkspace({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const pending = initial.items.some(
+  const pending = initial.items.find(
     (look) => look.media.status === "queued" || look.media.status === "running",
   );
-  const polling = useSavedMediaRefresh(pending, changing || busyId !== null);
+  const polling = useSavedMediaRefresh(
+    Boolean(pending),
+    changing || busyId !== null,
+    writesEnabled ? pending?.media.operationId : null,
+  );
   const href = savedCollectionHref(filter, limit, cursor);
   async function retryImage(id: string) {
     if (!writesEnabled || busyId) return;
@@ -63,15 +69,22 @@ export function SavedCollectionWorkspace({
     setFailure(null);
     setMessage(null);
     try {
-      await requestData(`/api/saved-looks/${id}/media/retry`, {
-        method: "POST",
-      });
+      const result = mediaCommandSchema.parse(
+        await requestData(`/api/saved-looks/${id}/media/retry`, {
+          method: "POST",
+        }),
+      );
       setMessage("Image retry requested. Your saved outfit is unchanged.");
       polling.refresh();
+      await startOperationRequest(
+        result.media.operationId,
+        `/api/avatars/${result.media.operationId}`,
+      );
     } catch (error) {
       setFailure(errorMessage(error));
     } finally {
       setBusyId(null);
+      polling.refresh();
     }
   }
   return (
@@ -170,10 +183,15 @@ export function SavedDetailWorkspace({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const regeneration = useRef<{
+    expectedMediaId: string;
+    idempotencyKey: string;
+  } | null>(null);
   const look = toSavedLookView(initial);
   const polling = useSavedMediaRefresh(
     look.mediaStatus === "queued" || look.mediaStatus === "running",
     busy,
+    writesEnabled ? initial.media.operationId : null,
   );
   async function retryImage() {
     if (
@@ -187,15 +205,69 @@ export function SavedDetailWorkspace({
     setFailure(null);
     setMessage(null);
     try {
-      await requestData(`/api/saved-looks/${initial.id}/media/retry`, {
-        method: "POST",
-      });
+      const result = mediaCommandSchema.parse(
+        await requestData(`/api/saved-looks/${initial.id}/media/retry`, {
+          method: "POST",
+        }),
+      );
       setMessage("Image retry requested. Your saved outfit is unchanged.");
       polling.refresh();
+      await startOperationRequest(
+        result.media.operationId,
+        `/api/avatars/${result.media.operationId}`,
+      );
     } catch (error) {
       setFailure(errorMessage(error));
     } finally {
       setBusy(false);
+      polling.refresh();
+    }
+  }
+  async function regenerateImage() {
+    if (
+      !writesEnabled ||
+      busy ||
+      !initial.media.id ||
+      ["queued", "running"].includes(initial.media.status)
+    )
+      return;
+    if (
+      !regeneration.current ||
+      regeneration.current.expectedMediaId !== initial.media.id
+    )
+      regeneration.current = {
+        expectedMediaId: initial.media.id,
+        idempotencyKey: crypto.randomUUID(),
+      };
+    setBusy(true);
+    setFailure(null);
+    setMessage(null);
+    try {
+      const result = mediaCommandSchema.parse(
+        await requestData(`/api/saved-looks/${initial.id}/media/regenerate`, {
+          method: "POST",
+          body: JSON.stringify(regeneration.current),
+        }),
+      );
+      setMessage(
+        "New image requested. Your saved outfit and shared images are unchanged.",
+      );
+      polling.refresh();
+      await startOperationRequest(
+        result.media.operationId,
+        `/api/avatars/${result.media.operationId}`,
+      );
+    } catch (error) {
+      setFailure(errorMessage(error));
+      if (
+        error instanceof BrowserApiError &&
+        error.status >= 400 &&
+        error.status < 500
+      )
+        regeneration.current = null;
+    } finally {
+      setBusy(false);
+      polling.refresh();
     }
   }
   async function removeLook() {
@@ -250,6 +322,9 @@ export function SavedDetailWorkspace({
         busy={busy}
         writesEnabled={writesEnabled}
         onRetryImage={writesEnabled ? () => void retryImage() : undefined}
+        onRegenerateImage={
+          writesEnabled ? () => void regenerateImage() : undefined
+        }
         onDelete={removeLook}
         onPreview={(id) => router.push(`/preview?savedLookId=${id}`)}
         shareAction={share("Share")}

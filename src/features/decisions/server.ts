@@ -8,7 +8,7 @@ import {
 } from "@/lib/supabase/server";
 import { createWorkspaceSignedRead } from "@/lib/supabase/storage";
 import type { Database, Json } from "@/types/database";
-import { savedMediaState } from "./media";
+import { regenerateMediaSchema, savedMediaState } from "./media";
 import {
   cursorSchema,
   saveInputSchema,
@@ -24,6 +24,18 @@ type Media = Row<"saved_look_media">;
 
 function failure(error: { code?: string; message?: string } | null): void {
   if (!error) return;
+  if (error.message === "STYLORA_SAVED_MEDIA_BUSY")
+    throw new ApiError(
+      "MEDIA_ALREADY_PREPARING",
+      "An image is already preparing. Refresh its status.",
+      409,
+    );
+  if (error.message === "STYLORA_SAVED_MEDIA_REVISION_CONFLICT")
+    throw new ApiError(
+      "MEDIA_REVISION_CONFLICT",
+      "The saved image changed. Refresh before generating another.",
+      409,
+    );
   if (error.code === "40001")
     throw new ApiError(
       "REVISION_CONFLICT",
@@ -115,7 +127,9 @@ async function resolveMedia(
     return savedMediaState(null, null, false, null, context.writesEnabled);
   const operation = await context.client
     .from("workflow_operations")
-    .select("status,attempt_count")
+    .select(
+      "status,attempt_count,safe_error_code,cancel_requested_at,result_ref",
+    )
     .eq("workspace_id", context.workspaceId)
     .eq("id", media.operation_id)
     .eq("kind", "saved_avatar")
@@ -124,24 +138,55 @@ async function resolveMedia(
     .maybeSingle();
   failure(operation.error);
   let ready = false;
-  if (media.status === "succeeded" && media.output_asset_id) {
+  let readyMedia = media.status === "succeeded" ? media : null;
+  if (!readyMedia) {
+    const prior = await context.client
+      .from("saved_look_media")
+      .select("*")
+      .eq("workspace_id", context.workspaceId)
+      .eq("saved_look_id", savedId)
+      .eq("status", "succeeded")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    failure(prior.error);
+    readyMedia = prior.data;
+  }
+  if (readyMedia?.output_asset_id) {
     const asset = await context.client
       .from("assets")
       .select("id")
       .eq("workspace_id", context.workspaceId)
-      .eq("id", media.output_asset_id)
+      .eq("id", readyMedia.output_asset_id)
       .eq("bucket", "previews")
       .eq("status", "ready")
       .maybeSingle();
     failure(asset.error);
     ready = asset.data !== null;
   }
+  const imageUrl = ready
+    ? await signedImage(readyMedia?.output_asset_id ?? null)
+    : null;
   return savedMediaState(
     media,
-    operation.data,
+    operation.data
+      ? {
+          ...operation.data,
+          retryable:
+            object(operation.data.result_ref ?? undefined).retryable !== false,
+        }
+      : null,
     ready,
-    ready ? await signedImage(media.output_asset_id) : null,
+    media.id === readyMedia?.id ? imageUrl : null,
     context.writesEnabled,
+    ready && readyMedia?.output_asset_id
+      ? {
+          id: readyMedia.id,
+          assetId: readyMedia.output_asset_id,
+          imageUrl,
+        }
+      : undefined,
   );
 }
 
@@ -386,6 +431,24 @@ export async function retrySavedMedia(savedId: string) {
   const result = await context.client.rpc("retry_saved_look_media", {
     p_workspace_id: context.workspaceId,
     p_saved_look_id: savedId,
+  });
+  failure(result.error);
+  return {
+    savedLookId: savedId,
+    media: await resolveMedia(context, savedId, required(result.data)),
+  };
+}
+
+export async function regenerateSavedMedia(savedId: string, input: unknown) {
+  z.uuid().parse(savedId);
+  const parsed = regenerateMediaSchema.parse(input);
+  const context = getWorkspaceDatabase();
+  requireWorkspaceWrites(context);
+  const result = await context.client.rpc("regenerate_saved_look_media", {
+    p_workspace_id: context.workspaceId,
+    p_saved_look_id: savedId,
+    p_expected_media_id: parsed.expectedMediaId,
+    p_idempotency_key: parsed.idempotencyKey,
   });
   failure(result.error);
   return {

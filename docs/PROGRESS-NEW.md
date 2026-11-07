@@ -336,6 +336,23 @@ below the latest one.
 - Not run. Hosted migrations, database or Storage commands, paid provider calls, browser end-to-end journeys and local build. CI remains the full build and suite gate.
 - Limits. The app must be open for the bounded client pump. Server crashes need a later visit and lease recovery. Provider availability, Storage and end-to-end image completion still require the coordinator’s approved integration smoke. No cloud data was changed.
 
+### Owner 4 saved image recovery and regeneration, 7 November 2026
+
+- Task O4.7 and R44. Branch `o4/saved-media-bridge` connects saved detail's
+  regeneration command and executes returned avatar operations. Failed retries
+  and queued or running operations on collection and detail visits use the shared
+  bounded request store; only one collection image is resumed at a time.
+- Responses retain the latest generation identity and status separately from the
+  last ready image. Cancelled work stays cancelled, prior images remain visible,
+  and existing approved share media are not modified. Regeneration uses the
+  latest media ID and a UUID retained across transport retries.
+- Verification: `pnpm exec vitest run src/features/decisions/decisions.test.ts`
+  passed seven tests in 2.42 seconds with synthetic in-memory fixtures.
+  `git diff --check` passed. `make fast` awaits Owner 1's generated RPC types.
+  Hosted persistence, Storage, provider calls, browser journeys and local build
+  were not run. Owner 1's additive RPC and generated types are a prerequisite;
+  CI supplies the full suite and build gate.
+
 ### Owner 4 guarded smoke preparation, 7 November 2026
 
 - Added `scripts/smoke-owner4.mjs` with explicit prepare, exercise and cleanup

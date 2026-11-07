@@ -2,11 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { startOperationRequest } from "@/features/operations/client";
 
-export function useSavedMediaRefresh(pending: boolean, paused: boolean) {
+export function useSavedMediaRefresh(
+  pending: boolean,
+  paused: boolean,
+  operationId?: string | null,
+) {
   const router = useRouter();
   const reads = useRef(0);
   const [stopped, setStopped] = useState(false);
+  useEffect(() => {
+    if (!pending || paused || !operationId) return;
+    let mounted = true;
+    startOperationRequest(operationId, `/api/avatars/${operationId}`)
+      .finally(() => {
+        if (mounted) router.refresh();
+      })
+      .catch(() => {
+        /* The persisted operation is recovered on the next visit. */
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [pending, paused, operationId, router]);
   useEffect(() => {
     if (!pending || paused || stopped) return;
     let timer: ReturnType<typeof setTimeout>;
