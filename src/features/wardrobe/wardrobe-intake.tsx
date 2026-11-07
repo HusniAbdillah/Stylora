@@ -1,8 +1,8 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 import { useEffect, useRef, useState } from "react";
 import { Badge, Button, Icon } from "@/components/ui";
+import { WardrobePreviewImage } from "./wardrobe-intake-storage";
 import {
   type WardrobeCategory,
   type WardrobeField,
@@ -15,15 +15,18 @@ export type WardrobeProposal = {
   name: string;
   category: WardrobeCategory;
   imageUrl?: string | null;
+  imageKey?: string;
   fields: WardrobeField[];
 };
 
 export type WardrobeIntakeProps = {
   open: boolean;
-  status: "empty" | "uploading" | "analyzing" | "ready" | "error";
+  status: "empty" | "uploading" | "analyzing" | "ready" | "error" | "added";
   proposals: WardrobeProposal[];
   selectedProposalId?: string;
   errorMessage?: string;
+  errorTitle?: string;
+  inlineError?: string;
   onClose: () => void;
   onPickImage: (file: File) => void;
   onSelectProposal: (id: string) => void;
@@ -33,6 +36,13 @@ export type WardrobeIntakeProps = {
   onConfirm: (id: string) => void;
   onRetry?: () => void;
   onManualEntry?: () => void;
+  onUseSample?: () => void;
+  onDiscardDraft?: () => void;
+  onAddAnother?: () => void;
+  onFinish?: () => void;
+  retryLabel?: string;
+  descriptionSource?: "ai" | "manual" | "sample";
+  hasDraft?: boolean;
   busy?: boolean;
 };
 
@@ -42,6 +52,8 @@ export function WardrobeIntake({
   proposals,
   selectedProposalId,
   errorMessage,
+  errorTitle,
+  inlineError,
   onClose,
   onPickImage,
   onSelectProposal,
@@ -51,6 +63,13 @@ export function WardrobeIntake({
   onConfirm,
   onRetry,
   onManualEntry,
+  onUseSample,
+  onDiscardDraft,
+  onAddAnother,
+  onFinish,
+  retryLabel = "Retry description",
+  descriptionSource = "ai",
+  hasDraft = false,
   busy = false,
 }: WardrobeIntakeProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -105,12 +124,19 @@ export function WardrobeIntake({
         className={styles.fileInput}
         type="file"
         accept="image/jpeg,image/png,image/webp"
+        disabled={busy}
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) onPickImage(file);
           event.target.value = "";
         }}
       />
+
+      {inlineError && (
+        <p className={styles.inlineError} role="alert">
+          {inlineError}
+        </p>
+      )}
 
       {status === "empty" ? (
         <div className={styles.uploadPrompt}>
@@ -119,14 +145,19 @@ export function WardrobeIntake({
           </span>
           <h3>Start with one photo</h3>
           <p>
-            Choose a clear image of the piece. We will suggest a description for
-            you to review.
+            Choose a clear photo of one piece. Photo description is unavailable
+            in this local preview, so you can enter the details yourself.
           </p>
-          <Button variant="primary" onClick={chooseFile}>
+          <Button variant="primary" onClick={chooseFile} disabled={busy}>
             Choose photo
           </Button>
+          {onUseSample && (
+            <Button variant="secondary" onClick={onUseSample} disabled={busy}>
+              Try sample item
+            </Button>
+          )}
           <small>
-            JPEG, PNG or WebP. Your photo is checked before analysis.
+            JPEG, PNG or WebP, up to 10 MB. Photos stay in this browser.
           </small>
         </div>
       ) : status === "uploading" || status === "analyzing" ? (
@@ -139,12 +170,12 @@ export function WardrobeIntake({
           </span>
           <h3>
             {status === "uploading"
-              ? "Uploading your photo"
+              ? "Checking and saving your photo"
               : "Describing the piece"}
           </h3>
           <p>
             {status === "uploading"
-              ? "We are checking the image before reading it."
+              ? "The file is checked before it joins your local draft."
               : "Keep this open or come back later. Your uploaded draft is saved."}
           </p>
           <div className={styles.progressBar} aria-hidden="true">
@@ -152,25 +183,78 @@ export function WardrobeIntake({
           </div>
         </div>
       ) : status === "error" ? (
-        <div className={styles.error} role="alert">
-          <Icon name="info" size={32} />
-          <h3>Photo description is unavailable</h3>
+        <div className={styles.error} role={selected ? "status" : "alert"}>
+          {selected?.imageKey ? (
+            <div className={styles.photo}>
+              <WardrobePreviewImage
+                imageKey={selected.imageKey}
+                alt="Selected wardrobe photo"
+                retryable
+              />
+            </div>
+          ) : (
+            <Icon name="info" size={32} />
+          )}
+          <h3>{errorTitle ?? "Photo description is unavailable"}</h3>
           <p>
             {errorMessage ??
-              "The photo is saved as a draft. Try again or enter the details yourself."}
+              "Choose another photo or enter the details yourself."}
           </p>
           <div className={styles.errorActions}>
+            <Button variant="secondary" onClick={chooseFile} disabled={busy}>
+              Choose another photo
+            </Button>
             {onRetry && (
-              <Button variant="primary" onClick={onRetry}>
-                Retry description
+              <Button variant="primary" onClick={onRetry} disabled={busy}>
+                {retryLabel}
               </Button>
             )}
             {onManualEntry && (
-              <Button variant="secondary" onClick={onManualEntry}>
+              <Button
+                variant="secondary"
+                onClick={onManualEntry}
+                disabled={busy}
+              >
                 Enter details manually
               </Button>
             )}
+            {onUseSample && (
+              <Button variant="quiet" onClick={onUseSample} disabled={busy}>
+                Try sample item
+              </Button>
+            )}
           </div>
+        </div>
+      ) : status === "added" && selected ? (
+        <div className={styles.addedState} role="status">
+          <div className={styles.photo}>
+            <WardrobePreviewImage
+              imageKey={selected.imageKey}
+              fallbackUrl={selected.imageUrl}
+              alt="Saved wardrobe photo"
+            />
+          </div>
+          <h3>{selected.name} was added</h3>
+          <p>
+            The item is in this browser&apos;s wardrobe. Its details are{" "}
+            {descriptionSource === "sample"
+              ? "labeled sample data"
+              : "entered by you"}
+            .
+          </p>
+          {onAddAnother && (
+            <Button variant="primary" onClick={onAddAnother}>
+              Add another garment from this photo
+            </Button>
+          )}
+          {onFinish && (
+            <Button
+              variant={onAddAnother ? "secondary" : "primary"}
+              onClick={onFinish}
+            >
+              Done
+            </Button>
+          )}
         </div>
       ) : selected ? (
         <div className={styles.ready}>
@@ -206,18 +290,25 @@ export function WardrobeIntake({
           )}
           <div className={styles.summary}>
             <div className={styles.photo}>
-              {selected.imageUrl ? (
-                <img src={selected.imageUrl} alt="Uploaded wardrobe item" />
-              ) : (
-                <Icon name="image" size={32} />
-              )}
+              <WardrobePreviewImage
+                imageKey={selected.imageKey}
+                fallbackUrl={selected.imageUrl}
+                alt="Selected wardrobe item"
+              />
             </div>
             <div className={styles.summaryText}>
-              <Badge tone="owned">Photo read</Badge>
+              <Badge tone={descriptionSource === "ai" ? "owned" : "neutral"}>
+                {descriptionSource === "sample"
+                  ? "Sample item"
+                  : descriptionSource === "manual"
+                    ? "Manual details"
+                    : "Photo read"}
+              </Badge>
               <label className={styles.nameLabel}>
                 <span className={styles.srOnly}>Item name</span>
                 <input
                   value={selected.name}
+                  maxLength={160}
                   onChange={(event) =>
                     onNameChange(selected.id, event.target.value)
                   }
@@ -225,9 +316,11 @@ export function WardrobeIntake({
                 />
               </label>
               <p>
-                Check the details, then add it. You can change anything later.
+                {descriptionSource === "manual"
+                  ? "Describe what you can see. You can edit these details later."
+                  : "Check the details, then add it. You can change anything later."}
               </p>
-              <Button variant="secondary" onClick={chooseFile}>
+              <Button variant="secondary" onClick={chooseFile} disabled={busy}>
                 Replace photo
               </Button>
             </div>
@@ -257,11 +350,14 @@ export function WardrobeIntake({
               <div className={styles.field} key={field.key}>
                 <div className={styles.fieldText}>
                   <span className={styles.fieldLabel}>{field.label}</span>
-                  {editingKey === field.key ? (
+                  {descriptionSource === "manual" ||
+                  editingKey === field.key ? (
                     <input
-                      autoFocus
+                      autoFocus={editingKey === field.key}
                       value={field.value}
+                      maxLength={500}
                       aria-label={field.label}
+                      placeholder={`Enter ${field.label.toLowerCase()}`}
                       onChange={(event) =>
                         onFieldChange(
                           selected.id,
@@ -269,7 +365,9 @@ export function WardrobeIntake({
                           event.target.value,
                         )
                       }
-                      onBlur={() => setEditingKey(null)}
+                      onBlur={() => {
+                        if (descriptionSource !== "manual") setEditingKey(null);
+                      }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") setEditingKey(null);
                       }}
@@ -289,7 +387,7 @@ export function WardrobeIntake({
                           : "Note"}
                   </Badge>
                 )}
-                {field.editable !== false && (
+                {descriptionSource !== "manual" && field.editable !== false && (
                   <button
                     className={styles.editField}
                     type="button"
@@ -309,20 +407,30 @@ export function WardrobeIntake({
         </div>
       ) : null}
 
-      <footer className={styles.footer}>
-        <Button variant="quiet" onClick={onClose}>
-          Cancel
-        </Button>
-        {status === "ready" && selected && (
-          <Button
-            variant="primary"
-            disabled={busy}
-            onClick={() => onConfirm(selected.id)}
-          >
-            {busy ? "Adding item…" : "Add to wardrobe"}
-          </Button>
-        )}
-      </footer>
+      {status !== "added" && (
+        <footer className={styles.footer}>
+          <div className={styles.footerLeft}>
+            <Button variant="quiet" onClick={onClose}>
+              {" "}
+              {hasDraft ? "Keep draft" : "Cancel"}{" "}
+            </Button>
+            {hasDraft && onDiscardDraft && (
+              <Button variant="quiet" onClick={onDiscardDraft} disabled={busy}>
+                Discard draft
+              </Button>
+            )}
+          </div>
+          {status === "ready" && selected && (
+            <Button
+              variant="primary"
+              disabled={busy || !selected.name.trim()}
+              onClick={() => onConfirm(selected.id)}
+            >
+              {busy ? "Adding item…" : "Add to wardrobe"}
+            </Button>
+          )}
+        </footer>
+      )}
     </dialog>
   );
 }

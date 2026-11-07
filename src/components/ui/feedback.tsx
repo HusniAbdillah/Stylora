@@ -15,8 +15,13 @@ export function RecoveryPanel({
   reference?: string;
 }) {
   return (
-    <section className="mx-auto grid max-w-xl justify-items-center gap-4 rounded-panel bg-paper p-8 text-center text-ink">
-      <Icon name={kind === "not-found" ? "search" : "refresh"} size={32} />
+    <section className="mx-auto grid max-w-xl justify-items-center gap-4 px-5 py-12 text-center text-ink">
+      <div className="grid size-16 place-items-center rounded-pill bg-blush text-crimson">
+        <Icon name={kind === "not-found" ? "search" : "refresh"} size={24} />
+      </div>
+      {kind === "not-found" && (
+        <span className="font-display text-hero italic text-crimson">404</span>
+      )}
       <h2 className="font-display text-4xl">{title}</h2>
       <p className="text-secondary">{message}</p>
       {action}

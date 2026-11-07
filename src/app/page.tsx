@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { Button } from "@/components/ui";
+
 export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-5xl items-center px-6 py-12 sm:px-12">
@@ -12,6 +15,9 @@ export default function HomePage() {
           Stylora is being built to help you understand a look, find pieces you
           own, and decide what to wear next.
         </p>
+        <Button className="mt-6" asChild>
+          <Link href="/wardrobe">Open wardrobe</Link>
+        </Button>
       </div>
     </main>
   );
