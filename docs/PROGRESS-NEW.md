@@ -1186,3 +1186,43 @@ which data, code revision or provider behavior was verified.
   aside a stale generated dev validator from before main's route move. Local
   lint passed. CI is the full build gate. No credentials, environment settings,
   dependencies or database declarations were changed.
+
+## Owner 1 PWA and app icons, 7 November 2026
+
+- Task O1.5, R01 and R10. Branch `o1/pwa-icons`, Lane B. Added root app
+  metadata, a standalone manifest with task shortcuts, public browser and
+  home-screen icons, a browser-supported workspace install action and Safari
+  instructions. Existing logo geometry and design colors are preserved.
+- Service-worker registration is production-only. Its cache contains only the
+  offline document, retry script and public icon. API, RSC, writes and private
+  media pass through. Updates do not force reloads or interrupt open drafts.
+  `docs/PWA.md` records the audit, cache boundary and device release checklist.
+- Windows worktree, Node 22.23.3, pnpm 10.26.2; no `.env.local` or hosted
+  configuration was copied. `corepack pnpm install --frozen-lockfile` completed.
+  `make pr-ready PNPM="corepack pnpm"` passed lint and typecheck and reported
+  Lane B. `corepack pnpm build` passed, including the static manifest route.
+- `corepack pnpm exec vitest run src/components/pwa/service-worker.test.mjs
+  src/components/shell/navigation.test.tsx` passed five tests. The new cache
+  boundary tests cover excluded requests, live navigation, network failure and
+  cache cleanup. No provider, online test or shared-data fixture ran.
+- `node scripts/generate-app-icons.mjs` generated the committed assets. A local
+  Sharp inspection confirmed exact dimensions, full opacity for the maskable
+  icon and every logo pixel inside the centered 40 percent radius safe zone.
+  The ICO directory contains 16, 32 and 48 px frames.
+- A local production server on `127.0.0.1:3127` returned the manifest and every
+  declared icon and recovery asset with HTTP 200. Node HTTP assertions passed
+  manifest identity, scope and display; worker no-store, CSP, MIME and nosniff
+  headers; and rendered favicon, Apple, theme and manifest metadata.
+- Edge visibly offered the native Install Stylora action without a simulated
+  installation event. After a controlled reload and shutdown of this task's
+  server, navigation to `/profile?offline-check=1` displayed the branded cached
+  fallback at the same address, including its icon and retry control.
+  Recovery layout was inspected at desktop and mobile widths; measured mobile
+  content width equaled its 355 CSS px viewport and the retry target was about
+  50 px tall. Temporary viewport overrides were reset.
+- Browser automation intermittently detached. The final retry-to-online click,
+  installation acceptance, iOS instructions on a device, Android launcher masks,
+  an installed-app relaunch and an existing-worker upgrade were not verified.
+  The local unconfigured Profile state is not database integration evidence.
+  CI remains the full test gate. No deployment, hosted write or provider call
+  was performed; human review is required before merging this Lane B change.
