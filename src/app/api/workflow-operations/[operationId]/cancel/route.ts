@@ -1,12 +1,10 @@
-import { operationResponse } from "@/features/operations/http";
-import { cancelOperation } from "@/features/operations/control";
-import { operationStatus } from "@/features/operations/schema";
-
+import { apiRoute } from "@/lib/api";
+import { controlOperation } from "@/features/operations/create";
 export async function POST(
   _request: Request,
   context: { params: Promise<{ operationId: string }> },
 ) {
-  return operationResponse(async () =>
-    operationStatus(await cancelOperation((await context.params).operationId)),
+  return apiRoute(async () =>
+    controlOperation((await context.params).operationId, "cancel"),
   );
 }

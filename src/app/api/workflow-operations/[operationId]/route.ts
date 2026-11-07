@@ -1,11 +1,8 @@
-import { operationResponse } from "@/features/operations/http";
-import { operationStatus, readOperation } from "@/features/operations/server";
-
+import { apiRoute } from "@/lib/api";
+import { getOperation } from "@/features/operations/create";
 export async function GET(
   _request: Request,
   context: { params: Promise<{ operationId: string }> },
 ) {
-  return operationResponse(async () =>
-    operationStatus(await readOperation((await context.params).operationId)),
-  );
+  return apiRoute(async () => getOperation((await context.params).operationId));
 }
