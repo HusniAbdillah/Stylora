@@ -251,6 +251,7 @@ export function SavedDetailWorkspace({
         writesEnabled={writesEnabled}
         onRetryImage={writesEnabled ? () => void retryImage() : undefined}
         onDelete={removeLook}
+        onPreview={(id) => router.push(`/preview?savedLookId=${id}`)}
         shareAction={share("Share")}
         manageShareAction={share("Manage")}
         onRefresh={polling.refresh}
@@ -267,7 +268,7 @@ export function SavedDetailWorkspace({
         </div>
       )}
       <p className="mt-5 text-sm text-secondary">
-        Preview and capsule actions are unavailable for this saved look.
+        Capsule actions are unavailable for this saved look.
       </p>
       <Link
         href={backHref}

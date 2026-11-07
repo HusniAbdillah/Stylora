@@ -527,6 +527,10 @@ which data, code revision or provider behavior was verified.
 - Owner 2's earlier Create screens and Owner 4's generation, preview and capsule
   source adapters remain separate integration work. Their unavailable states are
   explicit; these features are not reported as implemented by this frontend.
+- Pre-merge update: pulled main `2b88681` without conflicts. Its saved-avatar
+  executor and saved-preview source adapter now exist. Connected saved detail's
+  Open in preview action to the exact `savedLookId` handoff. Direct saved-image
+  regeneration and saved-to-capsule conversion still require their own contracts.
 
 ## Owner 4 operation runner increment, 7 November 2026
 

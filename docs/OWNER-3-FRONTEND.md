@@ -46,10 +46,12 @@ shared `/looks/[lookId]` dispatcher lands, requests for these earlier steps show
 an explicit return-to-details state and retain the look reference. This does not
 claim those earlier screens are implemented by Owner 3.
 
-Owner 4 owns the image consumer, regeneration after success, preview and capsule
-source adapters. Their saved-look actions remain visibly unavailable until a
-real consumer accepts the saved snapshot. Failed-image retry uses the existing
-retry contract and never doubles as successful-image regeneration.
+Latest main `2b88681` supplies the saved-avatar executor and the saved snapshot
+preview source adapter. Saved detail now opens `/preview?savedLookId=...` so the
+owning feature restores the exact saved source. Direct saved-image regeneration
+and saved-to-capsule source conversion remain unavailable until their contracts
+are published. Failed-image retry uses the existing retry contract and never
+doubles as successful-image regeneration.
 
 The backend contracts and provider execution limits remain documented in
 [OWNER-3-BACKEND.md](OWNER-3-BACKEND.md).
