@@ -18,6 +18,13 @@ immutable, so approving a later image creates a new link. Descriptions use
 existing public copy or saved item names as an editable starting point. This
 slice never calls an image or language model.
 
+The review shows the completed saved avatar automatically. Creating the link
+includes that displayed media ID without a separate checkbox; server validation
+still requires succeeded media from the exact saved look. Manage opens a
+read-only list of published descriptions and revocation actions. Create new
+link opens a separate review; it never edits an existing publication. After
+creation, only the new-link copy state is shown, without duplicate history rows.
+
 Public image URLs use ordinal indexes, not database IDs. Avatar bytes require
 an approved, succeeded media row from the exact saved look and a ready preview
 asset. Item thumbnails resolve only captured ready wardrobe or preview asset
