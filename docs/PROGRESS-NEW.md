@@ -1,5 +1,25 @@
 # Stylora shared progress reporting
 
+## Owner 1 deployment quota policy: 7 November 2026
+
+- Task: user-authorized shared deployment configuration, branch
+  `o1/vercel-deployment-budget`, based on `origin/main` at `10f0dd6`. Lane B;
+  human review and merge required.
+- `vercel.json` enables automatic Git deployments only for `main`. Owner
+  branches retain pull request CI and can request manual Previews. The workflow
+  documents manual deployment, Preview workspace selection, existing-branch
+  adoption, and the fact that Ignored Build Step still consumes deployment quota.
+  The delivery gate now classifies `vercel.json` as Lane B.
+- Local environment: Windows PowerShell, isolated worktree. Initial
+  `pnpm install --frozen-lockfile` failed with registry EACCES under the sandbox;
+  retried with approved network access. Validation results follow before delivery.
+- Not run: hosted deployment, live Preview, provider calls, database changes,
+  unit tests and local production build. This configuration does not restore
+  the exhausted allowance; live Git-trigger behavior remains unverified until
+  the change is adopted and Vercel permits another deployment.
+- Fixtures and cleanup: no application fixtures or shared data changed. Existing
+  owner worktrees are untouched; no environment files or credentials are copied.
+
 ## Owner 2 CI correction: 7 November 2026
 
 - Follow-up to the failing Check workflow for [PR #45](https://github.com/HusniAbdillah/Stylora/pull/45). The user authorized fixing the reported CI errors and pushing the same branch.
