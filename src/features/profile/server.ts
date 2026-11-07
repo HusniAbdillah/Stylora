@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { ApiError } from "@/lib/api";
+import { getProfileStatistics } from "./statistics";
 import {
   getWorkspaceDatabase,
   requireWorkspaceWrites,
@@ -44,7 +45,7 @@ export async function getProfile() {
       "The shared profile is unavailable.",
       404,
     );
-  return toProfile(data);
+  return { ...toProfile(data), stats: await getProfileStatistics() };
 }
 
 export async function saveProfile(input: unknown) {
