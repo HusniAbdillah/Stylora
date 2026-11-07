@@ -5,3 +5,4 @@ export {
   ShareUnavailable,
 } from "./share-views";
 export type { PublicLook, PublicShareItem } from "./share-views";
+export { ShareManager } from "./share-manager";
