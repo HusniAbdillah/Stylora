@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluateCandidate,
+  classifyInventoryMatch,
+  isOwnedInventoryItem,
   resolveEffectiveAttributes,
   type MatchItem,
 } from "./gates";
@@ -67,6 +69,48 @@ describe("functional wardrobe matching", () => {
         }),
       ).eligible,
     ).toBe(false);
+  });
+  it("compares all combined records without turning candidates into owned matches", () => {
+    const candidate = owned({ inventoryStatus: "saved_candidate" });
+    const archived = owned({ archivedAt: "2026-11-07T00:00:00Z" });
+    const sample = owned({ sourceType: "sample" });
+    for (const item of [candidate, archived, sample]) {
+      const comparison = evaluateCandidate(shirt, item, null, {}, "combined");
+      expect(comparison.eligible).toBe(true);
+      expect(classifyInventoryMatch(item, comparison)).toBe(
+        item.inventoryStatus === "owned"
+          ? "owned_match"
+          : "wardrobe_alternative",
+      );
+    }
+    expect(isOwnedInventoryItem(candidate, "combined")).toBe(false);
+    expect(isOwnedInventoryItem(archived, "combined")).toBe(true);
+    expect(isOwnedInventoryItem(archived, "live")).toBe(false);
+    expect(
+      evaluateCandidate(
+        shirt,
+        owned({ inventoryStatus: undefined }),
+        null,
+        {},
+        "combined",
+      ).eligible,
+    ).toBe(false);
+  });
+
+  it("retains functional exclusions for combined candidates and archived items", () => {
+    for (const metadata of [
+      { inventoryStatus: "saved_candidate" },
+      { archivedAt: "2026-11-07T00:00:00Z" },
+    ]) {
+      const jersey = owned({
+        ...metadata,
+        subcategory: "football jersey",
+        attributes: { ...shirt.attributes, functionalFamily: "sports_uniform" },
+      });
+      expect(
+        evaluateCandidate(shirt, jersey, null, {}, "combined").reason,
+      ).toBe("incompatible_functional_family");
+    }
   });
 
   it("rejects outdoor shells as dinner-jacket substitutes", () => {

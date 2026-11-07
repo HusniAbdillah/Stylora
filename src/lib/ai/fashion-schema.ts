@@ -402,9 +402,16 @@ const descriptionScalarKeys = scalarKeys.filter((key) => key !== "dominantHex");
 const descriptionListKeys = listKeys.filter(
   (key) => key !== "accentHex" && key !== "colors",
 );
-const descriptionAttributeSchema = z.union([
+function descriptionAttributesFor(category: z.infer<typeof categorySchema>) {
+  const forbidden = new Set<string>([
+    ...(category === "shoes" ? [] : shoeKeys),
+    ...(["bottom", "dress"].includes(category) ? [] : lowerKeys),
+    ...(["top", "dress", "outerwear"].includes(category) ? [] : upperKeys),
+    ...(category === "accessory" ? [] : accessoryKeys),
+  ]);
+  return z.union([
   physicalEvidenceSchema.extend({
-    key: z.enum(descriptionScalarKeys),
+    key: z.enum(descriptionScalarKeys.filter((key) => !forbidden.has(key))),
     value: text.nullable(),
   }),
   physicalEvidenceSchema.extend({
@@ -415,12 +422,13 @@ const descriptionAttributeSchema = z.union([
     key: z.literal("colors"),
     value: z.array(z.string().trim().min(1).max(40)).max(5),
   }),
-]);
+  ]);
+}
 
-export const descriptionPieceSchema = z
-  .strictObject({
+function descriptionProjectionFor<T extends z.infer<typeof categorySchema>>(category: T) {
+  return z.strictObject({
     name: z.string().trim().min(1).max(160),
-    category: categorySchema,
+    category: z.literal(category),
     subcategory: text.nullable(),
     description: z.string().trim().min(1).max(600),
     coreEvidence: z.strictObject({
@@ -429,10 +437,20 @@ export const descriptionPieceSchema = z
       subcategory: physicalEvidenceSchema,
       description: physicalEvidenceSchema,
     }),
-    attributes: z.array(descriptionAttributeSchema).max(120),
+    attributes: z.array(descriptionAttributesFor(category)).max(120),
     confidence: z.number().min(0).max(1).nullable(),
     uncertainty: z.array(z.string().min(1).max(400)).max(12),
-  })
+  });
+}
+
+export const descriptionPieceSchema = z.union([
+  descriptionProjectionFor("top"),
+  descriptionProjectionFor("bottom"),
+  descriptionProjectionFor("dress"),
+  descriptionProjectionFor("outerwear"),
+  descriptionProjectionFor("shoes"),
+  descriptionProjectionFor("accessory"),
+])
   .superRefine((piece, context) => {
     const keys = piece.attributes.map((entry) => entry.key);
     if (new Set(keys).size !== keys.length)

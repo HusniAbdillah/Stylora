@@ -325,7 +325,14 @@ export async function saveWardrobeDraft(id: string, input: unknown) {
       id,
       parsed.expectedRevision,
       "save",
-      draftPayloadSchema.parse({ ...draft.payload, proposals }),
+      draftPayloadSchema.parse({
+        ...draft.payload,
+        proposals,
+        metadata:
+          parsed.occasion === undefined
+            ? draft.payload.metadata
+            : { ...draft.payload.metadata, occasion: parsed.occasion },
+      }),
     )
   ).draft;
 }

@@ -1,14 +1,8 @@
-import { WorkspaceShell } from "@/components/shell";
 import { LoadingLayout, Skeleton } from "@/components/ui";
 
 export default function LoadingLook() {
   return (
-    <WorkspaceShell
-      activeHref="/create"
-      displayName="Studio guest"
-      breadcrumbs={[{ label: "Create" }, { label: "Outfit details" }]}
-      activity={[]}
-    >
+    <>
       <div className="space-y-6 pb-24">
         <Skeleton className="h-12 max-w-3xl rounded-card" />
         <Skeleton className="h-12 max-w-xl" />
@@ -26,6 +20,6 @@ export default function LoadingLook() {
           </div>
         </div>
       </div>
-    </WorkspaceShell>
+    </>
   );
 }

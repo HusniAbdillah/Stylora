@@ -10,7 +10,7 @@ import {
   skinSwatchOptions,
   womenBodyIllustrations,
 } from "@/features/preferences/preferences-types";
-import { slotForPreviewItem } from "./schema";
+import { previewSelectionSchema, slotForPreviewItem } from "./schema";
 
 const selectedList = z
   .array(z.string().trim().min(1).max(120))
@@ -129,13 +129,31 @@ const visualKeys = [
 const hasVisualChoices = (
   preferences: z.infer<typeof visualPreferencesSchema>,
 ) => visualKeys.some((key) => preferences[key] !== undefined);
+const slotSchema = previewSelectionSchema.keyof();
+const slots = slotSchema.options;
+type Slot = z.infer<typeof slotSchema>;
+const compositionSchema = z
+  .strictObject({
+    selectedSlots: z.array(slotSchema).max(slots.length),
+    omittedSlots: z.array(slotSchema).max(slots.length),
+  })
+  .refine((composition) => {
+    const combined = [
+      ...composition.selectedSlots,
+      ...composition.omittedSlots,
+    ];
+    return (
+      combined.length === slots.length &&
+      new Set(combined).size === slots.length
+    );
+  }, "Selected and omitted slots must form a unique, disjoint, complete partition.");
 const poseInstructions = {
   "standing-clear":
-    "Relaxed balanced standing with a slight weight shift. Keep arms naturally apart from the torso and hands visible; show garment fronts, seams, hem and footwear without obstruction.",
+    "Relaxed balanced standing with a slight weight shift. Keep arms naturally apart from the torso and hands visible; show selected garment fronts, seams and hems without obstruction.",
   "three-quarter-outerwear":
     "Stand in a restrained three-quarter view with relaxed shoulders. Keep hands outside pockets and clear of the torso; show outerwear edges, fastenings and the selected layers without changing how they are worn.",
   "standing-dress":
-    "Stand naturally with a restrained three-quarter turn and one foot slightly forward in a balanced stationary stance. Keep hands away from the waist and skirt; show the dress silhouette, hem and footwear.",
+    "Stand naturally with a restrained three-quarter turn and one foot slightly forward in a balanced stationary stance. Keep hands away from the waist and skirt; show the selected dress silhouette and hem.",
   "three-quarter-bag":
     "Stand in a gentle three-quarter view. Keep the selected bag fully visible in its referenced carrying position, slightly to the side where appropriate; keep hands and the bag clear of garment fronts and edges.",
   "standing-accessories":
@@ -145,12 +163,36 @@ const bagInstruction =
   " Keep the selected bag visible in its referenced carrying position without covering the clothing.";
 const accessoryInstruction =
   " Keep selected accessories visible and hands away from garment details.";
+function poseForSlots(selectedSlots: readonly Slot[]) {
+  const bag = selectedSlots.includes("bags");
+  const accessories = bag || selectedSlots.includes("accessories");
+  const id = selectedSlots.includes("outerwear")
+    ? "three-quarter-outerwear"
+    : selectedSlots.includes("dress")
+      ? "standing-dress"
+      : bag
+        ? "three-quarter-bag"
+        : accessories
+          ? "standing-accessories"
+          : "standing-clear";
+  const bagNote = bag && id !== "three-quarter-bag" ? bagInstruction : "";
+  const accessoryNote =
+    accessories && id !== "standing-accessories" ? accessoryInstruction : "";
+  const footwearNote = selectedSlots.includes("shoes")
+    ? " Keep the selected footwear fully visible."
+    : "";
+  return {
+    id,
+    instructions: poseInstructions[id] + bagNote + accessoryNote + footwearNote,
+  };
+}
 
 export const avatarVisualDirectionSchema = z
   .strictObject({
-    version: z.literal("visual-direction.v1"),
+    version: z.literal("visual-direction.v2"),
     mode: z.enum(["neutral", "personalized"]),
     preferences: visualPreferencesSchema,
+    composition: compositionSchema,
     pose: z.strictObject({
       id: z.enum([
         "standing-clear",
@@ -163,20 +205,16 @@ export const avatarVisualDirectionSchema = z
     }),
   })
   .superRefine((direction, context) => {
-    const base = poseInstructions[direction.pose.id];
+    const expectedPose = poseForSlots(direction.composition.selectedSlots);
     if (
-      ![
-        base,
-        base + bagInstruction,
-        base + accessoryInstruction,
-        base + bagInstruction + accessoryInstruction,
-      ].includes(direction.pose.instructions)
+      direction.pose.id !== expectedPose.id ||
+      direction.pose.instructions !== expectedPose.instructions
     )
       context.addIssue({
         code: "custom",
         path: ["pose", "instructions"],
         message:
-          "Pose instructions must use the versioned standing directions.",
+          "Pose instructions must match the selected composition and versioned standing directions.",
       });
     if (
       (direction.mode === "personalized") !==
@@ -325,44 +363,25 @@ export function buildAvatarVisualDirection(
     )
     .max(20)
     .parse(items);
-  const bag = outfit.some(
-    (item) =>
-      slotForPreviewItem({
-        category: item.category,
-        subcategory: item.subcategory ?? null,
-      }) === "bags" ||
-      (item.category === "accessory" &&
-        typeof item.attributes.bagType === "string" &&
-        ![
-          "",
-          "unknown",
-          "not_visible",
-          "not_applicable",
-          "not visible",
-          "not applicable",
-          "none",
-          "unsure",
-        ].includes(item.attributes.bagType.trim().toLowerCase())),
+  const suppliedSlots = new Set(
+    outfit.map((item) =>
+      slotSchema.parse(
+        slotForPreviewItem({
+          category: item.category,
+          subcategory: item.subcategory ?? null,
+        }),
+      ),
+    ),
   );
-  const id = outfit.some((item) => item.category === "outerwear")
-    ? "three-quarter-outerwear"
-    : outfit.some((item) => item.category === "dress")
-      ? "standing-dress"
-      : bag
-        ? "three-quarter-bag"
-        : outfit.some((item) => item.category === "accessory")
-          ? "standing-accessories"
-          : "standing-clear";
-  const bagNote = bag && id !== "three-quarter-bag" ? bagInstruction : "";
-  const accessoryNote =
-    outfit.some((item) => item.category === "accessory") &&
-    id !== "standing-accessories"
-      ? accessoryInstruction
-      : "";
+  const composition = {
+    selectedSlots: slots.filter((slot) => suppliedSlots.has(slot)),
+    omittedSlots: slots.filter((slot) => !suppliedSlots.has(slot)),
+  };
   return avatarVisualDirectionSchema.parse({
-    version: "visual-direction.v1",
+    version: "visual-direction.v2",
     mode: hasVisualChoices(validated) ? "personalized" : "neutral",
     preferences: validated,
-    pose: { id, instructions: poseInstructions[id] + bagNote + accessoryNote },
+    composition,
+    pose: poseForSlots(composition.selectedSlots),
   });
 }

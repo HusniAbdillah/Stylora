@@ -1,3 +1,5 @@
+export type InventoryMode = "live" | "sample" | "combined";
+
 export type MatchItem = {
   id: string;
   name: string;
@@ -14,6 +16,27 @@ export type MatchItem = {
   inventoryStatus?: string;
   archivedAt?: string | null;
 };
+
+export function isOwnedInventoryItem(
+  item: MatchItem,
+  mode: InventoryMode = "live",
+) {
+  return (
+    item.inventoryStatus === "owned" &&
+    (mode === "combined" || !item.archivedAt)
+  );
+}
+
+export function classifyInventoryMatch(
+  candidate: MatchItem,
+  comparison: { score: number; evidenceCoverage: number },
+) {
+  return candidate.inventoryStatus === "owned" &&
+    comparison.score >= 0.8 &&
+    comparison.evidenceCoverage >= 0.25
+    ? ("owned_match" as const)
+    : ("wardrobe_alternative" as const);
+}
 
 const unknownValues = new Set([
   "unknown",
@@ -43,6 +66,7 @@ export function evaluateCandidate(
   candidate: MatchItem,
   occasion: string | null = null,
   preferences: Record<string, string | string[]> = {},
+  mode: InventoryMode = "live",
 ) {
   const reject = (reason: string) => ({
     eligible: false as const,
@@ -52,7 +76,11 @@ export function evaluateCandidate(
     sharedAttributes: [] as string[],
     differences: [] as string[],
   });
-  if (candidate.inventoryStatus !== "owned" || candidate.archivedAt)
+  if (
+    mode === "combined"
+      ? !["owned", "saved_candidate"].includes(candidate.inventoryStatus ?? "")
+      : !isOwnedInventoryItem(candidate, mode)
+  )
     return reject("not_active_owned_inventory");
   if (reference.category !== candidate.category)
     return reject("incompatible_category_role");

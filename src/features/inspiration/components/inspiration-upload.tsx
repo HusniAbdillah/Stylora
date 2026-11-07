@@ -286,8 +286,9 @@ export function InspirationUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const canAnalyze = status === "verified" && !analyzeDisabled;
+  const pickerDisabled = readOnly || status === "uploading";
   const openPicker = () => {
-    if (!readOnly) inputRef.current?.click();
+    if (!pickerDisabled) inputRef.current?.click();
   };
 
   return (
@@ -299,8 +300,9 @@ export function InspirationUpload({
             Begin with an <em className="text-crimson">inspiration.</em>
           </h1>
           <p className={styles.desktopDescription}>
-            Upload an outfit you saved. We describe each piece, check what you
-            already own and suggest three ways to wear it.
+            Upload an outfit and choose an occasion. Stylora reads its pieces
+            automatically, then helps match your wardrobe and explore three
+            outfits.
           </p>
         </div>
         {onAnalyze && (
@@ -315,8 +317,8 @@ export function InspirationUpload({
             </Button>
             <p className="mt-2 text-xs text-secondary">
               {tasks.some((task) => task.status === "running")
-                ? "Reading has already started in the background"
-                : "Reading starts when the image is ready"}
+                ? "Analysis is in progress"
+                : "Analysis starts after your photo is verified and an occasion is selected"}
             </p>
           </div>
         )}
@@ -328,7 +330,8 @@ export function InspirationUpload({
             type="file"
             accept="image/jpeg,image/png,image/webp"
             className="sr-only"
-            disabled={readOnly}
+            disabled={pickerDisabled}
+            tabIndex={-1}
             aria-label="Choose an outfit inspiration image"
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -347,7 +350,17 @@ export function InspirationUpload({
               event.target.value = "";
             }}
           />
-          <div className={styles.uploadImageWell}>
+          <button
+            type="button"
+            className={styles.uploadImageWell}
+            onClick={openPicker}
+            disabled={pickerDisabled}
+            aria-label={
+              imageUrl
+                ? "Replace outfit inspiration image"
+                : "Choose an outfit inspiration image"
+            }
+          >
             {imageUrl ? (
               <Image
                 src={imageUrl}
@@ -358,14 +371,16 @@ export function InspirationUpload({
                 className={styles.uploadImage}
               />
             ) : (
-              <div className="max-w-xs text-center">
+              <span className="block max-w-xs text-center">
                 <Icon name="image" className="mx-auto size-12 text-secondary" />
-                <p className="mt-3 font-semibold">Choose an outfit image</p>
-                <p className="mt-2 text-sm text-secondary">
+                <span className="mt-3 block font-semibold">
+                  Choose an outfit image
+                </span>
+                <span className="mt-2 block text-sm text-secondary">
                   JPEG, PNG or WebP up to 10 MiB. A full-length daylight photo
                   usually gives clearer details.
-                </p>
-              </div>
+                </span>
+              </span>
             )}
             {status === "verified" && (
               <span
@@ -380,13 +395,13 @@ export function InspirationUpload({
                 Uploading image…
               </span>
             )}
-          </div>
+          </button>
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
             <Button
               type="button"
               variant="secondary"
               onClick={openPicker}
-              disabled={readOnly}
+              disabled={pickerDisabled}
               className="flex-1 sm:flex-none"
             >
               {imageUrl ? (

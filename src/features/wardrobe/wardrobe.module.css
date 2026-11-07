@@ -23,6 +23,15 @@
   line-height: 1.4;
 }
 
+.collectionFooter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 1096px;
+  margin: -22px auto 40px;
+}
+
 .loadingHeading {
   display: grid;
   gap: 12px;

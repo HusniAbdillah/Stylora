@@ -417,6 +417,40 @@
   background: var(--color-sand);
   color: var(--color-secondary);
 }
+.readyPhoto {
+  width: min(240px, 100%);
+  height: 280px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--color-sand);
+}
+.occasionField {
+  display: grid;
+  gap: 8px;
+  margin-block: 16px;
+  font-size: 14px;
+}
+.occasionField input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--color-stone);
+  border-radius: var(--radius-field);
+  padding: 10px 12px;
+  background: var(--color-paper);
+}
+.occasionField small {
+  color: var(--color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.readyPhoto img,
+.progressImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 
 .progressIcon {
   width: 36px;
