@@ -1,13 +1,6 @@
 import { z } from "zod";
 
-export const categorySchema = z.enum([
-  "top",
-  "bottom",
-  "dress",
-  "outerwear",
-  "shoes",
-  "accessory",
-]);
+export { categorySchema } from "@/lib/ai/fashion-schema";
 const ids = z
   .array(z.uuid())
   .max(60)
