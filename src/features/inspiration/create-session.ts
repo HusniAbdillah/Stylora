@@ -156,14 +156,18 @@ export class CreateSession {
           type: "image/webp",
         });
         if (generation !== this.generation)
-          throw new Error(
-            "The active draft changed. The previous sample draft is retained.",
+          throw new DOMException(
+            "Sample preparation was superseded.",
+            "AbortError",
           );
         const upload = this.upload(photo);
         const uploadGeneration = this.generation;
         await upload;
         if (uploadGeneration !== this.generation)
-          throw new Error("The active draft changed.");
+          throw new DOMException(
+            "Sample preparation was superseded.",
+            "AbortError",
+          );
         return draft.id;
       } finally {
         if (this.state.draft?.id === draft.id)
@@ -172,7 +176,8 @@ export class CreateSession {
     })().catch((error) => {
       this.samplePreparation = null;
       this.update({ prefilling: false });
-      this.report(error);
+      if (!(error instanceof Error && error.name === "AbortError"))
+        this.report(error);
       throw error;
     });
     return this.samplePreparation;
@@ -753,9 +758,13 @@ export class CreateSession {
     return request;
   }
   private mergeOperation(operation: CreateOperation) {
-    if (operation.kind === "inspiration_description" && active(operation) && operation.id !== this.provisionalSource) {
+    if (
+      operation.kind === "inspiration_description" &&
+      active(operation) &&
+      operation.id !== this.provisionalSource
+    ) {
       this.provisionalSource = operation.id;
-      this.update({provisional:[]});
+      this.update({ provisional: [] });
     }
     this.update({
       operations: [

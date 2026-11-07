@@ -10,7 +10,10 @@ import {
   type MatchItem,
 } from "@/features/matching/gates";
 import type { MatchResult } from "@/features/matching/schema";
-import { createEvidenceProjection } from "@/features/matching/evidence";
+import {
+  createEvidenceProjection,
+  projectRecommendationItem,
+} from "@/features/matching/evidence";
 import {
   outfitOptionsSchema,
   validateOptionComposition,
@@ -59,9 +62,9 @@ export async function generateOptions(
       requestedTypes: input.optionType
         ? [input.optionType]
         : ["closest", "from_wardrobe", "fresh_alternative"],
-      pieces: input.pieces,
+      pieces: input.pieces.map(projectRecommendationItem),
       matches: input.matches,
-      inventory: input.inventory,
+      inventory: input.inventory.map(projectRecommendationItem),
       inventoryMode: input.inventoryMode ?? "live",
       allowedOwnedIds: input.inventory
         .filter((item) => isOwnedInventoryItem(item, input.inventoryMode))

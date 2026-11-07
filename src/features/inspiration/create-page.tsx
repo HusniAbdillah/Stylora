@@ -165,7 +165,13 @@ export function CreatePage({
           .then((id) => {
             if (mounted) router.replace(`/create?draft=${id}`);
           })
-          .catch((error) => session.report(error));
+          .catch((error) => {
+            if (
+              mounted &&
+              !(error instanceof Error && error.name === "AbortError")
+            )
+              session.report(error);
+          });
       else void session.hydrate(draftId, lookId);
     } else {
       session.finishSamplePreparation();

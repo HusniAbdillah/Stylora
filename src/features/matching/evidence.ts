@@ -49,13 +49,22 @@ function populatedPaths(
     });
 }
 
-function fashionEvidence(item: MatchItem) {
+export function projectRecommendationItem(item: MatchItem) {
   return {
+    id: item.id,
     name: item.name,
     category: item.category,
     subcategory: item.subcategory,
     description: item.description,
-    attributes: item.attributes,
+    attributes: Object.fromEntries(
+      Object.entries(item.attributes).filter(
+        ([, value]) =>
+          value !== null &&
+          value !== undefined &&
+          (!Array.isArray(value) || value.length > 0),
+      ),
+    ),
+    revision: item.revision,
     confidence: item.confidence,
     uncertainty: item.uncertainty,
     sourceType: item.sourceType,
@@ -90,9 +99,9 @@ export function createEvidenceProjection(input: {
     }
   }
   for (const piece of input.pieces)
-    add("inspiration", piece.id, fashionEvidence(piece));
+    add("inspiration", piece.id, projectRecommendationItem(piece));
   for (const item of input.inventory)
-    add("wardrobe", item.id, fashionEvidence(item));
+    add("wardrobe", item.id, projectRecommendationItem(item));
   add("preference", null, input.preferences);
   add("context", null, { occasion: input.occasion });
   if (!catalog.length) throw new Error("evidence_catalog_empty");

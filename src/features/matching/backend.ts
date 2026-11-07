@@ -17,7 +17,10 @@ import {
   type MatchItem,
 } from "./gates";
 import { explainedMatchesSchema, type MatchResult } from "./schema";
-import { createEvidenceProjection } from "./evidence";
+import {
+  createEvidenceProjection,
+  projectRecommendationItem,
+} from "./evidence";
 
 export type { MatchItem, InventoryMode } from "./gates";
 export type MatchContext = {
@@ -264,8 +267,10 @@ export async function calculateMatches(
       inventoryMode: context.inventoryMode ?? "live",
       matches: planned.map(({ piece, chosen, ...match }) => ({
         ...match,
-        inspiration: piece,
-        wardrobeItem: chosen?.candidate ?? null,
+        inspiration: projectRecommendationItem(piece),
+        wardrobeItem: chosen
+          ? projectRecommendationItem(chosen.candidate)
+          : null,
       })),
       preferences: context.preferences,
       occasion: context.occasion,

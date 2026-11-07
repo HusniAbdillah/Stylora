@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { explanationSchema } from "@/lib/ai/fashion-schema";
-import { createEvidenceProjection } from "./evidence";
+import {
+  createEvidenceProjection,
+  projectRecommendationItem,
+} from "./evidence";
 import type { MatchItem } from "./gates";
 
 const piece: MatchItem = {
@@ -172,5 +175,62 @@ describe("per-request recommendation evidence", () => {
         (entry) => entry.reference.source === "inspiration",
       ),
     ).toBe(true);
+  });
+
+  it("keeps all inventory facts within the existing context limit without unused provenance", () => {
+    const inventory = Array.from({ length: 80 }, (_, index) => ({
+      ...item,
+      id: `f10b9179-6273-45e5-a240-${String(index).padStart(12, "0")}`,
+      description: "Ivory shirt with a relaxed woven silhouette.",
+      confidence: 0.8,
+      attributes: {
+        ...item.attributes,
+        apparentMaterial: null,
+        patternColors: [],
+      },
+      provenance: Object.fromEntries(
+        Array.from({ length: 100 }, (_, key) => [
+          `attributes.field${key}`,
+          {
+            source: "visual_inference",
+            evidence: "Visible garment detail. ".repeat(20),
+          },
+        ]),
+      ),
+    }));
+    const evidence = createEvidenceProjection({ ...input, inventory });
+    const rawContext = {
+      pieces: input.pieces,
+      inventory,
+      evidenceCatalog: evidence.catalog,
+    };
+    const compactContext = {
+      pieces: input.pieces.map(projectRecommendationItem),
+      inventory: inventory.map(projectRecommendationItem),
+      evidenceCatalog: evidence.catalog,
+    };
+    expect(
+      new TextEncoder().encode(JSON.stringify(rawContext)).byteLength,
+    ).toBeGreaterThan(300_000);
+    expect(
+      new TextEncoder().encode(JSON.stringify(compactContext)).byteLength,
+    ).toBeLessThan(300_000);
+    expect(compactContext.inventory).toHaveLength(inventory.length);
+    expect(compactContext.inventory[0]).toMatchObject({
+      id: inventory[0].id,
+      inventoryStatus: "saved_candidate",
+      archivedAt: item.archivedAt,
+      sourceType: "sample",
+      description: inventory[0].description,
+      confidence: 0.8,
+      attributes: { primaryColor: "ivory", colors: ["ivory"] },
+    });
+    expect(compactContext.inventory[0]).not.toHaveProperty("provenance");
+    expect(compactContext.inventory[0].attributes).not.toHaveProperty(
+      "apparentMaterial",
+    );
+    expect(compactContext.inventory[0].attributes).not.toHaveProperty(
+      "patternColors",
+    );
   });
 });
