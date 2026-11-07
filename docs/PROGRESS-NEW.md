@@ -465,3 +465,18 @@ which data, code revision or provider behavior was verified.
   fixture seeding and connected browser smoke remain with the Owner 4
   coordinator under the approved budget. Local application checks were not
   repeated for this documentation-only checkpoint.
+
+### Hosted type parity and bag selection correction
+
+- Regenerated `src/types/database.ts` directly from the hosted Supabase MCP
+  generator. Verified that Owner 2, Owner 3, workflow, image and Studio RPCs
+  remain declared. Main already contained the workflow RPC names before this
+  regeneration.
+- The Preview UI and mapper classify purses, satchels, duffels, briefcases,
+  crossbody bags and messenger bags as bag slots. The earlier Studio SQL used
+  a shorter exact-match list. Additive migration
+  `20261107045847_preview_bag_subcategories.sql` uses the same classification
+  expression as the UI and mapper.
+- Local `preview_bag_subcategories.sql` passed as `service_role`, covering ten
+  supported subtypes, wrong-slot rejection and fixture rollback. Hosted
+  application of this correction follows its CI gate.
