@@ -1,24 +1,38 @@
-import Link from "next/link";
-import { Button } from "@/components/ui";
+import {
+  LandingAbout,
+  LandingCallToAction,
+  LandingFeatures,
+  LandingFooter,
+  LandingHeader,
+  LandingHero,
+  LandingSteps,
+} from "@/features/landing/components";
+import { getLandingSample } from "@/features/landing/sample";
 
-export default function HomePage() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const sample = await getLandingSample();
+  const links = {
+    createHref: "/create",
+    sampleHref: "/sample",
+    wardrobeHref: "/wardrobe",
+    capsulesHref: "/capsules",
+    previewHref: "/preview",
+    savedLooksHref: "/saved-looks",
+    preferencesHref: "/preferences",
+  };
   return (
-    <main className="mx-auto flex min-h-dvh max-w-5xl items-center px-6 py-12 sm:px-12">
-      <div className="w-full rounded-2xl border border-stone bg-paper px-6 py-12 sm:px-12">
-        <p className="text-sm font-semibold text-crimson">
-          Stylora fashion studio
-        </p>
-        <h1 className="mt-4 max-w-2xl font-serif text-4xl tracking-tight sm:text-6xl">
-          Turn outfit inspiration into everyday decisions
-        </h1>
-        <p className="mt-5 max-w-prose text-base leading-7 text-secondary">
-          Stylora is being built to help you understand a look, find pieces you
-          own, and decide what to wear next.
-        </p>
-        <Button className="mt-6" asChild>
-          <Link href="/wardrobe">Open wardrobe</Link>
-        </Button>
-      </div>
-    </main>
+    <>
+      <LandingHeader links={links} />
+      <main>
+        <LandingHero {...links} sample={sample ?? undefined} />
+        <LandingSteps />
+        <LandingFeatures {...links} />
+        <LandingAbout />
+        <LandingCallToAction {...links} />
+      </main>
+      <LandingFooter />
+    </>
   );
 }
