@@ -13,7 +13,9 @@ not authorize cloud changes, deployments or paid usage by itself.
 | Decision             | Recommendation                                                                                                        | Owner          |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------- |
 | Names to owners      | Write the four names next to Owner 1 to 4 in TASK.md before anyone codes                                              | Team           |
-| Repository           | New repository, Next.js app scaffold, CI and PR template created at 00:00 by Owner 1 (README setup steps)             | Owner 1        |
+| Build clock T0       | Record the wall-clock start as an ISO time in PROGRESS-NEW.md; every `HH:MM` in this file is T0 plus that offset      | Team           |
+| Approval rule        | Lane A needs only green CI so agents can auto-merge; Lane B needs one human approval. Set branch protection to match  | Owner 1        |
+| Repository           | Created: scaffold, CI and PR template exist. Keep the README setup steps accurate                                     | Owner 1        |
 | Database target      | One new hosted Supabase project in the Singapore region is the only runtime database                                  | Owner 1        |
 | Data isolation       | One `STYLORA_WORKSPACE_ID` per developer plus `demo` and `preview` workspaces in the same project                     | Owner 1        |
 | Background execution | Option A in section 5 for the build, Option B only if Owner 4 is ahead at the 04:00 checkpoint                        | Owners 2 and 4 |
@@ -34,12 +36,12 @@ the deployed schema. Every server query is scoped by `STYLORA_WORKSPACE_ID`
 (TDD section 2), so separate workspace rows give each developer isolated data in
 one database at no cost.
 
-| Environment             | Runs where              | Database and workspace                         | Writes |
-| ----------------------- | ----------------------- | ---------------------------------------------- | ------ |
-| Developer laptop        | `pnpm dev`              | Hosted project, `dev-owner-1` to `dev-owner-4` | On     |
-| Pull request preview    | Vercel preview          | Hosted project, `preview` workspace            | On     |
-| Demo and judging        | Vercel production, main | Hosted project, `demo` workspace, seeded       | On     |
-| Optional migration test | Owner 1 laptop only     | Local Supabase stack via the Supabase CLI      | Local  |
+| Environment             | Runs where              | Database and workspace                          | Writes |
+| ----------------------- | ----------------------- | ----------------------------------------------- | ------ |
+| Developer laptop        | `pnpm dev`              | Hosted project, `dev-owner-1` to `dev-owner-4`  | On     |
+| Pull request preview    | Vercel preview          | Hosted project, `preview` workspace (see below) | On     |
+| Demo and judging        | Vercel production, main | Hosted project, `demo` workspace, seeded        | On     |
+| Optional migration test | Owner 1 laptop only     | Local Supabase stack via the Supabase CLI       | Local  |
 
 Rules:
 
@@ -48,7 +50,10 @@ Rules:
    after review push the migration to the hosted project with the CLI, then run
    `pnpm db:types` and commit the generated database types file in the same PR.
    Never edit a pushed migration, never use the dashboard Table Editor for
-   schema and never reset the hosted database.
+   schema and never reset the hosted database. The hosted schema may run ahead of
+   `main` between the push and the merge. Because migrations are additive, a wrong
+   one is fixed with a new forward migration, never by editing or dropping the
+   applied one. Other branches must not rely on a migration until its PR merges.
 2. Other owners send schema needs as a contract note (TASK.md section 8) and
    build against the generated types once merged. Until then, code against the
    Zod contract and keep the persistence call behind one function.
@@ -57,9 +62,18 @@ Rules:
    not used. Never prefix secrets with `NEXT_PUBLIC_`.
 4. Storage buckets are shared; paths already start with the workspace ID, so
    developers do not collide.
-5. Seed the `demo` workspace once from the team dataset with a small seed
-   script after team approval, then treat it as read-mostly until rehearsal.
-6. If the optional local stack is used, it is only to dry-run a risky
+5. Seed the `demo` workspace from the team dataset with an idempotent seed
+   script after team approval. The script touches only the `demo` workspace, so
+   running it again restores the demo state without resetting the database. Run
+   it before each rehearsal and before judging, then treat the workspace as
+   read-mostly.
+6. Many open pull requests share the `preview` workspace, so manual checks on
+   previews can overwrite each other. A reviewer clicking a preview uses fresh
+   records and does not depend on state left by another pull request.
+7. The provider budget in section 1 is counted from operation rows by workspace
+   and kind, not from memory. Owner 4 provides a read-only script that prints
+   the count per `dev-owner-N` workspace; check it at each checkpoint.
+8. If the optional local stack is used, it is only to dry-run a risky
    migration. Its result is never evidence that the hosted schema matches.
 
 ## 3. Git, pull requests and merge rhythm
@@ -72,11 +86,15 @@ Rules:
 - Each PR stays under roughly 400 changed lines, includes the Figma frame ID it
   implements (for example D04 and M04), a screenshot or preview link, and the
   checks run. Use the pull request template created at setup.
-- Before opening a PR: `git fetch`, rebase on `origin/main`, `pnpm check`. Open
-  the PR, let CI and the Vercel preview finish, click the changed flow once on
-  the preview, then request review.
-- Reviewer rotation: Owner 1 reviews 2, Owner 2 reviews 3, Owner 3 reviews 4,
-  Owner 4 reviews 1. Owner 1 must also approve any change to shared files.
+- Before opening a PR: run `make pr-ready` once (lint, typecheck, diff size and
+  lane report). CI runs the full check and build, and it tests the merge with
+  current `main`, so rebase only when GitHub reports a conflict. Section 10.4 is
+  the single rule for local checks. After opening, click the changed UI flow once
+  on the preview.
+- Reviewer rotation applies to Lane B pull requests: Owner 1 reviews 2, Owner 2
+  reviews 3, Owner 3 reviews 4, Owner 4 reviews 1. Owner 1 must also approve any
+  change to shared files. Lane A merges on green CI without waiting for a
+  reviewer; humans skim merged pull requests before each merge window.
 - Squash merge. Delete the branch. Everyone rebases within 10 minutes of each
   merge window.
 
@@ -164,9 +182,12 @@ so one failure never hides the others.
 
 ## 7. Detailed TODO
 
-Tick items in your own copy or in the PR description. Every item names its
-frame and its done condition. Do not start an item whose dependency is open;
-pick the next one.
+This is the canonical item list. [TODO.md](TODO.md) is a private, ignored copy
+for ticking; if they differ, this section wins. Checkboxes here are not status:
+completion and evidence live in [PROGRESS-NEW.md](PROGRESS-NEW.md), one section
+per owner so owners do not conflict in that file. Every item names its frame and
+its done condition. Do not start an item whose dependency is open; pick the next
+one.
 
 ### Owner 1: foundations, wardrobe, preferences, profile
 
@@ -206,6 +227,8 @@ pick the next one.
       revision fingerprint published to every AI task.
 - [ ] 05:00 Profile page, accessibility pass on shell and dialogs, 390 px pass.
 - [ ] 05:30 Final type regeneration if needed; verify no pending migration.
+- [ ] 05:30 Idempotent demo seed script limited to the `demo` workspace, and a
+      restore step before rehearsal. Done: running it twice gives the same state.
 
 ### Owner 2: landing and Create steps 1 to 4
 
@@ -272,6 +295,8 @@ pick the next one.
       outfit, illustrative limitation note.
 - [ ] 05:00 Saved-look avatar consumer: reuse a matching preview, retry,
       independent failure.
+- [ ] 02:00 Read-only provider budget script: operation count per workspace and
+      kind against the section 1 caps. Done: prints one table per `dev-owner-N`.
 
 ### Whole team: product, pitch and demo
 
@@ -306,8 +331,9 @@ pick the next one.
 
 Matches its Figma frame at 1440 and 390 px; uses tokens and shared primitives;
 has loading, empty, error and retry states; keeps state across navigation;
-confirms destructive actions with the custom dialog; passes `pnpm check`;
-merged through a reviewed PR; evidence row added to PROGRESS-NEW.md with the
+confirms destructive actions with the custom dialog; passes the checks in
+section 10.4 (`make fast` locally, `pnpm check` and `pnpm build` in CI); merged
+through a pull request under the lane rules in section 10.6; evidence row added to PROGRESS-NEW.md with the
 exact checks run and anything not run.
 
 ## 10. Agent delivery lane: commit, pull request and merge
@@ -354,6 +380,21 @@ overrides this section.
 
 Open the pull request as soon as the task slice works and `make fast` passed
 once. Use `.github/pull_request_template.md`, filled briefly.
+
+Shortcuts that enforce this section mechanically (they push only your own
+branch and never touch `main` or the database):
+
+| Command          | What it does                                                                  |
+| ---------------- | ----------------------------------------------------------------------------- |
+| `make pr-ready`  | `make fast`, then `scripts/pr-check.mjs`: diff size, Lane A or B, time window |
+| `make open-pr`   | `pr-ready`, push the branch, `gh pr create --fill`                            |
+| `make automerge` | Lane A only: enables squash auto-merge; exits without merging for Lane B      |
+| `make ship`      | `open-pr` then `automerge`; for Lane B it stops after opening                 |
+
+Set `STYLORA_T0` (the build start from section 1, as an ISO time) in the shell so
+`pr-check` also blocks merges after 05:15 and 06:00. Without it the time rule is
+the agent's responsibility. `scripts/pr-check.mjs` holds the Lane B path list;
+change it in the same pull request as any change to the table in 10.6.
 
 - Title in the same Conventional Commits form. Target `main`.
 - Body: two-line summary, task and Figma frame IDs, lane (A or B), checks run
@@ -412,10 +453,10 @@ comparison in section 4 and the definition of done, not repeated here.
 
 ### 10.6 Merge lanes
 
-| Lane | Scope                                                                                                                                                                                                                                                                                                                                                                         | Merge rule                                                                                   |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| A    | The owner's own feature folders and thin routes, tests for them, PROGRESS-NEW.md, TODO.md; no new dependency; about 400 lines or fewer                                                                                                                                                                                                                                        | The agent may squash-merge after the Lane A conditions below                                 |
-| B    | `src/app/globals.css`, `src/app/layout.tsx`, shell and shared UI primitives, `package.json`, lockfile, `.env.example`, `supabase/**`, generated types, `.github/**`, `Makefile`, `src/prompts`, security, storage and workspace-scoping code, public sharing and media, governing specs (PRD, TDD, DESIGN, TASK, RULES, FASHION*), cross-owner contracts, more than 400 lines | The agent opens the pull request, reports it and stops. A human reviewer approves and merges |
+| Lane | Scope                                                                                                                                                                                                                                                                                                                                                                                                                  | Merge rule                                                                                   |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| A    | The owner's own feature folders and thin routes, tests for them, PROGRESS-NEW.md, TODO.md; no new dependency; about 400 lines or fewer                                                                                                                                                                                                                                                                                 | The agent may squash-merge after the Lane A conditions below                                 |
+| B    | `src/app/globals.css`, `src/app/layout.tsx`, shell and shared UI primitives, `package.json`, lockfile, `.env.example`, `supabase/**`, generated types, `.github/**`, `Makefile`, `scripts/**`, `.agents/**`, `AGENTS.md`, `src/prompts`, security, storage and workspace-scoping code, public sharing and media, governing specs (PRD, TDD, DESIGN, TASK, RULES, FASHION*), cross-owner contracts, more than 400 lines | The agent opens the pull request, reports it and stops. A human reviewer approves and merges |
 
 When in doubt, treat the change as Lane B. A pull request that mixes lanes is
 Lane B; split it when practical.
@@ -427,7 +468,8 @@ Lane A merge conditions, all required:
    a blocker fix with a reason in the pull request body; after 06:00 do not
    merge without a human.
 3. The merge is gated by CI, not by the agent waiting for it. Run
-   `gh pr merge --squash --auto --delete-branch` right after opening the pull
+   `make automerge` (it checks the lane, then runs
+   `gh pr merge --squash --auto --delete-branch`) right after opening the pull
    request. GitHub merges it when the required check is green and the pull
    request is mergeable, then the agent moves to the next task. Never use
    `--admin` or bypass branch protection.

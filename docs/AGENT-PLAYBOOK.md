@@ -35,6 +35,9 @@ delivery lane), [TASK.md](TASK.md) (ownership) and [AGENTS.md](../AGENTS.md)
 4. `gh auth login` once. Confirm `gh pr list` works.
 5. For parallel work create a worktree per task: `make wt name=oN/<slug>`, run
    Codex from inside that folder.
+6. Export `STYLORA_T0` (the build start as an ISO time, recorded in
+   `docs/PROGRESS-NEW.md`) so `make automerge` enforces the 05:15 and 06:00
+   limits for you.
 
 ## 3. Skills
 
@@ -66,10 +69,10 @@ text; they run with the agent's permissions.
 2. `make wt name=oN/<slug>`, read the routed sections, state a five-line plan.
 3. Build the slice (`stylora-feature-slice`, `stylora-ai-task`,
    `stylora-ui-from-figma`). Commit every 15 to 30 minutes.
-4. `stylora-antislop` on the diff, `make fast` once.
-5. Add the `docs/PROGRESS-NEW.md` row, push, open the pull request.
-6. Lane A: enable auto-merge and start the next task. Lane B: stop and ping the
-   reviewer.
+4. `stylora-antislop` on the diff, then `make pr-ready` once.
+5. Add the `docs/PROGRESS-NEW.md` row in your owner section, then `make open-pr`.
+6. Lane A: `make automerge` and start the next task (`make ship` does steps 5 to
+   6 together). Lane B: the script stops; ping the reviewer.
 7. After merge, `make wt-rm name=oN/<slug>`.
 
 ## 5. Copy-paste kickoff prompt
