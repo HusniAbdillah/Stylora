@@ -25,6 +25,7 @@ const LANE_B_PATTERNS = [
   /^src\/types\/database\.ts$/,
   /^\.github\//,
   /^Makefile$/,
+  /^vercel\.json$/,
   /^scripts\//,
   /^src\/prompts\//,
   /^AGENTS\.md$/,
