@@ -17,6 +17,20 @@ import {
   discardPendingAvatar,
 } from "@/features/preview/image";
 
+const avatarInputSchema = z
+  .object({
+    intent: z.literal("regenerate").optional(),
+    requestId: z.uuid().optional(),
+  })
+  .refine((input) => !input.intent || input.requestId !== undefined, {
+    path: ["requestId"],
+    message: "Regeneration requires a request ID.",
+  });
+
+export function shouldReuseSavedAvatar(input: unknown): boolean {
+  return avatarInputSchema.parse(input).intent !== "regenerate";
+}
+
 export async function runSavedAvatar(operationId: string) {
   const context = getWorkspaceDatabase();
   const operation = await readOperation(operationId);
@@ -49,6 +63,7 @@ export async function runSavedAvatar(operationId: string) {
   await assertWorkflowRpc("complete_saved_avatar");
   return runOperation(operation.id, {
     execute: async (claim) => {
+      const reuse = shouldReuseSavedAvatar(claim.input);
       const { data, error } = await context.client
         .from("workflow_operations")
         .update({
@@ -72,6 +87,7 @@ export async function runSavedAvatar(operationId: string) {
         items,
         preferences: snapshot.preference_snapshot,
         allowIllustrativeItems: true,
+        reuse,
         signal: claim.signal,
       });
     },

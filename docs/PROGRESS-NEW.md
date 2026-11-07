@@ -404,6 +404,20 @@ below the latest one.
   by this Owner 4 smoke.
 
 
+### Owner 4 saved-avatar regeneration intent, 7 November 2026
+
+- Branch `o4/saved-avatar-intent` validates the leased operation's optional
+  regeneration intent and UUID request ID. Legacy empty input and saved-look
+  metadata continue to reuse existing images. Explicit regeneration disables
+  reuse while preserving model metadata updates and fenced completion.
+- `pnpm exec vitest run src/features/operations/schema.test.ts` passed all eight
+  tests in the managed Windows worktree. `make fast` passed lint and typecheck.
+  Tests cover legacy input, explicit regeneration, unknown intent and missing or
+  invalid request identity. The owned model fixture uses `gpt-image-1.5`.
+- This patch ran no hosted operations or provider calls. The report-only merge
+  resolution preserves the coordinator's complete integration report; local
+  checks were not repeated because worker code is unchanged. CI remains the gate.
+
 ### Owner 4 image Storage retry classification, 7 November 2026
 
 - Task O4.1 and R04–R06. Feature-owned image I/O now preserves transient
