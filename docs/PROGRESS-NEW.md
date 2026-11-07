@@ -723,3 +723,22 @@ which data, code revision or provider behavior was verified.
 - `pnpm exec vitest run src/lib/supabase/storage.test.ts` passed all 51 tests
   using synthetic SDK errors and in-memory image bytes. No hosted fixtures,
   database changes or provider requests were made. CI is the full build gate.
+
+## Owner 1 saved-media regeneration, 7 November 2026
+
+- Branch `o1/saved-media-regeneration`, O4.7 database contract. Added
+  `regenerate_saved_look_media(uuid,uuid,uuid,uuid)`, returning the complete
+  saved media row. A request UUID replays its original command before checking
+  the latest-media revision. Different commands cannot allocate concurrent work.
+- The transaction uses the existing retry and delete advisory lock, creates a
+  distinct saved-avatar operation and media version, and preserves the immutable
+  snapshot, prior image and approved share media. Operation input is exactly
+  `intent: regenerate` and `requestId`; rendering inputs remain unchanged.
+- `psql -v ON_ERROR_STOP=1 -f /tmp/stylora_regeneration_test.sql` passed as
+  `service_role` in isolated local database `stylora_operation_contract_v4`.
+  Synthetic fixtures rolled back. Cases cover foreign workspaces, queued and
+  completed replay, busy rejection, stale media, immutable data and denied
+  anon/authenticated execution. No provider calls or hosted fixtures were used.
+- Types were generated from the combined local schema with pinned Supabase CLI
+  3 and formatted with Prettier. Local `make fast` is running; CI and hosted
+  schema application remain pending. Caller execution belongs to Owner 4.
