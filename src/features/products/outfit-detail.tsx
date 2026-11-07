@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { Badge, Button, Chip, Icon } from "@/components/ui";
 
@@ -31,6 +32,10 @@ export type ProductOffer = {
   };
   scoreVersion?: string;
   savedCandidate?: boolean;
+  importing?: boolean;
+  choosing?: boolean;
+  importPending?: boolean;
+  destinationType?: string;
 };
 
 export type ShoppingSlot = {
@@ -55,6 +60,7 @@ export type OutfitDetailOption = {
   differences?: string[];
   uncertainty?: string[];
   shoppingSlots: ShoppingSlot[];
+  unavailable?: boolean;
 };
 
 export type ValueWeights = { price: number; rating: number; relevance: number };
@@ -66,15 +72,17 @@ const OPTION_LABELS: Record<OutfitDetailOption["type"], string> = {
 };
 
 function ProductPicture({ src, alt }: { src?: string | null; alt: string }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   return (
     <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-sand">
-      {src ? (
+      {src && src !== failedSrc ? (
         <Image
           src={src}
           alt={alt}
           fill
           sizes="(max-width: 640px) 160px, 240px"
           unoptimized
+          onError={() => setFailedSrc(src)}
           className="object-contain"
         />
       ) : (
@@ -181,17 +189,27 @@ export function ProductCard({
           <Button
             variant="secondary"
             onClick={() => onSave?.(offer)}
-            disabled={offer.savedCandidate || !onSave}
+            disabled={offer.savedCandidate || offer.importing || !onSave}
           >
-            {offer.savedCandidate ? "Saved as candidate" : "Save to wardrobe"}
+            {offer.importing
+              ? "Copying image…"
+              : offer.savedCandidate
+                ? "Saved as candidate"
+                : offer.importPending
+                  ? "Retry image import"
+                  : "Save to wardrobe"}
           </Button>
           {onChoose && (
             <Button
               variant="quiet"
               onClick={() => onChoose(offer)}
-              disabled={selected}
+              disabled={selected || offer.choosing}
             >
-              {selected ? "Selected for this piece" : "Choose for this piece"}
+              {offer.choosing
+                ? "Applying choice…"
+                : selected
+                  ? "Selected for this piece"
+                  : "Choose for this piece"}
             </Button>
           )}
           <a
@@ -200,7 +218,10 @@ export function ProductCard({
             rel="noopener noreferrer"
             className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-crimson hover:underline"
           >
-            Visit store <Icon name="external" className="size-4" />
+            {offer.destinationType === "catalog"
+              ? "Open catalog"
+              : "Visit store"}{" "}
+            <Icon name="external" className="size-4" />
           </a>
         </div>
       </div>
@@ -276,7 +297,10 @@ export function ShoppingSection({
                     onChange={(event) =>
                       onWeightsChange?.({
                         ...weights,
-                        [key]: Number(event.target.value),
+                        [key]: Math.max(
+                          0,
+                          Math.min(100, Number(event.target.value)),
+                        ),
                       })
                     }
                     className="h-11 w-full rounded-lg border border-stone bg-paper px-2"
@@ -326,13 +350,16 @@ export function ShoppingSection({
                 ? "Shopping search is unavailable."
                 : "No suitable products were returned for this piece."}
           </p>
-          {(slot.status === "error" || slot.status === "empty") && onRetry && (
-            <div className="mt-3">
-              <Button variant="secondary" onClick={() => onRetry(slot.id)}>
-                Try search again
-              </Button>
-            </div>
-          )}
+          {(slot.status === "error" ||
+            slot.status === "empty" ||
+            slot.status === "unavailable") &&
+            onRetry && (
+              <div className="mt-3">
+                <Button variant="secondary" onClick={() => onRetry(slot.id)}>
+                  Try search again
+                </Button>
+              </div>
+            )}
         </div>
       )}
     </section>
@@ -345,6 +372,8 @@ export function OutfitDetail({
   selectedOptionId,
   weights,
   saving = false,
+  loading = false,
+  backHref,
   onSelectOption,
   onSaveLook,
   onWeightsChange,
@@ -357,6 +386,8 @@ export function OutfitDetail({
   selectedOptionId?: string;
   weights?: ValueWeights;
   saving?: boolean;
+  loading?: boolean;
+  backHref?: string;
   onSelectOption?: (optionId: string) => void;
   onSaveLook?: (optionId: string) => void;
   onWeightsChange?: (weights: ValueWeights) => void;
@@ -401,13 +432,13 @@ export function OutfitDetail({
         <div className="hidden md:block">
           <Button
             variant="primary"
-            disabled={saving}
+            disabled={saving || loading || active.unavailable || !onSaveLook}
             onClick={() => onSaveLook?.(active.id)}
           >
             {saving ? "Saving look…" : "Save this look"}
           </Button>
           <p className="mt-2 text-xs text-secondary">
-            Saving also prepares your avatar.
+            Saving queues your illustrative outfit image.
           </p>
         </div>
       </header>
@@ -421,12 +452,38 @@ export function OutfitDetail({
             key={option.id}
             role="tab"
             aria-selected={option.id === active.id}
+            tabIndex={option.id === active.id ? 0 : -1}
+            disabled={option.unavailable}
+            onKeyDown={(event) => {
+              if (
+                !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+              )
+                return;
+              event.preventDefault();
+              const tabs = [
+                ...(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                  "[role=tab]:not(:disabled)",
+                ) ?? []),
+              ];
+              const index = tabs.indexOf(event.currentTarget);
+              const next =
+                event.key === "Home"
+                  ? 0
+                  : event.key === "End"
+                    ? tabs.length - 1
+                    : (index +
+                        (event.key === "ArrowRight" ? 1 : -1) +
+                        tabs.length) %
+                      tabs.length;
+              tabs[next]?.focus();
+              tabs[next]?.click();
+            }}
             onClick={() => {
               setActiveId(option.id);
               onSelectOption?.(option.id);
             }}
             className={
-              "min-h-11 min-w-28 flex-1 rounded-lg px-3 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-crimson " +
+              "min-h-11 min-w-0 flex-1 rounded-lg px-3 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-crimson disabled:opacity-50 " +
               (option.id === active.id
                 ? "border-b-2 border-crimson bg-blush font-medium"
                 : "hover:bg-porcelain")
@@ -445,113 +502,160 @@ export function OutfitDetail({
           </button>
         ))}
       </div>
-      <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="min-w-0 space-y-4">
-          {active.shoppingSlots.length ? (
-            active.shoppingSlots.map((slot) => (
-              <ShoppingSection
-                key={slot.id}
-                slot={slot}
-                weights={effectiveWeights}
-                onWeightsChange={changeWeights}
-                onRetry={onRetrySearch}
-                onSaveProduct={onSaveProduct}
-                onChooseProduct={onChooseProduct}
-              />
-            ))
-          ) : (
-            <div className="rounded-2xl border border-stone bg-paper p-6">
-              <h2 className="font-serif text-2xl">Everything is covered</h2>
-              <p className="mt-2 text-sm text-secondary">
-                This direction has no missing pieces to shop for.
-              </p>
-            </div>
-          )}
-          <section className="rounded-2xl border border-stone bg-paper p-4 sm:p-6">
-            <h2 className="font-serif text-2xl">Your outfit</h2>
-            <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
-              {active.items.map((item) => (
-                <div key={item.id} className="min-w-0">
-                  <ProductPicture src={item.imageUrl} alt={item.name} />
-                  <p className="mt-1 line-clamp-2 text-xs font-medium">
-                    {item.name}
-                  </p>
-                  <Badge
-                    tone={
-                      item.status === "owned"
-                        ? "owned"
-                        : item.status === "alternative"
-                          ? "alternative"
-                          : item.status === "missing"
-                            ? "missing"
-                            : "neutral"
-                    }
-                  >
-                    {item.status === "candidate"
-                      ? "Candidate, not owned"
-                      : item.status === "owned"
-                        ? "Owned"
-                        : item.status === "alternative"
-                          ? "Alternative"
-                          : "Missing"}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </section>
+      {loading ? (
+        <div
+          role="status"
+          className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]"
+        >
+          <div className="h-96 rounded-2xl bg-sand" />
+          <div className="h-64 rounded-2xl bg-sand" />
+          <span className="sr-only">
+            Loading the selected outfit and saved shopping results
+          </span>
         </div>
-        <aside className="rounded-2xl border border-stone bg-paper p-5">
-          <h2 className="font-serif text-2xl">Why this</h2>
-          <ul className="mt-3 space-y-3 text-sm leading-relaxed">
-            {active.reasons.map((reason, index) => (
-              <li key={index} className="flex gap-2">
-                <Icon
-                  name="check"
-                  className="mt-0.5 size-4 shrink-0 text-crimson"
-                />
-                <span>{reason}</span>
-              </li>
-            ))}
-          </ul>
-          {active.inputsUsed.length > 0 && (
-            <>
-              <h3 className="mt-5 text-xs font-medium text-secondary">
-                Inputs used
-              </h3>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {active.inputsUsed.map((input) => (
-                  <Chip key={input} selected>
-                    {input}
-                  </Chip>
+      ) : active.unavailable ? (
+        <section className="rounded-2xl border border-stone bg-paper p-6">
+          <h2 className="font-serif text-2xl">This direction is unavailable</h2>
+          <p className="mt-2 text-sm text-secondary">
+            Choose another available direction. No outfit or product has been
+            substituted.
+          </p>
+        </section>
+      ) : (
+        <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="contents">
+            <div className="order-1 min-w-0 space-y-4 lg:col-start-1">
+              {active.shoppingSlots.length ? (
+                active.shoppingSlots.map((slot) => (
+                  <ShoppingSection
+                    key={slot.id}
+                    slot={slot}
+                    weights={effectiveWeights}
+                    onWeightsChange={changeWeights}
+                    onRetry={onRetrySearch}
+                    onSaveProduct={onSaveProduct}
+                    onChooseProduct={onChooseProduct}
+                  />
+                ))
+              ) : (
+                <div className="rounded-2xl border border-stone bg-paper p-6">
+                  <h2 className="font-serif text-2xl">Everything is covered</h2>
+                  <p className="mt-2 text-sm text-secondary">
+                    This direction has no missing pieces to shop for.
+                  </p>
+                </div>
+              )}
+            </div>
+            <section className="order-3 min-w-0 rounded-2xl border border-stone bg-paper p-4 sm:p-6 lg:col-start-1">
+              <h2 className="font-serif text-2xl">Your outfit</h2>
+              <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {active.items.map((item) => (
+                  <div key={item.id} className="min-w-0">
+                    <ProductPicture src={item.imageUrl} alt={item.name} />
+                    <p className="mt-1 line-clamp-2 text-xs font-medium">
+                      {item.name}
+                    </p>
+                    <Badge
+                      tone={
+                        item.status === "owned"
+                          ? "owned"
+                          : item.status === "alternative"
+                            ? "alternative"
+                            : item.status === "missing"
+                              ? "missing"
+                              : "neutral"
+                      }
+                    >
+                      {item.status === "candidate"
+                        ? "Candidate, not owned"
+                        : item.status === "owned"
+                          ? "Owned"
+                          : item.status === "alternative"
+                            ? "Alternative"
+                            : "Missing"}
+                    </Badge>
+                  </div>
                 ))}
               </div>
-            </>
-          )}
-          {active.differences?.length ? (
-            <>
-              <h3 className="mt-5 text-xs font-medium text-secondary">
-                Differences
-              </h3>
-              <ul className="mt-2 space-y-1 text-sm">
-                {active.differences.map((difference, index) => (
-                  <li key={index}>{difference}</li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          {active.uncertainty?.length ? (
-            <div className="mt-5 rounded-xl bg-porcelain p-3 text-xs leading-relaxed text-secondary">
-              <Icon name="info" className="mr-1 inline size-4" />
-              {active.uncertainty.join(" ")}
-            </div>
-          ) : null}
-        </aside>
-      </div>
+            </section>
+          </div>
+          <aside className="order-2 rounded-2xl border border-stone bg-paper p-5 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            <h2 className="font-serif text-2xl">Why this</h2>
+            <ul className="mt-3 space-y-3 text-sm leading-relaxed">
+              {active.reasons.map((reason, index) => (
+                <li key={index} className="flex gap-2">
+                  <Icon
+                    name="check"
+                    className="mt-0.5 size-4 shrink-0 text-crimson"
+                  />
+                  <span>{reason}</span>
+                </li>
+              ))}
+            </ul>
+            {!active.reasons.length && (
+              <p className="mt-3 text-sm text-secondary">
+                No explanation was recorded for this direction.
+              </p>
+            )}
+            {active.inputsUsed.length > 0 && (
+              <>
+                <h3 className="mt-5 text-xs font-medium text-secondary">
+                  Inputs used
+                </h3>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {active.inputsUsed.map((input) => (
+                    <Chip key={input} selected>
+                      {input}
+                    </Chip>
+                  ))}
+                </div>
+              </>
+            )}
+            {active.differences?.length ? (
+              <>
+                <h3 className="mt-5 text-xs font-medium text-secondary">
+                  Differences
+                </h3>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {active.differences.map((difference, index) => (
+                    <li key={index}>{difference}</li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+            {active.uncertainty?.length ? (
+              <div className="mt-5 rounded-xl bg-porcelain p-3 text-xs leading-relaxed text-secondary">
+                <Icon name="info" className="mr-1 inline size-4" />
+                {active.uncertainty.join(" ")}
+              </div>
+            ) : null}
+          </aside>
+        </div>
+      )}
+      {backHref && (
+        <Link
+          href={backHref}
+          className="hidden min-h-11 items-center gap-2 text-sm font-medium text-crimson hover:underline md:inline-flex"
+        >
+          <Icon name="arrowLeft" className="size-4" />
+          Back to outfit ideas
+        </Link>
+      )}
       <div className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-stone bg-paper p-4 md:hidden">
-        <span className="text-sm text-secondary">Outfit details</span>
+        {backHref ? (
+          <Link
+            href={backHref}
+            className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-crimson"
+          >
+            <Icon name="arrowLeft" className="size-4" />
+            Ideas
+          </Link>
+        ) : (
+          <span className="text-sm text-secondary">Outfit details</span>
+        )}
         <Button
           variant="primary"
-          disabled={saving}
+          disabled={saving || loading || active.unavailable || !onSaveLook}
           onClick={() => onSaveLook?.(active.id)}
         >
           {saving ? "Saving…" : "Save this look"}
