@@ -16,8 +16,8 @@ import {
   displayWardrobeItem,
   wardrobeChanged,
   wardrobeRequest,
+  type WardrobeDisplayItem,
 } from "./client";
-import type { CanonicalWardrobeItem } from "./schema";
 type WardrobeRecord = ReturnType<typeof displayWardrobeItem>;
 import {
   wardrobeCategories,
@@ -107,7 +107,7 @@ export function WardrobeCollectionScreen({
   writesEnabled = false,
 }: {
   initialSearch?: string;
-  initialItems?: CanonicalWardrobeItem[];
+  initialItems?: WardrobeDisplayItem[];
   initialError?: string;
   writesEnabled?: boolean;
 }) {
@@ -127,7 +127,7 @@ export function WardrobeCollectionScreen({
   async function refresh() {
     setRefreshing(true);
     try {
-      const result = await wardrobeRequest<{ items: CanonicalWardrobeItem[] }>(
+      const result = await wardrobeRequest<{ items: WardrobeDisplayItem[] }>(
         "",
       );
       setRecords(result.items.map(displayWardrobeItem));

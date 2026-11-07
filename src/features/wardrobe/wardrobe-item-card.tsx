@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import type { ReactNode } from "react";
 import { Badge, Icon } from "@/components/ui";
+import { marketplacePrice } from "./catalog";
 import {
   type WardrobeItemSummary,
   wardrobeCategoryLabel,
@@ -52,6 +53,14 @@ export function WardrobeItemCard({
         {wardrobeCategoryLabel(item.category)}
       </span>
       {item.isSample && <span className={styles.sampleLabel}>Sample item</span>}
+      {item.marketplace && (
+        <span className="mt-1 block text-xs text-secondary">
+          {marketplacePrice(item.marketplace)}
+          {item.marketplace.rating !== null
+            ? ` · ${item.marketplace.rating}/5`
+            : ""}
+        </span>
+      )}
     </button>
   );
 }

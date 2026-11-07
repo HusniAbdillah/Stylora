@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { regenerateMediaSchema, savedMediaState } from "./media";
+import {
+  regenerateMediaSchema,
+  savedMediaState,
+  pendingSavedAvatarOperations,
+} from "./media";
 import { saveInputSchema, selectionInputSchema } from "./schemas";
 
 const optionId = "3f9b6f84-5379-4d39-8ea0-82b2e3cbd653";
@@ -9,6 +13,26 @@ const assetId = "c83d6d9c-f37d-47c1-85c7-f24c9016829e";
 const mediaId = "2b69cebf-fce6-418d-b317-0bdb79bec823";
 
 describe("decision contracts", () => {
+  it("resumes distinct pending saved images with a bounded batch, regardless of source", () => {
+    const queued = (id: string) => ({
+      media: { status: "queued" as const, operationId: id },
+    });
+    expect(
+      pendingSavedAvatarOperations([
+        queued(operationId),
+        queued(operationId),
+        queued(optionId),
+        queued(assetId),
+      ]),
+    ).toEqual([operationId, optionId]);
+    expect(
+      pendingSavedAvatarOperations([
+        { media: { status: "succeeded", operationId } },
+        { media: { status: "failed", operationId } },
+        { media: { status: "unavailable", operationId: null } },
+      ]),
+    ).toEqual([]);
+  });
   it("requires a media revision and UUID request identity for regeneration", () => {
     const input = { expectedMediaId: mediaId, idempotencyKey: operationId };
     expect(regenerateMediaSchema.safeParse(input).success).toBe(true);

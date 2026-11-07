@@ -7,7 +7,7 @@ import { Button } from "@/components/ui";
 import { BrowserApiError, requestData } from "@/lib/browser-api";
 import { ShareManager } from "@/features/sharing/share-manager";
 import { startOperationRequest } from "@/features/operations/client";
-import { mediaCommandSchema } from "./media";
+import { mediaCommandSchema, pendingSavedAvatarOperations } from "./media";
 import { SavedLookDetail, SavedLooksGallery } from "./saved-looks";
 import {
   savedCollectionHref,
@@ -42,13 +42,11 @@ export function SavedCollectionWorkspace({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const pending = initial.items.find(
-    (look) => look.media.status === "queued" || look.media.status === "running",
-  );
+  const pending = pendingSavedAvatarOperations(initial.items);
   const polling = useSavedMediaRefresh(
-    Boolean(pending),
+    pending.length > 0,
     changing || busyId !== null,
-    writesEnabled ? pending?.media.operationId : null,
+    writesEnabled ? pending : null,
   );
   const href = savedCollectionHref(filter, limit, cursor);
   async function retryImage(id: string) {

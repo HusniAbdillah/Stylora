@@ -5,6 +5,7 @@ import Link, { useLinkStatus } from "next/link";
 import { Button, Drawer, Icon, Logo } from "@/components/ui";
 import { createPreviewStore } from "@/lib/preview/store";
 import styles from "./shell.module.css";
+import { useFeedback } from "@/lib/feedback/store";
 
 export const workspaceLinks = [
   { href: "/create", label: "Create", icon: "plus" },
@@ -59,7 +60,9 @@ function DestinationLink({
       aria-current={active ? "page" : undefined}
     >
       <Icon name={icon} />
-      {!rail && label}
+      <span className={styles.linkLabel} aria-hidden={rail || undefined}>
+        {label}
+      </span>
       <NavigationFeedback label={label} />
     </Link>
   );
@@ -107,7 +110,9 @@ function Destinations({
             title={link.label + " is unavailable"}
           >
             <Icon name={link.icon} />
-            {!rail && link.label}
+            <span className={styles.linkLabel} aria-hidden={rail || undefined}>
+              {link.label}
+            </span>
           </span>
         ) : (
           <DestinationLink
@@ -168,60 +173,51 @@ export function WorkspaceSidebar({
   const toggleLabel = rail ? "Expand navigation" : "Collapse navigation";
   return (
     <aside className={styles.sidebar} data-rail={rail}>
-      <div
-        className={styles.sidebarSurfaceToggle}
-        aria-hidden="true"
-        onPointerUp={(event) => {
-          if (event.button === 0) toggle();
-        }}
-      />
-      <div className={styles.brandRow}>
-        <Link href="/" aria-label="Stylora home">
-          <Logo markOnly={rail} />
-        </Link>
-        <button
-          type="button"
-          className={styles.sidebarToggle}
-          title={toggleLabel}
-          aria-label={toggleLabel}
-          aria-controls={navId}
-          aria-expanded={!rail}
-          onClick={toggle}
-        >
-          <Icon
-            name="chevronDown"
-            size={18}
-            className={styles.sidebarChevron}
-          />
-        </button>
-      </div>
-      <div id={navId} className={styles.destinations}>
-        <Destinations
-          activeHref={activeHref}
-          rail={rail}
-          availableHrefs={availableHrefs}
-          destinationHrefs={destinationHrefs}
-        />
-      </div>
-      {resume && !rail && (
-        <Link className={styles.resume} href={resume.href}>
-          <Icon name="sparkle" size={16} />
-          {resume.label}
-        </Link>
-      )}
-      <Link
-        className={styles.profile}
-        href="/profile"
-        aria-current={activeHref === "/profile" ? "page" : undefined}
-        aria-label="Workspace profile"
-        title={rail ? displayName : undefined}
+      <button
+        type="button"
+        className={styles.sidebarToggle}
+        title={toggleLabel}
+        aria-label={toggleLabel}
+        aria-controls={navId}
+        aria-expanded={!rail}
+        onClick={toggle}
       >
-        <Icon name="user" />
-        <span hidden={rail}>
-          <strong>{displayName}</strong>
-          <small>{contextLabel ?? "Shared workspace"}</small>
-        </span>
-      </Link>
+        <Icon name="chevronDown" size={18} className={styles.sidebarChevron} />
+      </button>
+      <div className={styles.sidebarContent}>
+        <div className={styles.brandRow}>
+          <Link href="/" aria-label="Stylora home">
+            <Logo markOnly={rail} />
+          </Link>
+        </div>
+        <div id={navId} className={styles.destinations}>
+          <Destinations
+            activeHref={activeHref}
+            rail={rail}
+            availableHrefs={availableHrefs}
+            destinationHrefs={destinationHrefs}
+          />
+        </div>
+        {resume && !rail && (
+          <Link className={styles.resume} href={resume.href}>
+            <Icon name="sparkle" size={16} />
+            {resume.label}
+          </Link>
+        )}
+        <Link
+          className={styles.profile}
+          href="/profile"
+          aria-current={activeHref === "/profile" ? "page" : undefined}
+          aria-label="Workspace profile"
+          title={rail ? displayName : undefined}
+        >
+          <Icon name="user" />
+          <span className={styles.profileLabel} aria-hidden={rail || undefined}>
+            <strong>{displayName}</strong>
+            <small>{contextLabel ?? "Shared workspace"}</small>
+          </span>
+        </Link>
+      </div>
     </aside>
   );
 }
@@ -319,7 +315,31 @@ export type ActivityItem = {
   onRetry?: () => void;
 };
 
-export function ActivityMenu({ items }: { items: readonly ActivityItem[] }) {
+export function ActivityMenu({
+  items: supplied,
+}: {
+  items: readonly ActivityItem[];
+}) {
+  const feedback = useFeedback();
+  const items = [
+    ...feedback.map((item) => {
+      const original = supplied.find(
+        (entry) => item.id === `operation:${entry.id}`,
+      );
+      return {
+        ...item,
+        href: item.href ?? original?.href,
+        onRetry: original?.onRetry ?? item.onRetry,
+      };
+    }),
+    ...supplied.filter(
+      (item) =>
+        !feedback.some(
+          (entry) =>
+            entry.id === `operation:${item.id}` || entry.id === item.id,
+        ),
+    ),
+  ];
   const panelId = useId();
   const attention = items.some((item) =>
     ["queued", "running", "partial", "failed"].includes(item.state),

@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { Button, ConfirmDialog, StateNotice } from "@/components/ui";
 import { requestOperation } from "@/features/operations/client";
+import { feedbackRequest } from "@/lib/feedback/request";
 import { CapsuleWizard } from "./capsule-wizard";
 import {
   capsuleBriefReady,
@@ -232,19 +233,22 @@ export function CapsuleDraftStudio({
         const latest = drafts.get(snapshot.id) ?? snapshot;
         const receipt = acknowledged.get(snapshot.id);
         const baseline = preparationBaseline(latest, receipt);
-        const response = await fetch(`/api/capsules/drafts/${snapshot.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          keepalive: true,
-          body: JSON.stringify({
-            brief: snapshot.brief,
-            step: snapshot.step,
-            visited: snapshot.visited,
-            expectedRevision: baseline.revision,
-            capsuleId: baseline.capsuleId,
-            capsuleRevision: baseline.capsuleRevision,
-          }),
-        });
+        const response = await feedbackRequest(
+          `/api/capsules/drafts/${snapshot.id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            keepalive: true,
+            body: JSON.stringify({
+              brief: snapshot.brief,
+              step: snapshot.step,
+              visited: snapshot.visited,
+              expectedRevision: baseline.revision,
+              capsuleId: baseline.capsuleId,
+              capsuleRevision: baseline.capsuleRevision,
+            }),
+          },
+        );
         const result = z
           .object({
             data: z
@@ -337,10 +341,19 @@ export function CapsuleDraftStudio({
     return () => {
       active.current = false;
       leave();
-      loaded.delete(initial.id);
       window.removeEventListener("pagehide", leave);
     };
   }, [draft, flush, initial.id, ensurePrepared]);
+
+  // Forget the recovered snapshot only when the studio really unmounts. Doing it
+  // in the effect above made every re-run drop the cache, so the next snapshot
+  // was a new object, which re-ran the effect again without end.
+  useEffect(() => {
+    const id = initial.id;
+    return () => {
+      loaded.delete(id);
+    };
+  }, [initial.id]);
 
   function change(
     brief: CapsuleDraft,

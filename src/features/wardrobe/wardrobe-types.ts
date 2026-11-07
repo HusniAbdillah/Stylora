@@ -12,6 +12,7 @@ export type WardrobeItemSummary = {
   imageKey?: string;
   isSample?: boolean;
   inventoryStatus: InventoryStatus;
+  marketplace?: MarketplaceMetadata | null;
 };
 
 export type WardrobeField = {
@@ -43,3 +44,4 @@ export function wardrobeCategoryLabel(category: WardrobeCategory) {
     category
   );
 }
+import type { MarketplaceMetadata } from "./catalog";

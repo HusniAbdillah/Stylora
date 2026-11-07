@@ -320,6 +320,8 @@ export function WardrobeItemDetailFlow({
       <WardrobeItemDetail
         item={{
           ...displayed,
+          marketplace: item.marketplace,
+          sourceName: item.marketplace?.sourceName,
           fields: displayed.fields.map((field) => ({
             ...field,
             value: fieldText[field.key] ?? field.value,

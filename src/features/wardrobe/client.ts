@@ -1,7 +1,12 @@
 "use client";
+import { withFeedback } from "@/lib/feedback/store";
 import type { ItemValues, CanonicalWardrobeItem } from "./schema";
 import type { publicDraft } from "./server";
 import type { WardrobeField } from "./wardrobe-types";
+import type { MarketplaceMetadata } from "./catalog";
+export type WardrobeDisplayItem = CanonicalWardrobeItem & {
+  marketplace?: MarketplaceMetadata | null;
+};
 export type WardrobeDraft = ReturnType<typeof publicDraft>;
 export class WardrobeRequestError extends Error {
   constructor(
@@ -17,26 +22,47 @@ export async function wardrobeRequest<T>(
   method = "GET",
   body?: unknown,
 ): Promise<T> {
-  const response = await fetch(`/api/wardrobe${path}`, {
-    method,
-    cache: "no-store",
-    headers:
-      body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const result = await response.json();
-  if (!response.ok || result.error)
-    throw new WardrobeRequestError(
-      result.error?.code ?? "request_failed",
-      result.error?.message ??
-        "Your wardrobe could not be loaded or saved. Try again.",
-    );
-  return result.data as T;
+  const run = async () => {
+    const response = await fetch(`/api/wardrobe${path}`, {
+      method,
+      cache: "no-store",
+      headers:
+        body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const result = await response.json();
+    if (!response.ok || result.error)
+      throw new WardrobeRequestError(
+        result.error?.code ?? "request_failed",
+        result.error?.message ??
+          "Your wardrobe could not be loaded or saved. Try again.",
+      );
+    return result.data as T;
+  };
+  if (
+    method === "GET" ||
+    path === "/uploads" ||
+    path.endsWith("/verify") ||
+    path.endsWith("/analyze")
+  )
+    return run();
+  return withFeedback(
+    {
+      id: `wardrobe:${method}:${path}`,
+      label: "Wardrobe update",
+      success: path.endsWith("/confirm")
+        ? "Piece added to your wardrobe."
+        : "Wardrobe change saved.",
+      href: "/wardrobe",
+      quiet: path.includes("/drafts") && !path.endsWith("/confirm"),
+    },
+    run,
+  );
 }
 export function notifyWardrobeChanged() {
   window.dispatchEvent(new Event(wardrobeChanged));
 }
-export async function uploadWardrobeFile(
+async function uploadWardrobeFileData(
   file: File,
   draft: WardrobeDraft,
   onPrepared?: (draft: WardrobeDraft) => void,
@@ -87,6 +113,22 @@ function label(key: string) {
   return key
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/^./, (value) => value.toUpperCase());
+}
+export function uploadWardrobeFile(
+  file: File,
+  draft: WardrobeDraft,
+  onPrepared?: (draft: WardrobeDraft) => void,
+) {
+  return withFeedback(
+    {
+      id: `wardrobe-upload:${draft.id}`,
+      label: "Wardrobe photo",
+      success:
+        "Photo uploaded and verified. Review the description before adding the piece.",
+      href: "/wardrobe",
+    },
+    () => uploadWardrobeFileData(file, draft, onPrepared),
+  );
 }
 const listKeys = new Set([
   "colors",
@@ -149,7 +191,7 @@ export function changeField(
     },
   };
 }
-export function displayWardrobeItem(item: CanonicalWardrobeItem) {
+export function displayWardrobeItem(item: WardrobeDisplayItem) {
   return {
     ...item,
     fields: itemFields(item),

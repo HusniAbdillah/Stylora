@@ -1,4 +1,5 @@
 "use client";
+import { withFeedback } from "@/lib/feedback/store";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -185,7 +186,14 @@ function PieceEditorPanel({
     setBusy(true);
     setError(null);
     try {
-      await onSave(values);
+      await withFeedback(
+        {
+          id: "piece-editor",
+          label: "Apply piece changes",
+          success: "Reviewed piece changes applied.",
+        },
+        () => Promise.resolve(onSave(values)),
+      );
       setConfirmAction(null);
       onClose();
     } catch (failure) {
@@ -203,7 +211,14 @@ function PieceEditorPanel({
     setBusy(true);
     setError(null);
     try {
-      await onRemove(piece);
+      await withFeedback(
+        {
+          id: "piece-editor",
+          label: "Remove piece",
+          success: "Piece removed from this review.",
+        },
+        () => Promise.resolve(onRemove(piece)),
+      );
       setConfirmAction(null);
       onClose();
     } catch (failure) {

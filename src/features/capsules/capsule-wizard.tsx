@@ -249,6 +249,7 @@ export function CapsuleWizard({
   }
   function chooseItem(itemId: string) {
     const included = draft.includedItemIds.includes(itemId);
+    if (!included && draft.includedItemIds.length >= 60) return;
     change({
       ...draft,
       includedItemIds: included
@@ -258,6 +259,18 @@ export function CapsuleWizard({
         ? draft.requiredItemIds.filter((id) => id !== itemId)
         : draft.requiredItemIds,
       excludedItemIds: draft.excludedItemIds.filter((id) => id !== itemId),
+    });
+  }
+  function selectAllItems() {
+    const includedItemIds = Array.from(
+      new Set([...draft.includedItemIds, ...inventory.map((item) => item.id)]),
+    ).slice(0, 60);
+    change({
+      ...draft,
+      includedItemIds,
+      excludedItemIds: draft.excludedItemIds.filter(
+        (id) => !includedItemIds.includes(id),
+      ),
     });
   }
   function nextStep() {
@@ -572,6 +585,26 @@ export function CapsuleWizard({
       {step === 3 && (
         <div className="mt-6 grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
           <section className="min-w-0 rounded-2xl border border-stone bg-paper p-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p role="status" className="text-sm text-secondary">
+                {draft.includedItemIds.length} items selected. Select up to 60
+                across all categories.
+              </p>
+              <Button
+                variant="secondary"
+                onClick={selectAllItems}
+                disabled={
+                  busy ||
+                  inventory.length === 0 ||
+                  draft.includedItemIds.length >= 60 ||
+                  inventory.every((item) =>
+                    draft.includedItemIds.includes(item.id),
+                  )
+                }
+              >
+                {inventory.length > 60 ? "Select up to 60" : "Select all"}
+              </Button>
+            </div>
             <div className="flex gap-1 overflow-x-auto rounded-xl bg-porcelain p-1">
               {categories.map((category) => (
                 <button
@@ -622,6 +655,10 @@ export function CapsuleWizard({
                       <button
                         type="button"
                         onClick={() => chooseItem(item.id)}
+                        disabled={
+                          busy ||
+                          (!included && draft.includedItemIds.length >= 60)
+                        }
                         aria-pressed={included}
                         className="w-full text-left"
                       >
@@ -648,6 +685,10 @@ export function CapsuleWizard({
                       <div className="mt-1 flex flex-wrap gap-1">
                         <button
                           type="button"
+                          disabled={
+                            busy ||
+                            (!included && draft.includedItemIds.length >= 60)
+                          }
                           onClick={() =>
                             change({
                               ...draft,

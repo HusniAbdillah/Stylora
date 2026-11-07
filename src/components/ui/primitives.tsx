@@ -97,7 +97,8 @@ export const iconNames = [
   "user",
   "x",
 ] as const;
-export type IconName = (typeof iconNames)[number] | "arrow-left" | "arrow-right" | "chevron-down";
+export type IconName =
+  (typeof iconNames)[number] | "arrow-left" | "arrow-right" | "chevron-down";
 
 type IconProps = HTMLAttributes<HTMLSpanElement> & {
   name: IconName;
@@ -141,12 +142,14 @@ export function Badge({
 }: HTMLAttributes<HTMLSpanElement> & {
   tone?: "neutral" | "owned" | "alternative" | "missing";
 }) {
-  const icon = ({
-    owned: "check",
-    alternative: "swap",
-    missing: "bag",
-    neutral: undefined,
-  } as const)[tone];
+  const icon = (
+    {
+      owned: "check",
+      alternative: "swap",
+      missing: "bag",
+      neutral: undefined,
+    } as const
+  )[tone];
   return (
     <span
       {...props}
@@ -202,18 +205,28 @@ export function Toast({
   children,
   tone = "owned",
   onDismiss,
+  pending = false,
+  action,
 }: {
   title: string;
   children?: ReactNode;
   tone?: "owned" | "missing" | "neutral";
   onDismiss?: () => void;
+  pending?: boolean;
+  action?: ReactNode;
 }) {
   return (
-    <div className={styles.toast}>
-      <Icon name={tone === "owned" ? "check" : "info"} />
-      <div role="status">
-        <strong>{title}</strong>
-        {children && <div>{children}</div>}
+    <div className={styles.toast} data-tone={tone}>
+      <Icon
+        name={pending ? "refresh" : tone === "owned" ? "check" : "info"}
+        className={pending ? styles.toastPending : undefined}
+      />
+      <div className={styles.toastContent}>
+        <div role={tone === "missing" ? "alert" : "status"} aria-atomic="true">
+          <strong>{title}</strong>
+          {children && <div>{children}</div>}
+        </div>
+        {action}
       </div>
       {onDismiss && (
         <button

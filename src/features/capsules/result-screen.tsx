@@ -11,6 +11,8 @@ import { saveStudioLook } from "@/features/outfits/studio-save";
 import { SavedLooksLoading } from "@/features/decisions/saved-loading";
 import { CapsuleOutfitDetail, CapsuleResults } from "./capsule-results";
 import type { CapsuleResult } from "./capsule-types";
+import { feedbackRequest } from "@/lib/feedback/request";
+import { publishFeedback } from "@/lib/feedback/store";
 
 type Props = {
   result: CapsuleResult;
@@ -90,6 +92,13 @@ export function CapsuleResultScreen({
     setSaving(true);
     setMessage("");
     setOperationId(undefined);
+    const feedbackId = `capsule-save:${outfit}`;
+    publishFeedback({
+      id: feedbackId,
+      label: "Save capsule outfit",
+      state: "running",
+      detail: "Saving the outfit snapshot.",
+    });
     const response = await saveStudioLook({
       source: { kind: "capsule", id: outfit, parentId: result.id },
       expectedRevision: revision,
@@ -99,6 +108,13 @@ export function CapsuleResultScreen({
       idempotencyKey: `studio:capsule:${outfit}:${revision}`,
     }).catch(() => ({ ok: false as const }));
     if (response.ok) {
+      publishFeedback({
+        id: feedbackId,
+        label: "Capsule outfit saved",
+        state: "complete",
+        detail: "Outfit saved. Avatar image has its own status.",
+        href: `/saved-looks/${response.savedLookId}`,
+      });
       void startOperationRequest(
         response.operationId,
         `/api/avatars/${response.operationId}`,
@@ -106,6 +122,12 @@ export function CapsuleResultScreen({
       ).catch(() => {});
       router.push(`/saved-looks/${response.savedLookId}`);
     } else {
+      publishFeedback({
+        id: feedbackId,
+        label: "Capsule outfit could not be saved",
+        state: "failed",
+        detail: "Your capsule is kept. Retry saving.",
+      });
       savingRequest.current = false;
       setSaving(false);
       setMessage(
@@ -124,18 +146,27 @@ export function CapsuleResultScreen({
 
   async function deleteOutfit(id: string) {
     setOperationId(undefined);
-    const response = await fetch(`/api/capsules/${result.id}/outfits/${id}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expectedRevision: revision }),
-    });
-    if (response.ok) {
-      router.push(`/capsules/${result.id}`);
-      router.refresh();
-    } else
-      setMessage(
-        "The outfit could not be deleted. Reload the capsule to check its latest revision.",
+    try {
+      const response = await feedbackRequest(
+        `/api/capsules/${result.id}/outfits/${id}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ expectedRevision: revision }),
+        },
       );
+      if (response.ok) {
+        router.push(`/capsules/${result.id}`);
+        router.refresh();
+      } else
+        setMessage(
+          "The outfit could not be deleted. Reload the capsule to check its latest revision.",
+        );
+    } catch {
+      setMessage(
+        "Could not connect. Your outfit is kept. Try deleting it again.",
+      );
+    }
   }
 
   const index = result.outfits.findIndex((outfit) => outfit.id === outfitId);
