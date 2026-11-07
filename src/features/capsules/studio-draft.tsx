@@ -21,7 +21,11 @@ import {
   type PreparedCapsule,
 } from "./schema";
 import type { CapsuleDraft, CapsuleItem } from "./capsule-types";
-import { canApplyPreparation, capsuleAutoReady, preparationBaseline } from "./draft-preparation";
+import {
+  canApplyPreparation,
+  capsuleAutoReady,
+  preparationBaseline,
+} from "./draft-preparation";
 
 const drafts = new Map<string, CapsuleDraftState>();
 const saving = new Map<string, Promise<void>>();
@@ -137,7 +141,14 @@ export function CapsuleDraftStudio({
       const destructiveEdit =
         editingExisting &&
         JSON.stringify(snapshot.brief) !== JSON.stringify(baseBrief);
-      if (!navigate && (snapshot.step !== 3 || destructiveEdit || saving.has(snapshot.id) || !capsuleAutoReady(snapshot.brief, ownedItems))) return;
+      if (
+        !navigate &&
+        (snapshot.step !== 3 ||
+          destructiveEdit ||
+          saving.has(snapshot.id) ||
+          !capsuleAutoReady(snapshot.brief, ownedItems))
+      )
+        return;
       let pending = preparing.get(snapshot.id);
       if (!pending) {
         pending = requestOperation(
@@ -263,7 +274,13 @@ export function CapsuleDraftStudio({
         setMessage("");
         saved = true;
         const latestInput = drafts.get(snapshot.id) ?? current.current;
-        if (JSON.stringify(latestInput.brief) === JSON.stringify(snapshot.brief) && latestInput.step === snapshot.step && latestInput.visited === snapshot.visited) dirtyDrafts.delete(snapshot.id);
+        if (
+          JSON.stringify(latestInput.brief) ===
+            JSON.stringify(snapshot.brief) &&
+          latestInput.step === snapshot.step &&
+          latestInput.visited === snapshot.visited
+        )
+          dirtyDrafts.delete(snapshot.id);
         if (active.current && window.location.pathname === "/capsules/new") {
           window.history.replaceState(
             window.history.state,
@@ -283,9 +300,15 @@ export function CapsuleDraftStudio({
     void pending.then(() => {
       if (saving.get(snapshot.id) !== pending) return;
       saving.delete(snapshot.id);
-      if (saved && !dirty.current && !dirtyDrafts.has(snapshot.id)) void ensurePrepared(current.current).catch((error: unknown) => {
-        if (!dirty.current) setMessage(error instanceof Error ? error.message : "The capsule could not be prepared. Your draft is saved.");
-      });
+      if (saved && !dirty.current && !dirtyDrafts.has(snapshot.id))
+        void ensurePrepared(current.current).catch((error: unknown) => {
+          if (!dirty.current)
+            setMessage(
+              error instanceof Error
+                ? error.message
+                : "The capsule could not be prepared. Your draft is saved.",
+            );
+        });
     });
     return pending;
   }, [writesEnabled, mirror, ensurePrepared]);
@@ -338,9 +361,17 @@ export function CapsuleDraftStudio({
     setBuilding(true);
     setApplyOpen(false);
     try {
-      if (current.current.revision === 0) { dirty.current = true; dirtyDrafts.add(current.current.id); }
+      if (current.current.revision === 0) {
+        dirty.current = true;
+        dirtyDrafts.add(current.current.id);
+      }
       await flush();
-      if (dirty.current || dirtyDrafts.has(current.current.id) || !writesEnabled) return;
+      if (
+        dirty.current ||
+        dirtyDrafts.has(current.current.id) ||
+        !writesEnabled
+      )
+        return;
       current.current = drafts.get(current.current.id) ?? current.current;
       await ensurePrepared(current.current, true);
     } catch (error) {
@@ -352,6 +383,17 @@ export function CapsuleDraftStudio({
     } finally {
       setBuilding(false);
     }
+  }
+
+  function requestBuild() {
+    const snapshot = current.current;
+    if (
+      snapshot.capsuleId &&
+      snapshot.capsuleId !== snapshot.id &&
+      JSON.stringify(snapshot.brief) !== JSON.stringify(baseBrief)
+    )
+      setApplyOpen(true);
+    else void build();
   }
 
   return (
@@ -376,8 +418,14 @@ export function CapsuleDraftStudio({
           <StateNotice
             title="Draft status"
             action={
-              <Button variant="secondary" onClick={() => void flush()}>
-                Retry saving
+              <Button
+                variant="secondary"
+                disabled={building}
+                onClick={() =>
+                  status === "failed" ? void flush() : requestBuild()
+                }
+              >
+                {status === "failed" ? "Retry saving" : "Retry preparation"}
               </Button>
             }
           >
@@ -400,13 +448,7 @@ export function CapsuleDraftStudio({
           void flush();
           router.push("/capsules");
         }}
-        onBuild={() =>
-          current.current.capsuleId &&
-          current.current.capsuleId !== current.current.id &&
-          JSON.stringify(current.current.brief) !== JSON.stringify(baseBrief)
-            ? setApplyOpen(true)
-            : void build()
-        }
+        onBuild={requestBuild}
       />
       <ConfirmDialog
         open={applyOpen}
