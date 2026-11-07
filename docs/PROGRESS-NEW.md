@@ -1,5 +1,13 @@
 # Stylora shared progress reporting
 
+## Owner 2 CI correction: 7 November 2026
+
+- Follow-up to the failing Check workflow for [PR #45](https://github.com/HusniAbdillah/Stylora/pull/45). The user authorized fixing the reported CI errors and pushing the same branch.
+- Commit `ce20cc2` removes synchronous effect state updates in the shell, Preferences return navigation and the shared Profile/Preferences draft hook. The shell derives the current option from the validated URL; Preferences receives the return destination from route search parameters and validates it during rendering. Settings load updates state from the asynchronous API response callbacks; explicit reload retains its loading state.
+- Main `dcd4f9a` was pulled with `git pull --ff-only` and merged into `o2/create-frontend` as `1384889` without conflicts. Owner 4's saved-media changes are retained.
+- Actual checks after the merge: `pnpm lint` and `pnpm typecheck` passed. Targeted ESLint on the four changed source files and `git diff --check origin/main...HEAD` also passed. The first lint attempt exposed one remaining hook violation; restructuring the response callbacks resolved it. No lint rule, test or CI configuration was disabled or weakened.
+- Frontend interaction tests, local Vitest and local production build were not run. No provider call, hosted write, fixture or cleanup was needed for this fix. Existing API and draft recovery contracts remain unchanged. The PR stays Lane B and requires human review.
+
 ## Owner 2 frontend delivery: 7 November 2026
 
 - Branch: `o2/create-frontend`, created from fresh main `99cd157`; subsequently integrated Owner 3 details/sharing, Owner 4 operation recovery and storage/preview corrections. Main was updated with `git pull --ff-only`, then merged as `bd9aa01` and `88b637c` without conflicts, including the hosted Wardrobe implementation in `f634525`. No merge to main or deployment was performed.
