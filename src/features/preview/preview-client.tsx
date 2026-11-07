@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { Button, ConfirmDialog } from "@/components/ui";
-import { requestOperation } from "@/features/operations/client";
+import {
+  requestOperation,
+  retryOperationRequest,
+} from "@/features/operations/client";
 import { StudioSaveButton } from "@/features/outfits/studio-save-button";
 import {
   PreviewStudio,
@@ -87,14 +90,6 @@ export function PreviewClient({
       const current = { ...draft.current };
       const renderSelection = latestSelection.current;
       try {
-        if (mode === "retry" && operationId) {
-          const retry = await requestOperation(
-            `retry:${operationId}`,
-            `/api/workflow-operations/${operationId}/retry`,
-            {},
-          );
-          if (!retry.ok) throw new Error("retry_unavailable");
-        }
         const body = {
           draftId: current.draftId,
           expectedRevision: current.revision,
@@ -104,11 +99,14 @@ export function PreviewClient({
         };
         pendingRender.current = body.renderRequestId;
         if (body.renderRequestId) setSavedSelection(false);
-        const response = await requestOperation(
-          `preview:${JSON.stringify(body)}`,
-          "/api/previews",
-          body,
-        );
+        const response =
+          mode === "retry" && operationId
+            ? await retryOperationRequest(operationId, "/api/previews", body)
+            : await requestOperation(
+                `preview:${JSON.stringify(body)}`,
+                "/api/previews",
+                body,
+              );
         if (!response.ok) {
           const failure = z
             .object({
