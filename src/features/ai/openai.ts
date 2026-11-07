@@ -163,6 +163,7 @@ export async function generateFashionImage(input: {
   items: unknown[];
   preferences: unknown;
   pose?: string;
+  allowDescriptionOnly?: boolean;
   signal?: AbortSignal;
   images: {
     bytes: Uint8Array;
@@ -170,7 +171,7 @@ export async function generateFashionImage(input: {
   }[];
 }) {
   if (
-    input.images.length < 1 ||
+    (!input.images.length && !input.allowDescriptionOnly) ||
     input.images.length > 16 ||
     input.images.some((image) => image.bytes.length > 10485760)
   ) {
@@ -208,13 +209,26 @@ export async function generateFashionImage(input: {
       `garment-${index}.${extension}`,
     );
   }
-  const response = await request(
-    "images/edits",
-    body,
-    230000,
-    false,
-    input.signal,
-  );
+  const prompt = body.get("prompt");
+  if (typeof prompt !== "string" || prompt.length > 31800) {
+    throw new OpenAIUnavailableError("OPENAI_IMAGE_PROMPT_TOO_LARGE");
+  }
+  const response = input.images.length
+    ? await request("images/edits", body, 230000, false, input.signal)
+    : await request(
+        "images/generations",
+        JSON.stringify({
+          model: IMAGE_MODEL,
+          prompt: `${prompt}\nThis saved-outfit task permits illustrative rendering from canonical descriptions. Missing reference images remain uncertain.`,
+          size: "1024x1536",
+          quality: "medium",
+          output_format: "png",
+          n: 1,
+        }),
+        230000,
+        true,
+        input.signal,
+      );
   const parsed = imageResponse.safeParse(await response.json());
   if (!parsed.success)
     throw new OpenAIUnavailableError("OPENAI_IMAGE_OUTPUT_INVALID");
