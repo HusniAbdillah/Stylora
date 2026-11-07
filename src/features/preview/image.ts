@@ -18,6 +18,7 @@ import {
   createWorkspaceSignedUpload,
   verifyWorkspaceStorageAsset,
 } from "@/lib/supabase/storage";
+import { avatarIoError } from "./image-errors";
 
 export const avatarItemSchema = z.object({
   id: z.uuid().nullable(),
@@ -118,7 +119,11 @@ export async function renderAndStoreAvatar(input: {
   const { client, workspaceId } = context;
   requireWorkspaceWrites(context);
   const renderFingerprint = avatarRenderFingerprint(items, input.preferences);
-  const { data: prior, error: reuseError } = await client
+  const {
+    data: prior,
+    error: reuseError,
+    status: reuseStatus,
+  } = await client
     .from("workflow_operations")
     .select("result_ref")
     .eq("workspace_id", workspaceId)
@@ -128,10 +133,15 @@ export async function renderAndStoreAvatar(input: {
     .order("completed_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (reuseError) throw new Error("AVATAR_REUSE_LOOKUP_FAILED");
+  if (reuseError)
+    throw avatarIoError(reuseError, "AVATAR_REUSE_LOOKUP_FAILED", reuseStatus);
   if (prior && input.reuse !== false) {
     const reference = z.object({ assetId: z.uuid() }).parse(prior.result_ref);
-    const { data: existing, error } = await client
+    const {
+      data: existing,
+      error,
+      status,
+    } = await client
       .from("assets")
       .select("id")
       .eq("workspace_id", workspaceId)
@@ -139,7 +149,7 @@ export async function renderAndStoreAvatar(input: {
       .eq("bucket", "previews")
       .eq("status", "ready")
       .maybeSingle();
-    if (error) throw new Error("AVATAR_REUSE_LOOKUP_FAILED");
+    if (error) throw avatarIoError(error, "AVATAR_REUSE_LOOKUP_FAILED", status);
     if (existing)
       return { assetId: existing.id, renderFingerprint, createdAsset: false };
   }
@@ -150,19 +160,30 @@ export async function renderAndStoreAvatar(input: {
         throw new Error("AVATAR_IMAGE_UNAVAILABLE");
       continue;
     }
-    const { data: asset, error } = await client
+    const {
+      data: asset,
+      error,
+      status,
+    } = await client
       .from("assets")
       .select("id,status")
       .eq("workspace_id", workspaceId)
       .eq("id", item.asset_id)
       .eq("status", "ready")
       .maybeSingle();
-    if (error || !asset) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
-    const verified = await verifyWorkspaceStorageAsset(asset.id);
+    if (error) throw avatarIoError(error, "AVATAR_IMAGE_UNAVAILABLE", status);
+    if (!asset) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
+    const verified = await verifyWorkspaceStorageAsset(asset.id).catch(
+      (failure: unknown) => {
+        throw avatarIoError(failure, "AVATAR_IMAGE_UNAVAILABLE");
+      },
+    );
     const { data: image, error: downloadError } = await client.storage
       .from(verified.bucket)
       .download(verified.storagePath);
-    if (downloadError || !image) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
+    if (downloadError)
+      throw avatarIoError(downloadError, "AVATAR_IMAGE_UNAVAILABLE");
+    if (!image) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
     images.push({
       bytes: new Uint8Array(await image.arrayBuffer()),
       mimeType: verified.mimeType,
@@ -188,6 +209,8 @@ export async function renderAndStoreAvatar(input: {
     mimeType: "image/png",
     byteSize: generated.bytes.byteLength,
     sourceType: "live",
+  }).catch((failure: unknown) => {
+    throw avatarIoError(failure, "AVATAR_IMAGE_UPLOAD_FAILED");
   });
   try {
     const { error } = await client.storage
@@ -196,8 +219,12 @@ export async function renderAndStoreAvatar(input: {
         contentType: "image/png",
         upsert: false,
       });
-    if (error) throw new Error("AVATAR_IMAGE_UPLOAD_FAILED");
-    await verifyWorkspaceStorageAsset(asset.assetId);
+    if (error) throw avatarIoError(error, "AVATAR_IMAGE_UPLOAD_FAILED");
+    await verifyWorkspaceStorageAsset(asset.assetId).catch(
+      (failure: unknown) => {
+        throw avatarIoError(failure, "AVATAR_IMAGE_UPLOAD_FAILED");
+      },
+    );
     input.signal?.throwIfAborted();
     return { assetId: asset.assetId, renderFingerprint, createdAsset: true };
   } catch (error) {
