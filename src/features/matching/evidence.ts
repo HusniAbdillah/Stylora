@@ -8,7 +8,7 @@ import type { MatchItem } from "./gates";
 type EvidenceValue =
   string | number | boolean | Array<string | number | boolean>;
 type EvidenceEntry = {
-  key: string;
+  key: number;
   reference: z.infer<typeof evidenceReferenceSchema>;
   value: EvidenceValue;
 };
@@ -88,7 +88,7 @@ export function createEvidenceProjection(input: {
   ) {
     for (const entry of populatedPaths(value)) {
       catalog.push({
-        key: `e${catalog.length + 1}`,
+        key: catalog.length + 1,
         reference: evidenceReferenceSchema.parse({
           source,
           id,
@@ -132,7 +132,7 @@ export function createEvidenceProjection(input: {
         z.strictObject({
           reason: explanationSchema.shape.whyThis.element.shape.reason,
           evidence: z
-            .array(z.enum(catalog.map((entry) => entry.key)))
+            .array(z.number().int().min(1).max(catalog.length))
             .min(1)
             .max(8),
         }),
@@ -155,5 +155,12 @@ export function createEvidenceProjection(input: {
       })),
     }),
   );
-  return { schema, catalog, allowedInputs };
+  const providerCatalog = catalog.map(({ key, reference, value }) => [
+    key,
+    reference.source,
+    reference.id,
+    reference.path,
+    value,
+  ]);
+  return { schema, catalog, providerCatalog, allowedInputs };
 }

@@ -180,6 +180,8 @@ export function presentMatches(
       id: match.id,
       outcome: match.outcome,
       inspiration: {
+        category: look.pieces.find((piece) => piece.id === match.pieceId)
+          ?.category,
         name:
           look.pieces.find((piece) => piece.id === match.pieceId)?.name ??
           "Reviewed piece",

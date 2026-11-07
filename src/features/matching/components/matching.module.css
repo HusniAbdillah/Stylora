@@ -75,11 +75,27 @@
   width: 64px;
   height: 64px;
   color: var(--color-missing);
+  border: 1px solid var(--color-rose-wash);
+}
+.missing .matchContent {
+  border-radius: 14px;
+  background: var(--color-blush);
+  padding: 14px;
+}
+.missingExplanation {
+  margin-top: 10px;
+  color: var(--color-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+.missingVisualLabel {
+  display: none;
+  padding-inline: 8px;
+  line-height: 16px;
 }
 .matchContent {
   min-width: 0;
 }
-.candidateRows,
 .whyThis,
 .shoppingStatus {
   grid-column: 1 / -1;
@@ -87,17 +103,6 @@
 }
 .whyThis {
   border-top: 1px solid var(--color-stone);
-}
-.candidateRows {
-  border-top: 1px solid var(--color-stone);
-}
-.candidateList {
-  display: grid;
-  max-height: 26rem;
-  gap: 6px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-bottom: 4px;
 }
 .whyThis[open] {
   padding-bottom: 4px;
@@ -134,6 +139,9 @@
   .mobileFooter {
     display: none;
   }
+  .missingVisualLabel {
+    display: block;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -147,7 +155,7 @@
     min-width: 0;
     grid-column: 1;
     grid-row: 1;
-    align-self: start;
+    align-self: center;
   }
   .matchArrow {
     display: flex;
@@ -175,7 +183,6 @@
     grid-column: 4;
     grid-row: 1;
   }
-  .candidateRows,
   .whyThis,
   .shoppingStatus {
     grid-column: 4;

@@ -125,6 +125,9 @@ describe("per-request recommendation evidence", () => {
       }).success,
     ).toBe(false);
     for (const invalid of [
+      0,
+      projection.catalog.length + 1,
+      1.5,
       "invented_key",
       { source: "wardrobe", id: piece.id, path: "fabric" },
     ]) {
@@ -140,7 +143,7 @@ describe("per-request recommendation evidence", () => {
     }
   });
 
-  it("exports a closed string enum in the provider input schema", () => {
+  it("exports bounded integer keys that index only supplied evidence", () => {
     const projection = createEvidenceProjection(input);
     expect(
       z.toJSONSchema(projection.schema, { target: "draft-7", io: "input" }),
@@ -152,7 +155,9 @@ describe("per-request recommendation evidence", () => {
               evidence: {
                 items: {
                   type: "string",
-                  enum: projection.catalog.map((entry) => entry.key),
+                  type: "integer",
+                  minimum: 1,
+                  maximum: projection.catalog.length,
                 },
               },
             },
@@ -202,12 +207,12 @@ describe("per-request recommendation evidence", () => {
     const rawContext = {
       pieces: input.pieces,
       inventory,
-      evidenceCatalog: evidence.catalog,
+      evidenceCatalog: evidence.providerCatalog,
     };
     const compactContext = {
       pieces: input.pieces.map(projectRecommendationItem),
       inventory: inventory.map(projectRecommendationItem),
-      evidenceCatalog: evidence.catalog,
+      evidenceCatalog: evidence.providerCatalog,
     };
     expect(
       new TextEncoder().encode(JSON.stringify(rawContext)).byteLength,
