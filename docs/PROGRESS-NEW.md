@@ -198,6 +198,90 @@ below the latest one.
 - Hosted schema changes and authorization: None reported.
 - Unresolved work and next concrete action: Not reported.
 
+### Wardrobe starter seed, 7 November 2026 (Asia/Bangkok)
+
+- Task O1.6, PRD R33. Branch `o1/wardrobe-seed` from `4fd5aba`. Lane B
+  because this change contains Storage and workspace-scoped seed code.
+- Added `data/wardrobe/` with 45 unchanged WebP photographs, English item
+  descriptions, evidence, source references and a usage README. Initial
+  inventory is owned as requested. Source type stays sample.
+- Added `scripts/seed-wardrobe.mjs` and four focused Vitest cases. The CLI
+  reuses runtime configuration validation, checks the expected workspace and
+  write gate, validates Zod records and hashes, fully decodes WebP, uses three
+  concurrent tasks and random scoped Storage paths. Scoped import keys and
+  stable UUIDs preserve existing records and resume incomplete assets.
+  Stored descriptions use the source description text. User notes start empty.
+- Authorized target was Stylora, workspace `dev-owner-1`. The repository env
+  selected `demo`, so STYLORA_WORKSPACE_ID and DEMO_WRITES_ENABLED were
+  overridden only for the seed process. The env file was untouched. Demo
+  retained zero wardrobe items.
+- Actual commands were `pnpm install --frozen-lockfile`, Prettier on the new
+  files, `pnpm exec vitest run scripts/seed-wardrobe.test.mjs` (4 passed),
+  `pnpm lint` and `pnpm typecheck` (both passed, equivalent to make fast).
+  Node 22.14.0 ran the CLI with `--experimental-strip-types`, the local env
+  file and `--expected-workspace dev-owner-1`.
+- Hosted dry run planned 45 items with zero failures. First apply created 44
+  and left one pending after a Storage download check failed. Second apply
+  resumed it, created one and preserved 44. Third apply created zero, preserved
+  45 and verified all 45 downloaded hashes with zero failures.
+- Final scoped SQL confirmed 45 active owned items, 45 distinct ready assets,
+  45 Storage objects and zero incomplete assets. Full-row fingerprints before
+  and after the final apply matched. Intentionally retained the requested
+  inventory. No synthetic online fixture or orphan remains.
+- Read-only policy inspection confirmed RLS enabled and SELECT denied for
+  anon and authenticated on assets and wardrobe_items. No schema, generated
+  types, provider integration or other feature was changed.
+- Not run were full check and production build, which are CI gates under
+  WORKFLOW section 10.4. Wardrobe application and UI integration remain
+  separate work.
+- Automatic approval review rejected the commit command because authorization
+  covered seeding, with separate permission required for Git-history changes.
+  No commit, push or pull request was made. Files remain in the isolated
+  worktree for review.
+
+### Wardrobe post-seed audit, 7 November 2026 (Asia/Bangkok)
+
+- A new read-only audit compared every supported database field against all 45
+  source records, including canonical attributes, descriptions, inferred values,
+  evidence, corrections, confidence, uncertainty, ownership and source type.
+  All 45 matched. Each item linked to its scoped ready asset and Storage object.
+- Downloaded, hashed and fully decoded all 45 stored WebPs. Every hash, size
+  and dimension matched the local source. Total image bytes were 4,157,480.
+  A temporary signed display URL returned HTTP 200, the expected MIME and
+  identical bytes. The URL was not printed or stored.
+- Independently read allowed attribute names and category groups from
+  FASHION-STRUCTURE.md and checked actual list types, uniqueness, limits and
+  field evidence. All 45 passed. Maximum PostgreSQL attribute JSON size was
+  572 bytes and maximum provenance size was 5,556 bytes.
+- All 45 persisted rows could be projected into schema-valid canonical
+  fashion-item.v1 envelopes using real IDs, asset references and revisions.
+  The source JSON is a seed manifest; its raw records require that projection.
+  Source metadata and image context remain in the manifest. They are not
+  dedicated fields in the existing wardrobe table.
+- Environment discovery found configuration had moved from .env to .env.local.
+  The audit used the latter and explicitly scoped all reads to dev-owner-1.
+  No seed writes or schema changes were performed by this audit. The application
+  response adapter and browser Wardrobe journey were not verified.
+
+### Wardrobe dataset Git delivery, 7 November 2026 (Asia/Bangkok)
+
+- The user authorized pulling updates and publishing the starter dataset to main.
+  Rebased the isolated seed branch onto cb105ff without conflicts. The diff
+  contains the 45 source WebPs, manifest, seed CLI, its tests and this report.
+- New seed uploads now follow the shared Storage path contract using the asset
+  ID as the middle path segment. Existing hosted paths still require the separate
+  normalization task recorded in the Wardrobe backend plan. No hosted writes
+  were performed during Git delivery.
+- After rebase, the four targeted seed tests passed. Lint exited successfully
+  with one existing Preview navigation warning. Typecheck failed at
+  src/features/preview/generation.ts:262 because complete_preview_operation is
+  missing from the generated RPC types. That file and the generated types are
+  unchanged from main. Full check and build are delegated to the PR CI gate.
+- Upstream 4971f04 supplied the missing RPC types while this branch was being
+  prepared. Rebased onto that update and reran typecheck successfully.
+- Formatted the task's new files with the current project formatter. Git delivery
+  uses a pull request to main so the normal merge checks and protections apply.
+
 ## 5. Owner 2 report
 
 - Reporter and timestamp: Not reported.
