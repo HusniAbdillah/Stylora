@@ -175,6 +175,26 @@ below the latest one.
 
 ## 4. Owner 1 report
 
+### Navigation repair, 7 November 2026
+
+- User-assigned O1.5 shared shell repair, based on main `10f0dd6`.
+  Default navigation now includes Create on every feature shell. Outfit detail
+  routes mark Create active. The sidebar collapse control is an explicit
+  44-pixel menu button beside the home logo, replacing the transparent button
+  spanning the sidebar. Rail mode stacks the logo and toggle. The landing
+  footer logo also links to the home route.
+- Preserved destination overrides, persisted collapse preference, native links,
+  mobile drawer dismissal and shared focus handling. No schema changes,
+  provider calls or hosted mutations were needed.
+- Two render regression tests passed with
+  `pnpm exec vitest run src/components/shell/navigation.test.tsx`. The local
+  Preview HTTP read returned 200 with an enabled Create link and home-logo link.
+  `git diff --check` passed. One `make pr-ready` is running under host contention;
+  its result and CI remain the delivery gates.
+- Browser click verification could not complete because the browser automation
+  timed out while attaching and navigating. No desktop or mobile click-through
+  or screenshot pass is claimed for this repair.
+
 ### Foundation checkpoint, 7 November 2026 (Asia/Bangkok)
 
 - Scope: local App Router and Supabase setup, Node 22 and pinned pnpm, shared
