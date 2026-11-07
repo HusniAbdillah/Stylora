@@ -10,6 +10,7 @@ import {
   confirmWardrobeDraft,
   createWardrobeDraft,
   createWardrobeUpload,
+  deleteWardrobeItem,
   getWardrobeItem,
   listActiveOwnedWardrobe,
   listWardrobeItems,
@@ -25,7 +26,7 @@ const workspaceId = "6d68ca94-8165-42a7-9ee3-c5d050371c4a";
 describe.skipIf(!enabled)(
   "Wardrobe hosted integration (explicit dev-owner-1 opt-in)",
   () => {
-    it("reads all starter metadata and real private images through the application storage helper", async () => {
+    it("reads remaining starter metadata and real private images through the application storage helper", async () => {
       if (process.env.STYLORA_WORKSPACE_ID !== workspaceId)
         throw new Error("The smoke must target dev-owner-1.");
       expect((await checkWorkspaceConnection()).connected).toBe(true);
@@ -37,7 +38,7 @@ describe.skipIf(!enabled)(
         .eq("workspace_id", workspaceId)
         .like("import_idempotency_key", "wardrobe-starter.v1:%");
       if (error || !seed) throw new Error("Starter query failed.");
-      expect(seed.length).toBe(45);
+      expect(seed.length).toBeLessThanOrEqual(45);
       expect(
         seed.every((row) =>
           inventory.items.some(
@@ -77,7 +78,7 @@ describe.skipIf(!enabled)(
       }
     }, 120_000);
 
-    it("uploads, verifies, confirms once, edits with revision checks, marks owned, archives and restores, then removes its fixture", async () => {
+    it("uploads, verifies, confirms once, edits with revision checks, marks owned and permanently deletes its fixture", async () => {
       if (
         process.env.STYLORA_WORKSPACE_ID !== workspaceId ||
         process.env.DEMO_WRITES_ENABLED !== "true"
@@ -136,6 +137,9 @@ describe.skipIf(!enabled)(
         );
         const first = await getWardrobeItem(itemId!);
         expect(first.assetId).toBe(upload.assetId);
+        const editor = await createWardrobeDraft({ itemId: first.id });
+        drafts.push(editor.id);
+        expect(editor.payload.editor?.values.name).toBe(first.name);
         const edited = await mutateWardrobeItem(first.id, {
           action: "edit",
           expectedRevision: first.revision,
@@ -146,8 +150,7 @@ describe.skipIf(!enabled)(
           "Edited connectivity fixture",
         );
         await expect(
-          mutateWardrobeItem(first.id, {
-            action: "archive",
+          deleteWardrobeItem(first.id, {
             expectedRevision: first.revision,
           }),
         ).rejects.toMatchObject({ code: "revision_conflict" });
@@ -172,20 +175,6 @@ describe.skipIf(!enabled)(
           action: "mark_owned",
           expectedRevision: candidate.data.revision,
         });
-        const archived = await mutateWardrobeItem(first.id, {
-          action: "archive",
-          expectedRevision: owned.revision,
-        });
-        expect(
-          (await listActiveOwnedWardrobe()).some(
-            (item) => item.id === first.id,
-          ),
-        ).toBe(false);
-        const restored = await mutateWardrobeItem(first.id, {
-          action: "restore",
-          expectedRevision: archived.revision,
-        });
-        expect(restored.archivedAt).toBe(null);
         process.env.STYLORA_WORKSPACE_ID =
           "58fcedac-9b26-48b3-bf12-98af3f6c9b27";
         await expect(getWardrobeItem(first.id)).rejects.toMatchObject({
@@ -194,11 +183,23 @@ describe.skipIf(!enabled)(
         process.env.STYLORA_WORKSPACE_ID = workspaceId;
         process.env.DEMO_WRITES_ENABLED = "false";
         await expect(
-          mutateWardrobeItem(first.id, {
-            action: "archive",
-            expectedRevision: restored.revision,
+          deleteWardrobeItem(first.id, {
+            expectedRevision: owned.revision,
           }),
         ).rejects.toMatchObject({ code: "WORKSPACE_WRITES_DISABLED" });
+        process.env.DEMO_WRITES_ENABLED = "true";
+        const deletion = { expectedRevision: owned.revision };
+        expect(await deleteWardrobeItem(first.id, deletion)).toEqual({
+          deleted: true,
+          itemId: first.id,
+        });
+        expect(await deleteWardrobeItem(first.id, deletion)).toEqual({
+          deleted: true,
+          itemId: first.id,
+        });
+        await expect(getWardrobeItem(first.id)).rejects.toMatchObject({
+          code: "wardrobe_not_found",
+        });
       } finally {
         process.env.STYLORA_WORKSPACE_ID = workspaceId;
         process.env.DEMO_WRITES_ENABLED = "true";

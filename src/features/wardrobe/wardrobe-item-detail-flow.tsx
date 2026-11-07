@@ -1,27 +1,55 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, ConfirmDialog, SelectField } from "@/components/ui";
+import { z } from "zod";
+import { Button, ConfirmDialog } from "@/components/ui";
+import { createPreviewStore } from "@/lib/preview/store";
 import {
-  WardrobeArchiveDialog,
+  WardrobeDeleteDialog,
   WardrobeItemDetail,
 } from "./wardrobe-item-detail";
-import { validateWardrobePhoto } from "./wardrobe-intake-storage";
 import { getWardrobeCollectionHref } from "./wardrobe-navigation";
 import {
   changeField,
   displayWardrobeItem,
   draftPointer,
-  itemFields,
   notifyWardrobeChanged,
-  uploadWardrobeFile,
   wardrobeRequest,
   type WardrobeDraft,
 } from "./client";
 import type { WardrobeItemDetailRecord } from "./server";
-import type { CanonicalWardrobeItem, ItemValues } from "./schema";
-import { wardrobeCategories, type WardrobeCategory } from "./wardrobe-types";
+import {
+  draftValuesSchema,
+  itemValuesSchema,
+  revisionSchema,
+  type CanonicalWardrobeItem,
+  type ItemValues,
+} from "./schema";
 import styles from "./wardrobe-detail.module.css";
+
+const inlineDraftSchema = z.object({
+  baseRevision: revisionSchema,
+  values: draftValuesSchema,
+  notes: z.string().max(4000),
+  clearCorrections: z.array(z.string().max(160)).max(160),
+});
+type InlineDraft = z.infer<typeof inlineDraftSchema>;
+
+function draftFromItem(item: CanonicalWardrobeItem): InlineDraft {
+  return {
+    baseRevision: item.revision,
+    values: {
+      name: item.name,
+      category: item.category,
+      subcategory: item.subcategory,
+      description: item.description,
+      attributes: item.attributes,
+    },
+    notes: item.notes,
+    clearCorrections: [],
+  };
+}
 
 export function WardrobeItemDetailFlow({
   itemId,
@@ -34,140 +62,165 @@ export function WardrobeItemDetailFlow({
 }) {
   const router = useRouter();
   const [item, setItem] = useState(initialItem);
-  const [editor, setEditor] = useState<WardrobeDraft | null>(null);
-  const editorRef = useRef(editor);
-  const [editing, setEditing] = useState(false);
-  const [clearCorrections, setClearCorrections] = useState<string[]>([]);
   const [error, setError] = useState(initialError);
-  const [fieldText, setFieldText] = useState<Record<string, string>>({});
+  const [notice, setNotice] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const [confirm, setConfirm] = useState<
-    "apply" | "discard" | "replace" | "owned" | null
+  const [confirmation, setConfirmation] = useState<
+    "delete" | "owned" | "discard" | null
   >(null);
-  const [archiveOpen, setArchiveOpen] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const editNameInput = useRef<HTMLInputElement>(null);
-  const dirty = useRef(false);
-  const version = useRef(0);
-  const queue = useRef<Promise<void>>(Promise.resolve());
-  const pointer = `stylora:wardrobe-editor.v1:${itemId}`;
+  const [fieldText, setFieldText] = useState<Record<string, string>>({});
+  const [temporaryDraft, setTemporaryDraft] = useState<InlineDraft | null>();
+  const draftStore = useMemo(
+    () =>
+      createPreviewStore<InlineDraft | null>(
+        `wardrobe-inline-editor:${itemId}`,
+        null,
+        (value) => value === null || inlineDraftSchema.safeParse(value).success,
+      ),
+    [itemId],
+  );
+  const persistedDraft = draftStore.useValue();
+  const ready = draftStore.useReady();
+  const changedDraft =
+    temporaryDraft === undefined ? persistedDraft : temporaryDraft;
+  const draft = changedDraft ?? (item ? draftFromItem(item) : null);
+  const oldPointer = `stylora:wardrobe-editor.v1:${itemId}`;
+
   function report(failure: unknown) {
     setError(
       failure instanceof Error
         ? failure.message
-        : "The piece could not be saved. Try again.",
+        : "The item could not be saved. Try again.",
     );
   }
-  const acceptEditor = useCallback((saved: WardrobeDraft | null) => {
-    editorRef.current = saved;
-    setEditor(saved);
-  }, []);
+
+  function persist(next: InlineDraft | null) {
+    try {
+      draftStore.set(next);
+      setTemporaryDraft(undefined);
+      return true;
+    } catch {
+      setTemporaryDraft(next);
+      setNotice(
+        "Your edits are available on this page. This browser could not keep a draft for later.",
+      );
+      return false;
+    }
+  }
+
   useEffect(() => {
-    const id = draftPointer(pointer);
-    if (!id) return;
+    const oldId = draftPointer(oldPointer);
+    if (!oldId || draftStore.get()) return;
     let active = true;
-    wardrobeRequest<WardrobeDraft>(`/drafts/${id}`)
+    wardrobeRequest<WardrobeDraft>(`/drafts/${oldId}`)
       .then((saved) => {
-        if (!active) return;
-        if (
-          saved.status !== "active" ||
-          saved.payload.editor?.itemId !== itemId
-        ) {
-          draftPointer(pointer, null);
-          return;
+        if (!active || draftStore.get()) return;
+        const editor = saved.payload.editor;
+        if (saved.status !== "active" || editor?.itemId !== itemId) return;
+        const recovered: InlineDraft = {
+          baseRevision: editor.baseRevision,
+          values: editor.values,
+          notes: editor.notes,
+          clearCorrections: [],
+        };
+        try {
+          draftStore.set(recovered);
+        } catch {
+          setTemporaryDraft(recovered);
         }
-        acceptEditor(saved);
-        setEditing(true);
       })
-      .catch((failure) => {
-        if (active) report(failure);
+      .catch(() => {
+        // The item remains editable when an older server draft is unavailable.
       });
     return () => {
       active = false;
     };
-  }, [itemId, pointer, acceptEditor]);
-  const flush = useCallback(() => {
-    const task = queue.current
-      .catch(() => undefined)
-      .then(async () => {
-        const snapshot = editorRef.current;
-        if (!snapshot?.payload.editor || !dirty.current) return;
-        const stamp = version.current;
-        const saved = await wardrobeRequest<WardrobeDraft>(
-          `/drafts/${snapshot.id}/editor`,
-          "PATCH",
-          {
-            expectedRevision: snapshot.revision,
-            values: snapshot.payload.editor.values,
-            notes: snapshot.payload.editor.notes,
-          },
-        );
-        if (stamp === version.current) {
-          dirty.current = false;
-          acceptEditor(saved);
-        } else
-          acceptEditor({ ...editorRef.current!, revision: saved.revision });
-      });
-    queue.current = task;
-    return task;
-  }, [acceptEditor]);
-  useEffect(() => {
-    if (!dirty.current) return;
-    const timer = window.setTimeout(() => void flush().catch(report), 600);
-    return () => window.clearTimeout(timer);
-  }, [editor, flush]);
-  async function beginEdit() {
-    if (editor) {
-      setEditing(true);
+  }, [draftStore, itemId, oldPointer]);
+
+  function update(
+    values: ItemValues,
+    notes = draft?.notes ?? "",
+    changedKey?: string,
+  ) {
+    if (!draft || busy) return;
+    setError(undefined);
+    setNotice(undefined);
+    persist({
+      ...draft,
+      values,
+      notes,
+      clearCorrections: draft.clearCorrections.filter(
+        (key) => key !== changedKey,
+      ),
+    });
+  }
+
+  async function save() {
+    if (!draft || !item) return;
+    const parsed = itemValuesSchema.safeParse(draft.values);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const field = issue.path
+        .map(String)
+        .join(" ")
+        .replace(/^attributes /, "");
+      setError(
+        `${field ? `${field.charAt(0).toUpperCase()}${field.slice(1)}: ` : ""}${issue.message}`,
+      );
       return;
     }
     setBusy(true);
+    setError(undefined);
     try {
-      const saved = await wardrobeRequest<WardrobeDraft>("/drafts", "POST", {
-        itemId,
-      });
-      acceptEditor(saved);
-      draftPointer(pointer, saved.id);
-      setEditing(true);
-      requestAnimationFrame(() => editNameInput.current?.focus());
+      const saved = await wardrobeRequest<CanonicalWardrobeItem>(
+        `/${item.id}`,
+        "PATCH",
+        {
+          action: "edit",
+          expectedRevision: draft.baseRevision,
+          values: parsed.data,
+          notes: draft.notes,
+          clearCorrections: draft.clearCorrections,
+        },
+      );
+      setItem({ ...item, ...saved });
+      const cleared = persist(null);
+      draftPointer(oldPointer, null);
+      setFieldText({});
+      setNotice(
+        cleared
+          ? "Changes saved."
+          : "Changes saved. This browser could not clear its older draft.",
+      );
+      notifyWardrobeChanged();
     } catch (failure) {
       report(failure);
     } finally {
       setBusy(false);
     }
   }
-  function update(
-    values: ItemValues,
-    notes = editorRef.current?.payload.editor?.notes ?? "",
-  ) {
-    const snapshot = editorRef.current;
-    if (!snapshot?.payload.editor || busy) return;
-    version.current++;
-    dirty.current = true;
-    acceptEditor({
-      ...snapshot,
-      payload: {
-        ...snapshot.payload,
-        editor: { ...snapshot.payload.editor, values, notes },
-      },
-    });
+
+  async function removeItem() {
+    if (!item) return;
+    setBusy(true);
     setError(undefined);
-  }
-  async function clearDraft() {
-    await queue.current.catch(() => undefined);
-    const saved = editorRef.current;
-    if (saved?.status === "active")
-      await wardrobeRequest(`/drafts/${saved.id}`, "DELETE", {
-        expectedRevision: saved.revision,
+    try {
+      await wardrobeRequest(`/${item.id}`, "DELETE", {
+        expectedRevision: item.revision,
       });
-    dirty.current = false;
-    acceptEditor(null);
-    draftPointer(pointer, null);
-    setClearCorrections([]);
-    setEditing(false);
+      persist(null);
+      draftPointer(oldPointer, null);
+      notifyWardrobeChanged();
+      setConfirmation(null);
+      router.push(getWardrobeCollectionHref());
+    } catch (failure) {
+      report(failure);
+    } finally {
+      setBusy(false);
+    }
   }
-  async function mutate(action: string, extra = {}) {
+
+  async function markOwned() {
     if (!item) return;
     setBusy(true);
     setError(undefined);
@@ -175,60 +228,23 @@ export function WardrobeItemDetailFlow({
       const saved = await wardrobeRequest<CanonicalWardrobeItem>(
         `/${item.id}`,
         "PATCH",
-        { action, expectedRevision: item.revision, ...extra },
+        {
+          action: "mark_owned",
+          expectedRevision: item.revision,
+        },
       );
-      setItem((previous) => (previous ? { ...previous, ...saved } : undefined));
+      setItem({ ...item, ...saved });
+      if (draft && changedDraft && draft.baseRevision === item.revision)
+        persist({ ...draft, baseRevision: saved.revision });
       notifyWardrobeChanged();
-      setConfirm(null);
-      setArchiveOpen(false);
-      return saved;
+      setConfirmation(null);
     } catch (failure) {
       report(failure);
     } finally {
       setBusy(false);
     }
   }
-  async function apply() {
-    setBusy(true);
-    try {
-      await flush();
-      const current = editorRef.current?.payload.editor;
-      if (!current || !item) return;
-      if (current.baseRevision !== item.revision)
-        throw new Error(
-          "This edit draft uses an older item revision. Discard it and reload the piece before editing again.",
-        );
-      const saved = await mutate("edit", {
-        values: current.values,
-        notes: current.notes,
-        clearCorrections,
-      });
-      if (saved) await clearDraft();
-    } catch (failure) {
-      report(failure);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function replacePhoto() {
-    if (!pendingFile) return;
-    setBusy(true);
-    try {
-      const draft = await wardrobeRequest<WardrobeDraft>("/drafts", "POST", {});
-      const verified = await uploadWardrobeFile(pendingFile, draft);
-      if (
-        await mutate("replace_photo", {
-          draftId: verified.id,
-          draftRevision: verified.revision,
-        })
-      )
-        setPendingFile(null);
-    } catch (failure) {
-      report(failure);
-    } finally {
-      setBusy(false);
-    }
-  }
+
   async function reload() {
     setBusy(true);
     try {
@@ -240,15 +256,14 @@ export function WardrobeItemDetailFlow({
       setBusy(false);
     }
   }
-  if (!item)
+
+  if (!item || !draft)
     return (
       <section className={styles.notFound}>
-        <h1>Piece unavailable</h1>
-        <p>
-          {error ?? "This piece is no longer available in the shared wardrobe."}
-        </p>
+        <h1>Item unavailable</h1>
+        <p>{error ?? "This item is no longer available in the wardrobe."}</p>
         <Button variant="secondary" onClick={() => void reload()}>
-          Retry piece
+          Retry item
         </Button>
         <Button
           variant="quiet"
@@ -258,29 +273,16 @@ export function WardrobeItemDetailFlow({
         </Button>
       </section>
     );
-  const draft = editor?.payload.editor;
-  const confirmations = {
-    apply: [
-      "Apply these edits?",
-      "The reviewed values will replace the saved item details.",
-      "Apply changes",
-    ],
-    discard: [
-      "Discard unsaved edits?",
-      "The saved item stays as it was. This edit draft will be removed.",
-      "Discard edits",
-    ],
-    replace: [
-      "Replace this photo?",
-      "The current photo will be replaced. Its original description and evidence remain until you edit them.",
-      "Replace photo",
-    ],
-    owned: [
-      "Mark this item as owned?",
-      "The saved candidate will become an owned wardrobe piece.",
-      "Mark as owned",
-    ],
-  };
+
+  const displayed = displayWardrobeItem({
+    ...item,
+    ...draft.values,
+    notes: draft.notes,
+  });
+  const savedFields = displayWardrobeItem(item).fields;
+  const changed =
+    Boolean(changedDraft) &&
+    JSON.stringify(draft) !== JSON.stringify(draftFromItem(item));
   return (
     <>
       {error && (
@@ -291,200 +293,114 @@ export function WardrobeItemDetailFlow({
             onClick={() => void reload()}
             disabled={busy}
           >
-            Reload piece
+            Reload item
           </Button>
         </div>
       )}
-      <input
-        ref={fileInput}
-        className={styles.fileInput}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        aria-label="Replacement photo"
-        disabled={busy}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          event.target.value = "";
-          if (file)
-            void validateWardrobePhoto(file)
-              .then(() => {
-                setPendingFile(file);
-                setConfirm("replace");
-              })
-              .catch(report);
-        }}
-      />
+      {draft.baseRevision !== item.revision && (
+        <div className={styles.flowError} role="status">
+          <span>
+            This item changed while you were editing. Your draft is kept. Reload
+            the saved item or keep a copy of your edits before starting again.
+          </span>
+          <Button
+            variant="secondary"
+            onClick={() => setConfirmation("discard")}
+            disabled={busy}
+          >
+            Use saved details
+          </Button>
+        </div>
+      )}
+      {notice && (
+        <p className={styles.saveNotice} role="status">
+          {notice}
+        </p>
+      )}
       <WardrobeItemDetail
         item={{
-          ...displayWardrobeItem(item),
-          archived: Boolean(item.archivedAt),
+          ...displayed,
+          fields: displayed.fields.map((field) => ({
+            ...field,
+            value: fieldText[field.key] ?? field.value,
+            source:
+              savedFields.find((saved) => saved.key === field.key)?.value !==
+              field.value
+                ? "user"
+                : field.source,
+          })),
         }}
         busy={busy}
-        onBack={() => {
-          void flush()
-            .then(() => router.push(getWardrobeCollectionHref()))
-            .catch(report);
-        }}
-        onReplacePhoto={() => fileInput.current?.click()}
-        onMarkOwned={item.archivedAt ? undefined : () => setConfirm("owned")}
-        onArchive={() => setArchiveOpen(true)}
-        onRestore={() => void mutate("restore")}
-        onEdit={() => void beginEdit()}
-        editPanel={
-          editing && draft ? (
-            <section
-              className={styles.editPanel}
-              aria-labelledby="edit-item-heading"
-            >
-              <h2 id="edit-item-heading">Edit item details</h2>
-              <p>
-                Your draft is saved to the shared workspace. Apply it when the
-                details are ready.
-              </p>
-              <label>
-                Item name
-                <input
-                  ref={editNameInput}
-                  value={draft.values.name}
-                  maxLength={160}
-                  onChange={(e) =>
-                    update({ ...draft.values, name: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Category
-                <SelectField
-                  value={draft.values.category}
-                  onChange={(e) =>
-                    update({
-                      ...draft.values,
-                      category: e.target.value as WardrobeCategory,
-                    })
-                  }
-                >
-                  {wardrobeCategories
-                    .filter((c) => c.id !== "all")
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label}
-                      </option>
-                    ))}
-                </SelectField>
-              </label>
-              <label>
-                Subcategory
-                <input
-                  value={draft.values.subcategory ?? ""}
-                  maxLength={120}
-                  onChange={(e) =>
-                    update({
-                      ...draft.values,
-                      subcategory: e.target.value || null,
-                    })
-                  }
-                />
-              </label>
-              {itemFields({ ...draft.values, notes: draft.notes }).map(
-                (field) => (
-                  <label key={field.key}>
-                    {field.label}
-                    <input
-                      value={fieldText[field.key] ?? field.value}
-                      maxLength={
-                        field.key === "notes"
-                          ? 4000
-                          : field.key === "description"
-                            ? 600
-                            : 500
-                      }
-                      onBlur={() =>
-                        setFieldText((previous) => {
-                          const next = { ...previous };
-                          delete next[field.key];
-                          return next;
-                        })
-                      }
-                      onChange={(e) => {
-                        setFieldText((previous) => ({
-                          ...previous,
-                          [field.key]: e.target.value,
-                        }));
-                        if (field.key === "notes")
-                          update(draft.values, e.target.value);
-                        else
-                          update(
-                            changeField(
-                              draft.values,
-                              field.key,
-                              e.target.value,
-                            ),
-                          );
-                      }}
-                    />
-                    {item.corrections[field.key] && (
-                      <Button
-                        variant="quiet"
-                        disabled={clearCorrections.includes(field.key)}
-                        onClick={() =>
-                          setClearCorrections((paths) => [...paths, field.key])
-                        }
-                      >
-                        {clearCorrections.includes(field.key)
-                          ? "Original reading selected"
-                          : "Use original reading"}
-                      </Button>
-                    )}
-                  </label>
-                ),
-              )}
-              <div className={styles.editActions}>
-                <Button
-                  variant="quiet"
-                  disabled={busy}
-                  onClick={() => setConfirm("discard")}
-                >
-                  Discard edits
-                </Button>
-                <Button
-                  variant="primary"
-                  disabled={busy || !draft.values.name.trim()}
-                  onClick={() => setConfirm("apply")}
-                >
-                  Apply edits
-                </Button>
-              </div>
-            </section>
-          ) : undefined
+        saveDisabled={
+          !ready ||
+          !changed ||
+          !draft.values.name.trim() ||
+          draft.baseRevision !== item.revision
         }
+        onBack={() => router.push(getWardrobeCollectionHref())}
+        onNameChange={(name) => update({ ...draft.values, name })}
+        onCategoryChange={(category) => update({ ...draft.values, category })}
+        onSubcategoryChange={(subcategory) =>
+          update({ ...draft.values, subcategory: subcategory || null })
+        }
+        onFieldChange={(key, text) => {
+          setFieldText((previous) => ({ ...previous, [key]: text }));
+          if (key === "notes") update(draft.values, text, key);
+          else update(changeField(draft.values, key, text), draft.notes, key);
+        }}
+        onFieldBlur={(key) =>
+          setFieldText((previous) => {
+            const next = { ...previous };
+            delete next[key];
+            return next;
+          })
+        }
+        correctedFields={Object.keys(item.corrections)}
+        originalReadings={draft.clearCorrections}
+        onUseOriginal={(key) =>
+          persist({
+            ...draft,
+            clearCorrections: [...draft.clearCorrections, key],
+          })
+        }
+        onMarkOwned={() => setConfirmation("owned")}
+        onDelete={() => setConfirmation("delete")}
+        onSave={() => void save()}
+        onOpenSavedLook={(id) => router.push(`/saved-looks/${id}`)}
       />
-      <WardrobeArchiveDialog
-        open={archiveOpen}
+      <WardrobeDeleteDialog
+        open={confirmation === "delete"}
         itemName={item.name}
         itemImageUrl={item.imageUrl}
-        savedLookCount={item.savedLookCount}
         busy={busy}
         errorMessage={error}
-        onCancel={() => setArchiveOpen(false)}
-        onConfirm={() => void mutate("archive")}
+        onCancel={() => setConfirmation(null)}
+        onConfirm={() => void removeItem()}
       />
       <ConfirmDialog
-        open={confirm !== null}
-        title={confirm ? confirmations[confirm][0] : ""}
-        description={confirm ? confirmations[confirm][1] : ""}
-        confirmLabel={confirm ? confirmations[confirm][2] : "Confirm"}
+        open={confirmation === "owned" || confirmation === "discard"}
+        title={
+          confirmation === "discard"
+            ? "Use saved details?"
+            : "Mark this item as owned?"
+        }
+        description={
+          confirmation === "discard"
+            ? "This removes your unsaved edits and shows the current saved item details."
+            : "The saved candidate will become an owned wardrobe piece."
+        }
+        confirmLabel={
+          confirmation === "discard" ? "Use saved details" : "Mark as owned"
+        }
         busy={busy}
-        onClose={() => setConfirm(null)}
+        onClose={() => setConfirmation(null)}
         onConfirm={() => {
-          if (confirm === "apply") void apply();
-          if (confirm === "owned") void mutate("mark_owned");
-          if (confirm === "replace") void replacePhoto();
-          if (confirm === "discard") {
-            setBusy(true);
-            void clearDraft()
-              .then(() => setConfirm(null))
-              .catch(report)
-              .finally(() => setBusy(false));
+          if (confirmation === "owned") void markOwned();
+          else {
+            persist(null);
+            setFieldText({});
+            setNotice(undefined);
+            setConfirmation(null);
           }
         }}
       />

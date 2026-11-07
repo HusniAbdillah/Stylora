@@ -17,31 +17,10 @@
   padding: 24px 0 48px;
 }
 
-.archiveHeading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
 .sampleCaption {
   color: var(--color-secondary);
   font-size: 12px;
   line-height: 1.4;
-}
-
-.archiveGrid {
-  margin-top: 18px;
-}
-
-.archiveLinkRow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  max-width: 1096px;
-  margin: -30px auto 40px;
 }
 
 .loadingHeading {
@@ -523,14 +502,6 @@
 }
 
 @media (max-width: 600px) {
-  .archiveHeading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .archiveLinkRow {
-    margin-top: -22px;
-  }
   .wardrobe {
     padding: 20px 0 36px;
   }

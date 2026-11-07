@@ -231,7 +231,7 @@ fashion explanation of a product uses [FASHION-PROMPT.md](FASHION-PROMPT.md) and
 ## 7. Wardrobe, preferences, and profile
 
 **R33.** Wardrobe categories use tabs, with search, filters, images, item
-details, edit, archive, and image replacement. Preserve filters and scroll
+details with inline editing, save changes, and permanent deletion after confirmation. Preserve filters and scroll
 context when returning. Keep explicit sample inventory separate from actual
 stored ownership.
 

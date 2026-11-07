@@ -28,7 +28,6 @@ const meta = {
     stats: {
       wardrobeItems: 5,
       savedCandidates: 1,
-      archivedItems: 1,
     },
     onDisplayNameChange: () => undefined,
     onSaveName: () => undefined,
@@ -46,7 +45,6 @@ export const EmptyWorkspace: Story = {
     stats: {
       wardrobeItems: 0,
       savedCandidates: 0,
-      archivedItems: 0,
     },
   },
   render: (args) => <ControlledProfile {...args} />,

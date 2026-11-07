@@ -95,7 +95,7 @@ export const mutationSchema = z.discriminatedUnion("action", [
     clearCorrections: z.array(z.string().max(160)).max(160).default([]),
   }),
   z.strictObject({
-    action: z.enum(["archive", "restore", "mark_owned"]),
+    action: z.literal("mark_owned"),
     expectedRevision: revisionSchema,
   }),
   z.strictObject({
@@ -105,11 +105,12 @@ export const mutationSchema = z.discriminatedUnion("action", [
     draftRevision: revisionSchema,
   }),
 ]);
+export const deleteItemSchema = z.strictObject({
+  expectedRevision: revisionSchema,
+});
 export const listQuerySchema = z.strictObject({
   category: z.union([categorySchema, z.literal("all")]).default("all"),
-  status: z
-    .enum(["all", "owned", "saved_candidate", "archived"])
-    .default("all"),
+  status: z.enum(["all", "owned", "saved_candidate"]).default("all"),
   q: z.string().trim().max(120).default(""),
 });
 const evidenceSchema = observationSchema

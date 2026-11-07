@@ -1,6 +1,7 @@
 import {
   getWardrobeItem,
   mutateWardrobeItem,
+  deleteWardrobeItem,
 } from "@/features/wardrobe/server";
 import { wardrobeRoute, readJson } from "@/features/wardrobe/http";
 type Context = { params: Promise<{ itemId: string }> };
@@ -12,5 +13,11 @@ export async function PATCH(request: Request, context: Context) {
   const { itemId } = await context.params;
   return wardrobeRoute(async () =>
     mutateWardrobeItem(itemId, await readJson(request)),
+  );
+}
+export async function DELETE(request: Request, context: Context) {
+  const { itemId } = await context.params;
+  return wardrobeRoute(async () =>
+    deleteWardrobeItem(itemId, await readJson(request)),
   );
 }

@@ -3,12 +3,10 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { Button, Icon } from "@/components/ui";
-import { WardrobeCategoryTabs } from "./wardrobe-controls";
+import { Button } from "@/components/ui";
 import { WardrobeGrid } from "./wardrobe-grid";
 import { WardrobeIntakeFlow } from "./wardrobe-intake-flow";
 import { WardrobePreviewImage } from "./wardrobe-intake-storage";
-import { WardrobeItemCard } from "./wardrobe-item-card";
 import {
   rememberWardrobeCollectionHref,
   WARDROBE_RETURN_SCROLL_KEY,
@@ -33,7 +31,7 @@ const viewSchema = z.object({
   category: z
     .enum(["all", "top", "bottom", "dress", "outerwear", "shoes", "accessory"])
     .catch("all"),
-  status: z.enum(["owned", "saved_candidate", "archived"]).catch("owned"),
+  status: z.enum(["owned", "saved_candidate"]).catch("owned"),
   q: z.string().max(120).catch(""),
   add: z.enum(["1"]).optional().catch(undefined),
 });
@@ -179,12 +177,9 @@ export function WardrobeCollectionScreen({
 
   if (!ready) return <WardrobeCollectionLoading />;
 
-  const active = records.filter((item) => !item.archivedAt);
-  const archived = records.filter((item) => Boolean(item.archivedAt));
-  const statusItems =
-    view.status === "archived"
-      ? archived
-      : active.filter((item) => item.inventoryStatus === view.status);
+  const statusItems = records.filter(
+    (item) => item.inventoryStatus === view.status,
+  );
   const shown = statusItems.filter(
     (item) =>
       (view.category === "all" || item.category === view.category) &&
@@ -229,111 +224,29 @@ export function WardrobeCollectionScreen({
           This workspace is read only. Saved pieces are available to browse.
         </p>
       )}
-      {view.status === "archived" ? (
-        <section className={styles.wardrobe} aria-labelledby="archived-title">
-          <p className={styles.eyebrow}>Your wardrobe</p>
-          <div className={styles.archiveHeading}>
-            <div>
-              <h1 className={styles.title} id="archived-title">
-                Archived <em>pieces.</em>
-              </h1>
-              <p className={styles.intro}>
-                These pieces stay here for reference and can be restored from
-                their detail page.
-              </p>
-            </div>
-            <Button
-              variant="secondary"
-              onClick={() =>
-                updateView({ status: "owned", category: "all", q: "" })
-              }
-            >
-              <Icon name="arrowLeft" size={16} /> Back to wardrobe
-            </Button>
-          </div>
-          <WardrobeCategoryTabs
-            activeCategory={view.category}
-            totalCount={archived.length}
-            categoryCounts={counts}
-            onCategoryChange={(category) => updateView({ category })}
-          />
-          <label className={styles.search} data-field-surface="">
-            <Icon name="search" size={18} />
-            <span className={styles.srOnly}>Search archived pieces</span>
-            <input
-              type="search"
-              value={view.q}
-              maxLength={120}
-              placeholder="Search archived pieces"
-              onChange={(event) => updateView({ q: event.target.value })}
-            />
-          </label>
-          {shown.length > 0 ? (
-            <div className={`${styles.grid} ${styles.archiveGrid}`}>
-              {shown.map((item) => (
-                <WardrobeItemCard
-                  key={item.id}
-                  item={item}
-                  onOpen={openItem}
-                  renderImage={image}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className={styles.messageCard} role="status">
-              <Icon name="layers" />
-              <div>
-                <strong>
-                  {archived.length
-                    ? "No archived pieces found"
-                    : "No archived pieces yet"}
-                </strong>
-                <p>
-                  {archived.length
-                    ? "Try a different category or search."
-                    : "Archived pieces will appear here, ready to restore."}
-                </p>
-              </div>
-            </div>
-          )}
-        </section>
-      ) : (
-        <>
-          <WardrobeGrid
-            items={shown}
-            totalCount={statusItems.length}
-            categoryCounts={counts}
-            activeCategory={view.category}
-            inventoryFilter={view.status}
-            query={view.q}
-            hasAnyItems={active.length > 0}
-            renderItemImage={image}
-            status={error ? "error" : "ready"}
-            errorMessage={error}
-            onRetry={() => void refresh()}
-            onCategoryChange={(category) => updateView({ category })}
-            onFilterChange={(status) => updateView({ status })}
-            onQueryChange={(q) => updateView({ q })}
-            onAddItem={() => updateView({ add: "1" })}
-            onOpenItem={openItem}
-          />
-          <div className={styles.archiveLinkRow}>
-            <Button
-              variant="quiet"
-              onClick={() =>
-                updateView({ status: "archived", category: "all", q: "" })
-              }
-            >
-              <Icon name="layers" size={16} /> Archived pieces (
-              {archived.length})
-            </Button>
-            {records.some((item) => item.isSample) && (
-              <span className={styles.sampleCaption}>
-                Starter items are labeled sample data.
-              </span>
-            )}
-          </div>
-        </>
+      <WardrobeGrid
+        items={shown}
+        totalCount={statusItems.length}
+        categoryCounts={counts}
+        activeCategory={view.category}
+        inventoryFilter={view.status}
+        query={view.q}
+        hasAnyItems={records.length > 0}
+        renderItemImage={image}
+        status={error ? "error" : "ready"}
+        errorMessage={error}
+        onRetry={() => void refresh()}
+        onCategoryChange={(category) => updateView({ category })}
+        onFilterChange={(status) => updateView({ status })}
+        onQueryChange={(q) => updateView({ q })}
+        onAddItem={() => updateView({ add: "1" })}
+        onOpenItem={openItem}
+      />
+
+      {records.some((item) => item.isSample) && (
+        <p className={styles.sampleCaption}>
+          Starter items are labeled sample data.
+        </p>
       )}
       <WardrobeIntakeFlow
         open={view.add === "1"}
