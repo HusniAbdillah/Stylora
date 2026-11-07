@@ -17,7 +17,14 @@ export type PreviewItem = {
 export type PreviewSelection = Partial<Record<PreviewCategory, string>>;
 export type PreviewJob = {
   status:
-    "idle" | "queued" | "running" | "succeeded" | "failed" | "unavailable";
+    | "idle"
+    | "queued"
+    | "running"
+    | "succeeded"
+    | "failed"
+    | "unavailable"
+    | "cancelled";
+  superseded?: boolean;
   imageUrl?: string | null;
   elapsedSeconds?: number;
   errorMessage?: string;
@@ -137,9 +144,11 @@ export function PreviewStudio({
           ? "Generating image"
           : job.status === "failed"
             ? "Image could not be made"
-            : job.status === "unavailable"
-              ? "Image provider unavailable"
-              : "Ready to create";
+            : job.status === "cancelled"
+              ? "Image generation stopped"
+              : job.status === "unavailable"
+                ? "Image provider unavailable"
+                : "Ready to create";
   return (
     <section className="pb-24 md:pb-0">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -340,6 +349,7 @@ export function PreviewStudio({
               <Image
                 src={job.imageUrl}
                 alt="Illustrative avatar wearing the selected outfit"
+                loading="eager"
                 fill
                 sizes="(max-width: 768px) 90vw, 500px"
                 unoptimized
@@ -357,7 +367,9 @@ export function PreviewStudio({
                       : job.status === "unavailable"
                         ? (job.errorMessage ??
                           "Image generation is unavailable right now.")
-                        : "Select pieces to preview a look."}
+                        : job.status === "cancelled"
+                          ? "Image generation was stopped. Choose Generate image to start again."
+                          : "Select pieces to preview a look."}
                 </p>
                 {(job.status === "queued" || job.status === "running") && (
                   <div className="h-1.5 w-32 animate-pulse rounded-full bg-stone motion-reduce:animate-none" />

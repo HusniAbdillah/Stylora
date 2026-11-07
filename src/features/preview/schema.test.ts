@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { previewJobStatus } from "./job-status";
 import {
   previewSelectionSchema,
   slotForPreviewItem,
@@ -8,6 +9,12 @@ import {
 const id = "00000000-0000-4000-8000-000000000001";
 
 describe("Preview selection integrity", () => {
+  it("restarts superseded inputs while keeping cancellation stopped", () => {
+    expect(previewJobStatus("superseded")).toBe("idle");
+    expect(previewJobStatus("cancelled")).toBe("cancelled");
+    expect(previewJobStatus("partial")).toBe("running");
+    expect(previewJobStatus("unknown")).toBe("failed");
+  });
   it("rejects one garment repeated across slots", () => {
     expect(
       previewSelectionSchema.safeParse({ bags: id, accessories: id }).success,
