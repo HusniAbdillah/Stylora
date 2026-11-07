@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { z } from "zod";
+import Link from "next/link";
 import { Button } from "@/components/ui";
 import {
   startOperationRequest,
@@ -107,6 +108,14 @@ export function StudioSaveButton({
       <p className="max-w-xs text-sm text-secondary" role="status">
         {status}
       </p>
+      {saved ? (
+        <Link
+          className="text-sm text-crimson underline"
+          href={`/preview?savedLookId=${saved.savedLookId}`}
+        >
+          Open saved preview
+        </Link>
+      ) : null}
       {saved && retryable ? (
         <Button
           variant="secondary"
