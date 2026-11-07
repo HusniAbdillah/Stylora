@@ -144,11 +144,6 @@ async function operations() {
   return rows;
 }
 async function seedFixtures() {
-  const count = await data(
-    scoped("wardrobe_items", "id").limit(1),
-    "WARDROBE_READ_FAILED",
-  );
-  if (count.length) return;
   const dataset = validateManifest(
     JSON.parse(
       await readFile(join(root, "data/wardrobe/wardrobe.json"), "utf8"),
@@ -233,6 +228,7 @@ async function prepare() {
   await seedFixtures();
   const inventory = await data(
     scoped("wardrobe_items", "id,category,subcategory,asset_id")
+      .in("id", state.wardrobeIds)
       .eq("inventory_status", "owned")
       .is("archived_at", null)
       .not("asset_id", "is", null)
