@@ -16,6 +16,7 @@ import {
   renderAndStoreAvatar,
   discardPendingAvatar,
   getAvatarRenderSettings,
+  normalizeAvatarItems,
 } from "@/features/preview/image";
 import { imageRenderSettingsSchema } from "@/features/ai/image-settings";
 import { buildAvatarVisualDirection } from "@/features/preview/visual-direction";
@@ -59,10 +60,9 @@ export async function runSavedAvatar(operationId: string) {
       "This saved look is unavailable.",
       404,
     );
-  const items = z
-    .array(z.record(z.string(), z.unknown()))
-    .min(1)
-    .parse(snapshot.items);
+  const items = normalizeAvatarItems(
+    z.array(z.record(z.string(), z.unknown())).min(1).parse(snapshot.items),
+  );
   await assertWorkflowRpc("complete_saved_avatar");
   return runOperation(operation.id, {
     execute: async (claim) => {
