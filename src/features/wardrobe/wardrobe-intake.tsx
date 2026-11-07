@@ -33,6 +33,7 @@ export type WardrobeIntakeProps = {
   onNameChange: (id: string, name: string) => void;
   onCategoryChange: (id: string, category: WardrobeCategory) => void;
   onFieldChange: (id: string, key: string, value: string) => void;
+  onFieldBlur?: (id: string, key: string) => void;
   onConfirm: (id: string) => void;
   onRetry?: () => void;
   onManualEntry?: () => void;
@@ -44,6 +45,7 @@ export type WardrobeIntakeProps = {
   descriptionSource?: "ai" | "manual" | "sample";
   hasDraft?: boolean;
   busy?: boolean;
+  provisionalCount?: number;
 };
 
 export function WardrobeIntake({
@@ -60,6 +62,7 @@ export function WardrobeIntake({
   onNameChange,
   onCategoryChange,
   onFieldChange,
+  onFieldBlur,
   onConfirm,
   onRetry,
   onManualEntry,
@@ -71,6 +74,7 @@ export function WardrobeIntake({
   descriptionSource = "ai",
   hasDraft = false,
   busy = false,
+  provisionalCount = 0,
 }: WardrobeIntakeProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -145,8 +149,8 @@ export function WardrobeIntake({
           </span>
           <h3>Start with one photo</h3>
           <p>
-            Choose a clear photo of one piece. Photo description is unavailable
-            in this local preview, so you can enter the details yourself.
+            Choose a clear photo. Review the proposed descriptions before adding
+            each piece to your wardrobe.
           </p>
           <Button variant="primary" onClick={chooseFile} disabled={busy}>
             Choose photo
@@ -157,7 +161,8 @@ export function WardrobeIntake({
             </Button>
           )}
           <small>
-            JPEG, PNG or WebP, up to 10 MB. Photos stay in this browser.
+            JPEG, PNG or WebP, up to 10 MB. Photos are saved to the shared
+            wardrobe workspace.
           </small>
         </div>
       ) : status === "uploading" || status === "analyzing" ? (
@@ -175,9 +180,15 @@ export function WardrobeIntake({
           </h3>
           <p>
             {status === "uploading"
-              ? "The file is checked before it joins your local draft."
-              : "Keep this open or come back later. Your uploaded draft is saved."}
+              ? "The file is uploaded and checked before it joins your saved draft."
+              : "Your uploaded draft is saved. You can return to review it later."}
           </p>
+          {provisionalCount > 0 && (
+            <p>
+              {provisionalCount} garments described. Checking the complete
+              result.
+            </p>
+          )}
           <div className={styles.progressBar} aria-hidden="true">
             <span />
           </div>
@@ -236,10 +247,12 @@ export function WardrobeIntake({
           </div>
           <h3>{selected.name} was added</h3>
           <p>
-            The item is in this browser&apos;s wardrobe. Its details are{" "}
+            The item is in the shared wardrobe. Its details are{" "}
             {descriptionSource === "sample"
               ? "labeled sample data"
-              : "entered by you"}
+              : descriptionSource === "ai"
+                ? "read from the photo and reviewed by you"
+                : "entered by you"}
             .
           </p>
           {onAddAnother && (
@@ -346,59 +359,82 @@ export function WardrobeIntake({
                   ))}
               </select>
             </label>
-            {selected.fields.map((field) => (
-              <div className={styles.field} key={field.key}>
+            {Array.from(
+              selected.fields.reduce((groups, field) => {
+                const group = field.group ?? field.label;
+                const fields = groups.get(group) ?? [];
+                fields.push(field);
+                groups.set(group, fields);
+                return groups;
+              }, new Map<string, WardrobeField[]>()),
+            ).map(([group, fields]) => (
+              <div
+                className={styles.field}
+                key={group}
+                role="group"
+                aria-label={group}
+              >
                 <div className={styles.fieldText}>
-                  <span className={styles.fieldLabel}>{field.label}</span>
-                  {descriptionSource === "manual" ||
-                  editingKey === field.key ? (
-                    <input
-                      autoFocus={editingKey === field.key}
-                      value={field.value}
-                      maxLength={500}
-                      aria-label={field.label}
-                      placeholder={`Enter ${field.label.toLowerCase()}`}
-                      onChange={(event) =>
-                        onFieldChange(
-                          selected.id,
-                          field.key,
-                          event.target.value,
-                        )
-                      }
-                      onBlur={() => {
-                        if (descriptionSource !== "manual") setEditingKey(null);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") setEditingKey(null);
-                      }}
-                    />
-                  ) : (
-                    <strong>{field.value || "Unknown"}</strong>
-                  )}
+                  <span className={styles.fieldLabel}>{group}</span>
+                  {fields.map((field) => (
+                    <div key={field.key}>
+                      {fields.length > 1 && (
+                        <span className={styles.fieldLabel}>{field.label}</span>
+                      )}
+                      {descriptionSource === "manual" ||
+                      editingKey === field.key ? (
+                        <input
+                          autoFocus={editingKey === field.key}
+                          value={field.value}
+                          maxLength={500}
+                          aria-label={field.label}
+                          placeholder={`Enter ${field.label.toLowerCase()}`}
+                          onChange={(event) =>
+                            onFieldChange(
+                              selected.id,
+                              field.key,
+                              event.target.value,
+                            )
+                          }
+                          onBlur={() => {
+                            onFieldBlur?.(selected.id, field.key);
+                            if (descriptionSource !== "manual")
+                              setEditingKey(null);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") setEditingKey(null);
+                          }}
+                        />
+                      ) : (
+                        <strong>{field.value || "Unknown"}</strong>
+                      )}
+                      {field.value.trim() && field.source && (
+                        <Badge tone="neutral" className={styles.sourceBadge}>
+                          {field.source === "visual_inference"
+                            ? "AI"
+                            : field.source === "catalog"
+                              ? "Catalog"
+                              : field.source === "user"
+                                ? "You"
+                                : field.source === "sample"
+                                  ? "Sample"
+                                  : "Note"}
+                        </Badge>
+                      )}
+                      {descriptionSource !== "manual" &&
+                        field.editable !== false && (
+                          <button
+                            className={styles.editField}
+                            type="button"
+                            aria-label={`Edit ${field.label}`}
+                            onClick={() => setEditingKey(field.key)}
+                          >
+                            <Icon name="edit" size={16} />
+                          </button>
+                        )}
+                    </div>
+                  ))}
                 </div>
-                {field.value.trim() && field.source && (
-                  <Badge tone="neutral" className={styles.sourceBadge}>
-                    {field.source === "visual_inference"
-                      ? "AI"
-                      : field.source === "catalog"
-                        ? "Catalog"
-                        : field.source === "user"
-                          ? "You"
-                          : field.source === "sample"
-                            ? "Sample"
-                            : "Note"}
-                  </Badge>
-                )}
-                {descriptionSource !== "manual" && field.editable !== false && (
-                  <button
-                    className={styles.editField}
-                    type="button"
-                    aria-label={`Edit ${field.label}`}
-                    onClick={() => setEditingKey(field.key)}
-                  >
-                    <Icon name="edit" size={16} />
-                  </button>
-                )}
               </div>
             ))}
           </div>
