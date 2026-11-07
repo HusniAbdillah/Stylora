@@ -7,6 +7,7 @@ export type CapsuleTemplateId =
 
 export type CapsuleItem = {
   id: string;
+  revision?: number;
   name: string;
   category: "top" | "bottom" | "dress" | "outerwear" | "shoes" | "accessory";
   imageUrl?: string | null;
@@ -41,6 +42,13 @@ export type CapsuleOutfit = {
   inputsUsed?: string[];
   uncertainty?: string[];
   requiresAddition?: boolean;
+  differences?: string[];
+  proposedItems?: {
+    name: string;
+    category: CapsuleItem["category"];
+    description: string;
+  }[];
+  evidence?: { reason: string; evidenceItemIds: string[] }[];
 };
 
 export type CapsuleAddition = {
@@ -54,6 +62,7 @@ export type CapsuleAddition = {
 
 export type CapsuleResult = {
   id: string;
+  revision?: number;
   title: string;
   subtitle?: string;
   templateId?: CapsuleTemplateId | null;
@@ -61,6 +70,8 @@ export type CapsuleResult = {
   outfits: CapsuleOutfit[];
   additions: CapsuleAddition[];
   isDraft?: boolean;
+  pieceCount?: number;
+  outfitCount?: number;
 };
 
 export type CapsuleTemplate = {
