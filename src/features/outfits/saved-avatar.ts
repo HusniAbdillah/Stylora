@@ -3,6 +3,11 @@ import { z } from "zod";
 import { readDatabaseConfig } from "@/lib/config/server";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
 import {
+  IMAGE_MODEL,
+  FASHION_PROMPT_VERSION,
+  FASHION_SCHEMA_VERSION,
+} from "@/features/ai/openai";
+import {
   assertWorkflowRpc,
   readOperation,
   runOperation,
@@ -44,13 +49,33 @@ export async function runSavedAvatar(operationId: string) {
     .parse(snapshot.items);
   await assertWorkflowRpc("complete_saved_avatar");
   return runOperation(operation.id, {
-    execute: (claim) =>
-      renderAndStoreAvatar({
+    execute: async (claim) => {
+      const { data, error } = await context.client
+        .from("workflow_operations")
+        .update({
+          model: IMAGE_MODEL,
+          prompt_version: FASHION_PROMPT_VERSION,
+          schema_version: FASHION_SCHEMA_VERSION,
+        })
+        .eq("workspace_id", context.workspaceId)
+        .eq("id", claim.operationId)
+        .eq("attempt_count", claim.attemptCount)
+        .eq("status", "running")
+        .select("id")
+        .maybeSingle();
+      if (error || !data)
+        throw new OperationError(
+          "AVATAR_OPERATION_CHANGED",
+          "The image request changed. Reopen the saved look.",
+          409,
+        );
+      return renderAndStoreAvatar({
         items,
         preferences: snapshot.preference_snapshot,
         allowIllustrativeItems: true,
         signal: claim.signal,
-      }),
+      });
+    },
     async commit(claim, output) {
       try {
         const config = readDatabaseConfig();
@@ -72,6 +97,7 @@ export async function runSavedAvatar(operationId: string) {
               p_render_fingerprint: output.renderFingerprint,
             }),
             cache: "no-store",
+            redirect: "error",
             signal: AbortSignal.timeout(15000),
           },
         );

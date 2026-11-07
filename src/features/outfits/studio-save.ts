@@ -43,6 +43,7 @@ export async function saveStudioLook(input: z.input<typeof saveInput>) {
         p_title: request.title,
       }),
       cache: "no-store",
+      redirect: "error",
       signal: AbortSignal.timeout(15000),
     });
     if (!response.ok) {
