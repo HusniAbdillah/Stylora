@@ -163,60 +163,172 @@ export function draftPointer(key: string, value?: string | null) {
   return value;
 }
 
+type AttributeKey = keyof ItemValues["attributes"];
+
+const clothingFields: AttributeKey[] = [
+  "pattern",
+  "apparentMaterial",
+  "texture",
+  "silhouette",
+  "fit",
+  "length",
+];
+const categoryFields: Record<ItemValues["category"], AttributeKey[]> = {
+  top: [...clothingFields, "neckline", "collar", "sleeve"],
+  bottom: [...clothingFields, "rise", "waistband", "legShape"],
+  dress: [...clothingFields, "neckline", "sleeve", "waistDefinition"],
+  outerwear: [...clothingFields, "lapel", "closure", "hood"],
+  shoes: [
+    "shoeType",
+    "toeShape",
+    "heelType",
+    "heelHeightClass",
+    "soleType",
+    "upperAppearance",
+    "fasteningStyle",
+  ],
+  accessory: [
+    "accessoryType",
+    "apparentMaterial",
+    "shape",
+    "scale",
+    "placement",
+  ],
+};
+const accessoryFields: Array<{
+  matches: RegExp;
+  keys: AttributeKey[];
+}> = [
+  {
+    matches: /\b(bag|handbag|tote|clutch|backpack|satchel|purse)\b/i,
+    keys: [
+      "bagType",
+      "bagScale",
+      "apparentMaterial",
+      "structure",
+      "carryMode",
+      "strapType",
+      "handleType",
+      "closure",
+    ],
+  },
+  {
+    matches:
+      /\b(jewelry|jewellery|necklace|pendant|earring|earrings|ring|bracelet|bangle|watch|brooch)\b/i,
+    keys: [
+      "accessoryType",
+      "metalAppearance",
+      "stoneAppearance",
+      "shape",
+      "scale",
+      "motif",
+      "placement",
+    ],
+  },
+  {
+    matches:
+      /\b(hat|cap|headwear|head covering|scarf|scarves|hijab|shawl|wrap)\b/i,
+    keys: [
+      "accessoryType",
+      "shape",
+      "brim",
+      "wrapStyle",
+      "lengthClass",
+      "coverage",
+      "edgeFinish",
+    ],
+  },
+  {
+    matches: /\b(belt|hosiery|tie|necktie|socks|stockings|tights)\b/i,
+    keys: [
+      "accessoryType",
+      "widthClass",
+      "buckleShape",
+      "lengthClass",
+      "opacity",
+      "patternScale",
+    ],
+  },
+];
+
+function manualAttributeKeys(values: ItemValues): AttributeKey[] {
+  const accessoryName = [
+    values.subcategory,
+    values.attributes.accessoryType,
+    values.attributes.bagType,
+  ].join(" ");
+  const categoryKeys =
+    values.category === "accessory"
+      ? (accessoryFields.find(({ matches }) => matches.test(accessoryName))
+          ?.keys ?? categoryFields.accessory)
+      : categoryFields[values.category];
+  return ["primaryColor", "secondaryColors", ...categoryKeys, "occasion"];
+}
+
 export function intakeFields(
   values: ItemValues,
   provenance?: CanonicalWardrobeItem["provenance"],
   original?: ItemValues | null,
 ): WardrobeField[] {
-  const fields = itemFields({ ...values, provenance });
-  const groups = [
-    ["Colors", [["colors", "Colors (comma separated)"]]],
-    ["Pattern", [["pattern", "Pattern"]]],
-    [
-      "Fabric look",
-      [
-        ["apparentMaterial", "Apparent material"],
-        ["texture", "Texture"],
-      ],
-    ],
-    [
-      "Silhouette and fit",
-      [
-        ["silhouette", "Silhouette"],
-        ["fit", "Fit"],
-      ],
-    ],
-    ["Length", [["length", "Length"]]],
-    [
-      "Neckline and sleeve",
-      [
-        ["neckline", "Neckline"],
-        ["sleeve", "Sleeve"],
-      ],
-    ],
-    ["Occasion", [["occasion", "Occasion"]]],
-  ] as const;
   const originalFields = original ? itemFields(original) : [];
-  return groups.flatMap(([group, entries]) =>
-    entries.map(([key, label]) => {
-      const field = fields.find(
-        (candidate) => candidate.key === `attributes.${key}`,
-      );
-      const before = originalFields.find(
-        (candidate) => candidate.key === `attributes.${key}`,
-      );
+  const defaults =
+    !original ||
+    values.category !== original.category ||
+    values.subcategory !== original.subcategory
+      ? manualAttributeKeys(values)
+      : [];
+  const previousKeys = originalFields
+    .filter(
+      (field) => field.key.startsWith("attributes.") && field.value.trim(),
+    )
+    .map((field) => field.key.replace("attributes.", ""));
+  const fields = [
+    {
+      key: "subcategory",
+      label: "Subcategory",
+      value: values.subcategory ?? "",
+      source: provenance?.subcategory?.source,
+      editable: true,
+    },
+    ...itemFields({
+      ...values,
+      attributes: {
+        ...Object.fromEntries(
+          [...defaults, ...previousKeys].map((key) => [
+            key,
+            listKeys.has(key) ? [] : null,
+          ]),
+        ),
+        ...values.attributes,
+      },
+      provenance,
+    }),
+  ];
+  const defaultPaths = new Set(defaults.map((key) => `attributes.${key}`));
+  return fields
+    .filter(
+      (field) =>
+        field.key === "subcategory" ||
+        field.key === "description" ||
+        defaultPaths.has(field.key) ||
+        field.value.trim() ||
+        originalFields.some(
+          (previous) => previous.key === field.key && previous.value.trim(),
+        ),
+    )
+    .map((field) => {
+      const before =
+        field.key === "subcategory"
+          ? (original?.subcategory ?? "")
+          : originalFields.find((previous) => previous.key === field.key)
+              ?.value;
       return {
         ...field,
-        key: `attributes.${key}`,
-        label,
-        group,
-        value: field?.value ?? "",
-        editable: true,
+        group: field.label,
         source:
-          field?.value.trim() && (!original || field.value !== before?.value)
+          field.value.trim() && (!original || field.value !== before)
             ? ("user" as const)
-            : field?.source,
+            : field.source,
       };
-    }),
-  );
+    });
 }
