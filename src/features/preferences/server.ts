@@ -36,7 +36,7 @@ function toPreferences(row: unknown) {
   };
 }
 
-export async function getPreferences() {
+async function readPreferenceRow() {
   const { client, workspaceId } = getWorkspaceDatabase();
   const { data, error } = await client
     .from("user_preferences")
@@ -56,7 +56,11 @@ export async function getPreferences() {
       "Workspace preferences are unavailable.",
       404,
     );
-  return toPreferences(data);
+  return data;
+}
+
+export async function getPreferences() {
+  return toPreferences(await readPreferenceRow());
 }
 
 export async function savePreferences(input: unknown) {
@@ -90,6 +94,15 @@ export async function savePreferences(input: unknown) {
 }
 
 export async function getPersonalizationSnapshot() {
-  const current = await getPreferences();
-  return { ...current, preferences: normalizePreferences(current.preferences) };
+  const row = await readPreferenceRow();
+  const current = toPreferences(row);
+  return {
+    ...current,
+    preferences: normalizePreferences(current.preferences),
+    preferenceData: {
+      styleDna: row.style_dna,
+      fitPreferences: row.fit_preferences,
+      bodyProfile: row.body_profile,
+    },
+  };
 }
