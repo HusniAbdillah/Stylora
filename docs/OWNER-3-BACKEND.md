@@ -58,3 +58,24 @@ Reviewed desktop canvas `250:395` and high-fidelity contexts/screenshots for
 
 Design images are illustrative references. No Figma mock asset is substituted
 for a runtime wardrobe image, provider result or generated overview.
+
+## Integration boundaries
+
+`prefetchLookProducts(lookId)` is an awaited server export for Owner 2 after
+options commit. The pool bounds concurrent calls within a process; distributed
+quotas and the shared operation runner remain Owner 2/4 integration. No detached
+promise or browser timer is presented as durable execution.
+
+Product import uses the actual wardrobe schema through an isolated Owner 3
+adapter until Owner 1 exports its wardrobe writer. It preserves saved-candidate
+ownership and pending retry state. No LLM or image model is called here.
+
+The failed-media retry command preserves the same operation identity and attempt
+budget. Generating a new image after success is a separate Owner 4 regeneration
+contract. Preview/capsule navigation uses the saved ID and item references; this
+backend does not impersonate those features.
+
+Public link tokens are returned only at creation and cannot be recovered from
+their hashes. Owner lists show metadata only. A link created without approved
+overview media does not silently publish a later generated image; review and
+create a new publication when the image is ready.
