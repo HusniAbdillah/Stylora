@@ -10,6 +10,7 @@ import type { Database } from "@/types/database";
 import {
   createShareSchema,
   imageIndexSchema,
+  isShareActive,
   listSharesSchema,
   projectPublicSnapshot,
   publicSnapshotSchema,
@@ -41,9 +42,9 @@ function metadata(share: Share) {
     revokedAt: share.revoked_at,
     status: share.revoked_at
       ? "revoked"
-      : Date.parse(share.expires_at) <= Date.now()
-        ? "expired"
-        : "active",
+      : isShareActive(share.expires_at, share.revoked_at)
+        ? "active"
+        : "expired",
     approvedMediaCount: share.approved_media_ids.length,
     publicSnapshot: publicSnapshotSchema.parse(share.public_snapshot),
   };
@@ -80,7 +81,7 @@ async function activeShare(context: WorkspaceDatabase, token: string) {
     .eq("workspace_id", context.workspaceId)
     .eq("token_hash", hashToken(token))
     .is("revoked_at", null)
-    .gt("expires_at", new Date().toISOString())
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
     .maybeSingle();
   if (error)
     throw new ApiError(
@@ -92,8 +93,7 @@ async function activeShare(context: WorkspaceDatabase, token: string) {
   if (
     !data ||
     data.workspace_id !== context.workspaceId ||
-    data.revoked_at ||
-    !(Date.parse(data.expires_at) > Date.now())
+    !isShareActive(data.expires_at, data.revoked_at)
   )
     throw unavailable();
   return data;
@@ -224,9 +224,7 @@ export async function createShare(savedLookId: string, input: unknown) {
       public_snapshot: snapshot,
       approved_media_ids: body.approvedMediaIds,
       created_at: now.toISOString(),
-      expires_at: new Date(
-        now.getTime() + body.expiresInHours * 3600000,
-      ).toISOString(),
+      expires_at: null,
     })
     .select(shareFields)
     .single();
