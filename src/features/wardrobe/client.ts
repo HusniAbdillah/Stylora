@@ -2,6 +2,10 @@
 import type { ItemValues, CanonicalWardrobeItem } from "./schema";
 import type { publicDraft } from "./server";
 import type { WardrobeField } from "./wardrobe-types";
+import type { MarketplaceMetadata } from "./catalog";
+export type WardrobeDisplayItem = CanonicalWardrobeItem & {
+  marketplace?: MarketplaceMetadata | null;
+};
 export type WardrobeDraft = ReturnType<typeof publicDraft>;
 export class WardrobeRequestError extends Error {
   constructor(
@@ -149,7 +153,7 @@ export function changeField(
     },
   };
 }
-export function displayWardrobeItem(item: CanonicalWardrobeItem) {
+export function displayWardrobeItem(item: WardrobeDisplayItem) {
   return {
     ...item,
     fields: itemFields(item),

@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { marketplaceMetadata, type MarketplaceMetadata } from "./catalog";
 import { ApiError } from "@/lib/api";
 import {
   getWorkspaceDatabase,
@@ -89,6 +90,9 @@ export async function readWardrobeRow(id: string) {
 export async function getWardrobeItem(id: string) {
   const item = toCanonicalWardrobeItem(await readWardrobeRow(id));
   const { client, workspaceId } = getWorkspaceDatabase();
+  const catalog = await readMarketplaceMetadata(
+    item.sourceProductId ? [item.sourceProductId] : [],
+  );
   const { data, count, error } = await client
     .from("saved_look_snapshots")
     .select("id,title", { count: "exact" })
@@ -102,6 +106,9 @@ export async function getWardrobeItem(id: string) {
   if (error) wardrobeDatabaseError(error);
   return {
     ...item,
+    marketplace: item.sourceProductId
+      ? (catalog.get(item.sourceProductId) ?? null)
+      : null,
     savedLookCount: count ?? 0,
     usedIn: data.map((saved) => ({
       id: saved.id,
@@ -113,6 +120,23 @@ export async function getWardrobeItem(id: string) {
 export type WardrobeItemDetailRecord = Awaited<
   ReturnType<typeof getWardrobeItem>
 >;
+
+async function readMarketplaceMetadata(ids: string[]) {
+  const catalog = new Map<string, MarketplaceMetadata>();
+  if (!ids.length) return catalog;
+  const { client, workspaceId } = getWorkspaceDatabase();
+  const { data, error } = await client
+    .from("products")
+    .select(
+      "id,source_label,price_minor,currency,rating,review_count,product_url,retrieved_at",
+    )
+    .eq("workspace_id", workspaceId)
+    .in("id", [...new Set(ids)]);
+  if (error) wardrobeDatabaseError(error);
+  for (const product of data)
+    catalog.set(product.id, marketplaceMetadata(product));
+  return catalog;
+}
 
 export async function listWardrobeItems(input: unknown = {}) {
   const filter = listQuerySchema.parse(input);
@@ -131,7 +155,19 @@ export async function listWardrobeItems(input: unknown = {}) {
   for (let offset = 0; ; offset += 500) {
     const { data, error } = await query.range(offset, offset + 499);
     if (error) wardrobeDatabaseError(error);
-    items.push(...data.map(toCanonicalWardrobeItem));
+    const catalog = await readMarketplaceMetadata(
+      data.flatMap((row) =>
+        row.source_product_id ? [row.source_product_id] : [],
+      ),
+    );
+    items.push(
+      ...data.map((row) => ({
+        ...toCanonicalWardrobeItem(row),
+        marketplace: row.source_product_id
+          ? (catalog.get(row.source_product_id) ?? null)
+          : null,
+      })),
+    );
     if (data.length < 500) break;
   }
   const q = filter.q.toLocaleLowerCase();

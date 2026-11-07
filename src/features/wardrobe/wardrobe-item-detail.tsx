@@ -16,6 +16,7 @@ import {
   wardrobeCategoryLabel,
 } from "./wardrobe-types";
 import styles from "./wardrobe-detail.module.css";
+import { marketplacePrice, marketplaceLinkLabel } from "./catalog";
 
 export type WardrobeItemDetailData = WardrobeItemSummary & {
   fields: WardrobeField[];
@@ -245,7 +246,7 @@ export function WardrobeItemDetail({
                 )}
               </div>
             ))}
-            {item.priceWhenSaved && (
+            {item.priceWhenSaved && !item.marketplace && (
               <div className={styles.attribute}>
                 <span className={styles.fieldLabel}>
                   Price when saved <span>Catalog</span>
@@ -253,7 +254,7 @@ export function WardrobeItemDetail({
                 <span className={styles.fieldValue}>{item.priceWhenSaved}</span>
               </div>
             )}
-            {item.sourceName && (
+            {item.sourceName && !item.marketplace && (
               <div className={styles.attribute}>
                 <span className={styles.fieldLabel}>
                   Source <span>Catalog</span>
@@ -262,6 +263,55 @@ export function WardrobeItemDetail({
               </div>
             )}
           </div>
+          {item.marketplace && (
+            <section
+              className="mt-5 rounded-xl border border-stone p-4"
+              aria-label="Marketplace details"
+            >
+              <h2 className="text-sm font-medium">Marketplace details</h2>
+              <dl className="mt-3 grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <dt className="text-xs text-secondary">Listed price</dt>
+                  <dd className="mt-1">{marketplacePrice(item.marketplace)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-secondary">Rating</dt>
+                  <dd className="mt-1">
+                    {item.marketplace.rating === null
+                      ? "Rating unavailable"
+                      : `${item.marketplace.rating}/5`}
+                    {item.marketplace.reviewCount !== null &&
+                      ` (${item.marketplace.reviewCount} reviews)`}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-secondary">Source</dt>
+                  <dd className="mt-1">{item.marketplace.sourceName}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-secondary">Marketplace link</dt>
+                  <dd className="mt-1">
+                    {item.marketplace.url ? (
+                      <a
+                        href={item.marketplace.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-11 items-center text-crimson underline"
+                      >
+                        {marketplaceLinkLabel(item.marketplace)}
+                      </a>
+                    ) : (
+                      "Link unavailable"
+                    )}
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-xs text-secondary">
+                Catalog prices and ratings may change. Confirm them at the
+                source.
+              </p>
+            </section>
+          )}
           {item.usedIn && item.usedIn.length > 0 && (
             <div className={styles.usedIn}>
               <h2>Used in</h2>

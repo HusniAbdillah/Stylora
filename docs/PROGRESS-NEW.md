@@ -1256,3 +1256,29 @@ which data, code revision or provider behavior was verified.
 - Local `corepack pnpm typecheck` and `corepack pnpm lint` passed after the final
   Manage revision. CI is the complete build gate. No provider calls,
   database writes, migrations, environment or dependency changes were needed.
+
+## Wardrobe marketplace details and saved-image kickoff, 7 November 2026
+
+- Branch `codex/marketplace-details-saved-images`, based on main `0b6c057`.
+  Product-linked Wardrobe items now expose validated catalog price, currency,
+  rating, review count, source and destination in collection and detail reads.
+  Product lookups are batched and workspace scoped. Edits and mark-owned retain
+  the read-only catalog metadata; garment edit payloads remain unchanged.
+- Candidate cards show price and rating. Item details show catalog facts and
+  a source link, labeling Google catalog destinations accurately. Missing values
+  stay unavailable; HTTPS credentials and unsafe schemes are not rendered as
+  links. Catalog values are separate from inferred garment attributes.
+- Saving from Create immediately starts its persisted saved-avatar operation.
+  Collection recovery resumes two distinct pending operations at a time, using
+  the existing request deduplication and server operation fences. Preview image
+  reuse and failed-image retry behavior are unchanged.
+- Hosted reads found the live Create saved image already succeeded. Eight new
+  seed/sample compositions have no media job; this change does not silently
+  create image jobs or spend provider quota for those historical samples.
+- Eleven focused catalog/media tests passed. A temporary read-only hosted check
+  verified collection and detail metadata agree with the existing product's
+  stored price, rating, source and URL. The temporary harness was removed.
+  No model calls, database writes, migrations or env changes were used.
+- Local typecheck/lint and Storybook startup are pending. The initial browser
+  attempt received connection refused; no visual success is claimed yet. CI is
+  the complete build gate.

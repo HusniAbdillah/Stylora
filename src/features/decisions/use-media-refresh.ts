@@ -7,15 +7,22 @@ import { startOperationRequest } from "@/features/operations/client";
 export function useSavedMediaRefresh(
   pending: boolean,
   paused: boolean,
-  operationId?: string | null,
+  operationIds?: string | null | readonly string[],
 ) {
   const router = useRouter();
   const reads = useRef(0);
   const [stopped, setStopped] = useState(false);
+  const operationKey = (
+    typeof operationIds === "string" ? [operationIds] : (operationIds ?? [])
+  ).join("|");
   useEffect(() => {
-    if (!pending || paused || !operationId) return;
+    if (!pending || paused || !operationKey) return;
     let mounted = true;
-    startOperationRequest(operationId, `/api/avatars/${operationId}`)
+    Promise.allSettled(
+      operationKey
+        .split("|")
+        .map((id) => startOperationRequest(id, `/api/avatars/${id}`)),
+    )
       .finally(() => {
         if (mounted) router.refresh();
       })
@@ -25,7 +32,7 @@ export function useSavedMediaRefresh(
     return () => {
       mounted = false;
     };
-  }, [pending, paused, operationId, router]);
+  }, [pending, paused, operationKey, router]);
   useEffect(() => {
     if (!pending || paused || stopped) return;
     let timer: ReturnType<typeof setTimeout>;
