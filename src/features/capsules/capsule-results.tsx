@@ -129,7 +129,6 @@ export function CapsuleCollection({
     <section>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-medium text-crimson">Capsule Studio</p>
           <h1 className="mt-2 font-serif text-4xl md:text-5xl">
             Small sets, <em className="text-crimson">many outfits.</em>
           </h1>

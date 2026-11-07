@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { WorkspaceShell } from "@/components/shell";
 import { Button, StateNotice } from "@/components/ui";
 import { CapsuleCollection } from "./capsule-results";
 import type { CapsuleResult } from "./capsule-types";
@@ -31,12 +30,7 @@ export function CapsuleCollectionScreen({
       );
   }
   return (
-    <WorkspaceShell
-      activeHref="/capsules"
-      displayName="Studio guest"
-      activity={[]}
-      breadcrumbs={[{ label: "Capsules" }]}
-    >
+    <>
       {message && (
         <StateNotice title="Collection status">{message}</StateNotice>
       )}
@@ -71,6 +65,6 @@ export function CapsuleCollectionScreen({
           </StateNotice>
         </div>
       )}
-    </WorkspaceShell>
+    </>
   );
 }

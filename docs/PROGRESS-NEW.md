@@ -1,5 +1,39 @@
 # Stylora shared progress reporting
 
+## Owner 1 wardrobe visibility and navigation: 7 November 2026
+
+- User-authorized UI and navigation repair; branch `o1/navigation-wardrobe`
+  from `9387d79`. Scope covers the shared shell and thin routes plus the
+  Wardrobe and Capsule collection headings. Lane B; human merge required.
+- Read-only hosted diagnosis using the root local environment: workspace `demo`
+  initially had zero wardrobe rows, including owned, candidate, archived and
+  sample queries. A later read found 45 active owned sample rows. A guarded
+  `node --env-file=.env.local scripts/seed-wardrobe.mjs --dry-run
+  --expected-workspace demo` validated 45 images and preserved all 45 existing
+  rows. No seed apply, provider call or hosted mutation was performed here;
+  the concurrent data change is not attributed to this task.
+- Removed redundant collection eyebrow labels supplied in the user's
+  screenshots. Retained the page title, supporting copy and navigation context.
+  Compared the existing tokens and D07 frame `265:1061` in Figma; removing the
+  repeated label is the user's requested adjustment to that reference.
+- Moved Capsules, Preview, Saved looks and outfit detail routes into the common
+  workspace route group without changing URLs. Removed their page-owned shells
+  and duplicate saved collection layout. Draft feedback remains in capsule and
+  preview content. Shell state, profile, activity and Create recovery now share
+  one layout across workspace navigation.
+- Sidebar links retain automatic partial prefetch and request full prefetch
+  on hover or keyboard focus. Pending feedback reserves its space. Wardrobe
+  has a manual refresh action and renders one error message per current view.
+- Windows, Node.js 22.23.3, pnpm 10.26.2: frozen install passed. Focused
+  `pnpm exec vitest run src/components/shell/navigation.test.tsx
+  src/features/wardrobe/client.test.ts` passed 3 tests across 2 files. Editor
+  diagnostics reported no errors in navigation, wardrobe collection and capsule
+  draft components. Final lint, typecheck and runtime evidence follow.
+- Runtime uses an isolated dev server at `http://127.0.0.1:3027`; root env values
+  are passed through process environment without copying credential files into
+  the worktree. No production deployment or provider-backed feature execution.
+
+
 ## Owner 1 deployment quota policy: 7 November 2026
 
 - Task: user-authorized shared deployment configuration, branch

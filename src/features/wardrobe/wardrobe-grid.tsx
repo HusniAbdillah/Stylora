@@ -62,7 +62,6 @@ export function WardrobeGrid({
     <section className={styles.wardrobe} aria-labelledby="wardrobe-title">
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Your wardrobe</p>
           <h1 className={styles.title} id="wardrobe-title">
             Everything you <em>own.</em>
           </h1>
