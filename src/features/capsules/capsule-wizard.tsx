@@ -121,7 +121,7 @@ function StepHeading({
 }) {
   const titles = [
     <>
-      Start from a <em className="text-crimson">template.</em>
+      Start from a <em className="block text-crimson sm:inline">template.</em>
     </>,
     <>
       Where is this <em className="text-crimson">capsule going?</em>
@@ -761,6 +761,7 @@ export function CapsuleWizard({
         </Button>
         <Button
           variant="primary"
+          className="lg:hidden"
           disabled={!canContinue || busy}
           onClick={nextStep}
         >
