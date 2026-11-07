@@ -103,6 +103,74 @@ describe("outfit composition boundaries", () => {
       ),
     ).toContain("duplicate_composition");
   });
+  it("allows archived owned slots in combined mode and keeps legacy exclusion", () => {
+    const archived = inventory.map((item) => ({
+      ...item,
+      archivedAt: "2026-11-07T00:00:00Z",
+    }));
+    expect(
+      validateOptionComposition([outfit()], [], archived, "from_wardrobe", {
+        preferences: {},
+        occasion: null,
+        inventoryMode: "combined",
+      }),
+    ).toEqual([]);
+    expect(
+      validateOptionComposition([outfit()], [], archived, "from_wardrobe"),
+    ).toContain("invalid_owned_reference");
+    expect(
+      validateOptionComposition(
+        [{ ...outfit(), status: "unavailable", items: [] }],
+        [],
+        archived,
+        "from_wardrobe",
+        {
+          preferences: {},
+          occasion: null,
+          inventoryMode: "combined",
+        },
+      ),
+    ).toContain("wardrobe_direction_incorrectly_unavailable");
+  });
+
+  it("never accepts a saved candidate in an owned slot in any combined direction", () => {
+    const candidates = inventory.map((item) => ({
+      ...item,
+      inventoryStatus: "saved_candidate",
+    }));
+    for (const optionType of [
+      "closest",
+      "from_wardrobe",
+      "fresh_alternative",
+    ] as const) {
+      expect(
+        validateOptionComposition(
+          [{ ...outfit(), optionType }],
+          [],
+          candidates,
+          optionType,
+          {
+            preferences: {},
+            occasion: null,
+            inventoryMode: "combined",
+          },
+        ),
+      ).toContain("invalid_owned_reference");
+    }
+    expect(
+      validateOptionComposition(
+        [{ ...outfit(), status: "unavailable", items: [] }],
+        [],
+        candidates,
+        "from_wardrobe",
+        {
+          preferences: {},
+          occasion: null,
+          inventoryMode: "combined",
+        },
+      ),
+    ).toEqual([]);
+  });
   it("rejects incomplete clothing coverage and missing slots in the owned direction", () => {
     const incomplete = outfit();
     incomplete.items.pop();

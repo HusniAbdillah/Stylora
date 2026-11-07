@@ -3,7 +3,7 @@ import type { Database } from "@/types/database";
 
 vi.mock("server-only", () => ({}));
 
-import { toCanonicalPiece } from "./server";
+import { assertSingleProvisionalSource, parseProvisionalAdoption, toCanonicalPiece } from "./server";
 
 const row: Database["public"]["Tables"]["inspiration_pieces"]["Row"] = {
   id: "9f07a623-e31c-48e0-9ebe-a0af5414fccb",
@@ -47,6 +47,39 @@ const row: Database["public"]["Tables"]["inspiration_pieces"]["Row"] = {
 };
 
 describe("inspiration persistence adapter", () => {
+  it("rejects adopting pieces from different analysis operations in one batch", () => {
+    const first = "29b19ded-f307-4f53-bdc8-cbfaab1b3fc7";
+    const second = "77de3f09-9ded-49c1-97ca-d4096b8b0ca5";
+    expect(() => assertSingleProvisionalSource([{ operationId: first }, { operationId: first }])).not.toThrow();
+    expect(() => assertSingleProvisionalSource([{ operationId: first }, { operationId: second }]))
+      .toThrow(expect.objectContaining({ code: "provisional_analysis_conflict", status: 409 }));
+  });
+  it("adopts only complete evidence from the current workspace, source, look and failed operation", () => {
+    const operationId = "29b19ded-f307-4f53-bdc8-cbfaab1b3fc7";
+    const assetId = "04a3581d-21e8-48e0-a217-7bdc39b92087";
+    const evidence = { source: "visual_inference", state: "observed", confidence: 0.8,
+      evidence: "Visible loose fabric through the torso.", uncertainty: null };
+    const piece = { id: row.id, name: "Shirt", category: "top", subcategory: null,
+      description: "A loose shirt.", attributes: { fit: "relaxed" },
+      observations: ["name", "category", "description", "attributes.fit"].map((path) => ({ path, ...evidence })),
+      confidence: 0.8, uncertainty: [] };
+    const operation = { id: operationId, workspace_id: row.workspace_id,
+      kind: "inspiration_description", subject_type: "look", subject_id: row.look_id,
+      status: "failed", input_revision: 2, model: "test-model",
+      input: { lookId: row.look_id, lookRevision: 2, assetId } };
+    const event = { workspace_id: row.workspace_id, operation_id: operationId,
+      source_revision: 2, event_type: "piece_completed", payload: { piece } };
+    const input = { workspaceId: row.workspace_id, lookId: row.look_id, revision: 2,
+      assetId, operation, event };
+    expect(parseProvisionalAdoption(input).provenance["attributes.fit"]).toMatchObject({
+      source: "visual_inference", assetId, model: "test-model", evidence: evidence.evidence });
+    expect(() => parseProvisionalAdoption({ ...input, workspaceId: row.look_id })).toThrow();
+    expect(() => parseProvisionalAdoption({ ...input, revision: 3 })).toThrow();
+    expect(() => parseProvisionalAdoption({ ...input, operation: { ...operation, subject_id: row.id } })).toThrow();
+    expect(() => parseProvisionalAdoption({ ...input, operation: { ...operation, status: "running" } })).toThrow();
+    expect(() => parseProvisionalAdoption({ ...input, event: { ...event,
+      payload: { piece: { ...piece, observations: [] } } } })).toThrow();
+  });
   it("keeps the corrected effective value and original visual evidence distinct", () => {
     const piece = toCanonicalPiece(row, "04a3581d-21e8-48e0-a217-7bdc39b92087");
     expect(piece.attributes.primaryColor).toBe("navy");

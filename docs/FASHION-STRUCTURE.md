@@ -64,24 +64,24 @@ mapping and examples above are product design decisions.
 
 ## 3. Canonical item envelope
 
-| Field             | Type and meaning                                                                | Authority                                      |
-| ----------------- | ------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `schemaVersion`   | Literal `fashion-item.v1`                                                       | Server                                         |
-| `id`              | UUID for persisted records; temporary UI IDs never sent as owned IDs            | Server                                         |
-| `name`            | Human-readable concise item name, 1–160 characters                              | User or validated AI                           |
-| `category`        | Six-value enum above                                                            | Reviewed classification                        |
-| `subcategory`     | Specific garment type, nullable, up to 120 characters                           | Visible evidence or user                       |
-| `description`     | Short design summary, up to 600 characters; no recommendation claims            | Derived from effective attributes              |
-| `attributes`      | Flat, versioned dictionary in sections 4–6                                      | Validated effective values                     |
-| `provenance`      | Per-field records, section 7                                                    | Server and provider                            |
-| `corrections`     | Field changes with previous and corrected values                                | Explicit user edit                             |
-| `confidence`      | Nullable number from 0 to 1; overall visual uncertainty, not a fit probability  | Provider with source                           |
-| `uncertainty`     | Short limitations list                                                          | Provider or server                             |
-| `sourceType`      | `live`, `manual`, or `sample`                                                   | Server                                         |
-| `assetId`         | Nullable private asset reference                                                | Server                                         |
-| `sourceReference` | Typed internal reference to wardrobe, detected piece, product, or missing brief | Server                                         |
+| Field             | Type and meaning                                                                | Authority                                         |
+| ----------------- | ------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `schemaVersion`   | Literal `fashion-item.v1`                                                       | Server                                            |
+| `id`              | UUID for persisted records; temporary UI IDs never sent as owned IDs            | Server                                            |
+| `name`            | Human-readable concise item name, 1–160 characters                              | User or validated AI                              |
+| `category`        | Six-value enum above                                                            | Reviewed classification                           |
+| `subcategory`     | Specific garment type, nullable, up to 120 characters                           | Visible evidence or user                          |
+| `description`     | Short design summary, up to 600 characters; no recommendation claims            | Derived from effective attributes                 |
+| `attributes`      | Flat, versioned dictionary in sections 4–6                                      | Validated effective values                        |
+| `provenance`      | Per-field records, section 7                                                    | Server and provider                               |
+| `corrections`     | Field changes with previous and corrected values                                | Explicit user edit                                |
+| `confidence`      | Nullable number from 0 to 1; overall visual uncertainty, not a fit probability  | Provider with source                              |
+| `uncertainty`     | Short limitations list                                                          | Provider or server                                |
+| `sourceType`      | `live`, `manual`, or `sample`                                                   | Server                                            |
+| `assetId`         | Nullable private asset reference                                                | Server                                            |
+| `sourceReference` | Typed internal reference to wardrobe, detected piece, product, or missing brief | Server                                            |
 | `inventoryStatus` | `owned`, `saved_candidate`, or `not_applicable`                                 | Explicit user action; part of the baseline schema |
-| `revision`        | Positive integer for persisted editable state                                   | Server                                         |
+| `revision`        | Positive integer for persisted editable state                                   | Server                                            |
 
 `workspace_id`, database audit timestamps, asset paths, provider IDs, price
 records, and ownership constraints remain persistence metadata. Do not ask the
@@ -220,6 +220,10 @@ exclude this profile context.
 Match outcomes remain `owned_match`, `wardrobe_alternative`, and `missing`. They
 describe reference-to-inventory relationships, not purchase status. A saved
 marketplace candidate is never eligible as owned inventory.
+Combined Create comparison may assess sample, archived and saved-candidate rows
+when the adapter explicitly supplies them. Archived owned rows remain owned;
+saved candidates can only be alternatives or missing-item references. These
+comparison rules do not change eligibility for capsules, previews or saved looks.
 
 Before scoring, require compatible category role, functional family, occasion
 constraints, coverage, and garment construction where these are known. Reject a
@@ -236,15 +240,15 @@ explains or compares only eligible candidates using
 
 ## 10. Storage and compatibility mapping
 
-| Domain           | Persisted contract                                                                                  | Mapping requirement                                                                                                          |
-| ---------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Detection        | `inspiration_pieces.name/category/attributes/provenance/corrections/confidence`                     | Canonical fields in JSON; envelope metadata through parent look and asset.                                                   |
-| Wardrobe         | `wardrobe_items.name/category/color/subcategory/attributes/provenance/corrections/inventory_status` | `color` projects the effective primary color; preserve separate inference and corrections.                                   |
+| Domain           | Persisted contract                                                                                  | Mapping requirement                                                                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Detection        | `inspiration_pieces.name/category/attributes/provenance/corrections/confidence`                     | Canonical fields in JSON; envelope metadata through parent look and asset.                                                                   |
+| Wardrobe         | `wardrobe_items.name/category/color/subcategory/attributes/provenance/corrections/inventory_status` | `color` projects the effective primary color; preserve separate inference and corrections.                                                   |
 | Products         | `products` plus provider metadata and offer fields                                                  | Normalize catalog facts to canonical attributes; add a structured-description field to the baseline schema if columns cannot represent them. |
-| Options          | `outfit_option_items` references owned, product, or missing                                         | A structured missing item brief uses the same shape without fabricated ID or ownership.                                      |
-| Capsules         | `capsule_items`, `capsule_outfit_items`, missing additions                                          | Text and IDs only for generation; missing additions use the structured missing-item shape, never a name-only description.                                 |
-| Previews         | Resolved item references and operation input snapshot                                               | Canonical attributes plus authorized image references and selected profile.                                                  |
-| Saved and shared | Immutable saved snapshot; minimal public projection                                                 | Persist canonical snapshot internally; disclose only approved display fields and approved media.                             |
+| Options          | `outfit_option_items` references owned, product, or missing                                         | A structured missing item brief uses the same shape without fabricated ID or ownership.                                                      |
+| Capsules         | `capsule_items`, `capsule_outfit_items`, missing additions                                          | Text and IDs only for generation; missing additions use the structured missing-item shape, never a name-only description.                    |
+| Previews         | Resolved item references and operation input snapshot                                               | Canonical attributes plus authorized image references and selected profile.                                                                  |
+| Saved and shared | Immutable saved snapshot; minimal public projection                                                 | Persist canonical snapshot internally; disclose only approved display fields and approved media.                                             |
 
 Attribute JSON is validated with strict field-level schemas and an 8 KB limit
 per item. Unknown values are omitted from stored attributes while their

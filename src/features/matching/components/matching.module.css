@@ -75,11 +75,27 @@
   width: 64px;
   height: 64px;
   color: var(--color-missing);
+  border: 1px solid var(--color-rose-wash);
+}
+.missing .matchContent {
+  border-radius: 14px;
+  background: var(--color-blush);
+  padding: 14px;
+}
+.missingExplanation {
+  margin-top: 10px;
+  color: var(--color-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+.missingVisualLabel {
+  display: none;
+  padding-inline: 8px;
+  line-height: 16px;
 }
 .matchContent {
   min-width: 0;
 }
-.candidateRows,
 .whyThis,
 .shoppingStatus {
   grid-column: 1 / -1;
@@ -123,6 +139,9 @@
   .mobileFooter {
     display: none;
   }
+  .missingVisualLabel {
+    display: block;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -134,7 +153,9 @@
   .inspiration {
     display: block;
     min-width: 0;
-    grid-row: 1 / span 3;
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
   }
   .matchArrow {
     display: flex;
@@ -145,19 +166,23 @@
     border-radius: 50%;
     background: var(--color-porcelain);
     color: var(--color-secondary);
-    grid-row: 1 / span 3;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
   }
   .thumbnail,
   .missing .thumbnail {
     width: 132px;
     height: 132px;
-    grid-row: 1 / span 3;
+    grid-column: 3;
+    grid-row: 1;
+    align-self: start;
     border-radius: 14px;
   }
   .matchContent {
     grid-column: 4;
+    grid-row: 1;
   }
-  .candidateRows,
   .whyThis,
   .shoppingStatus {
     grid-column: 4;

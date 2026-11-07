@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, Chip, ConfirmDialog, Icon, Stepper } from "@/components/ui";
+import { Button, ConfirmDialog, Icon, Stepper } from "@/components/ui";
 import {
   InspirationUpload,
   ReviewPieces,
@@ -56,11 +56,13 @@ export function CreatePage({
   lookId,
   optionId,
   step = "upload",
+  samplePhoto = false,
 }: {
   draftId?: string;
   lookId?: string;
   optionId?: string;
   step?: CreateStep;
+  samplePhoto?: boolean;
 }) {
   const { scopeKey, writesEnabled } = useCreateWorkspace();
   const { session, state } = useCreateSession(scopeKey);
@@ -88,13 +90,6 @@ export function CreatePage({
   const confidence = session.currentOperation("inspiration_confidence");
   const matching = session.currentOperation("wardrobe_match");
   const options = session.currentOperation("outfit_options");
-  const inventoryLocked =
-    Boolean(look?.matches.length || look?.outfitOptions.length) ||
-    state.operations.some((operation) =>
-      ["wardrobe_match", "outfit_options", "option_regeneration"].includes(
-        operation.kind,
-      ),
-    );
   const completeDescription =
     Boolean(look?.pieces.length) && !isActive(description);
   const matchesReady =
@@ -161,9 +156,31 @@ export function CreatePage({
   };
 
   useEffect(() => {
+    let mounted = true;
     session.writesEnabled = writesEnabled;
-    void session.hydrate(draftId, lookId).then(() => session.refresh());
-  }, [session, draftId, lookId, writesEnabled]);
+    if (samplePhoto) {
+      if (writesEnabled)
+        void session
+          .prepareSample()
+          .then((id) => {
+            if (mounted) router.replace(`/create?draft=${id}`);
+          })
+          .catch((error) => {
+            if (
+              mounted &&
+              !(error instanceof Error && error.name === "AbortError")
+            )
+              session.report(error);
+          });
+      else void session.hydrate(draftId, lookId);
+    } else {
+      session.finishSamplePreparation();
+      void session.hydrate(draftId, lookId).then(() => session.refresh());
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [session, draftId, lookId, writesEnabled, samplePhoto, router]);
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState === "visible") void session.refresh();
@@ -184,6 +201,7 @@ export function CreatePage({
       !state.draft ||
       !state.preferenceFingerprint ||
       state.contextSaving ||
+      !look.occasion?.trim() ||
       look.sourceType === "sample"
     )
       return;
@@ -298,7 +316,11 @@ export function CreatePage({
   }
   function retryTask(kind: string) {
     const operation = session.currentOperation(kind);
-    if (operation?.status === "failed") void session.retry(operation);
+    if (
+      operation &&
+      ["failed", "cancelled", "superseded"].includes(operation.status)
+    )
+      void session.retry(operation);
     else void session.start(kind, true);
   }
   async function saveEditor(values: PieceEditValues) {
@@ -308,14 +330,31 @@ export function CreatePage({
     const source = editor
       ? current.pieces.find((piece) => piece.id === editor.id)
       : undefined;
-    const edited = canonicalEdit(source, values);
+    const provisional = editor
+      ? state.provisional.find((piece) => piece.id === editor.id)
+      : undefined;
+    const editedWithId = canonicalEdit(source ?? provisional, values);
+    const { id: provisionalId, ...adopted } = editedWithId;
+    const edited = source ? editedWithId : adopted;
+    void provisionalId;
     try {
       await session.savePieces(
         source
           ? current.pieces.map((piece) =>
               piece.id === source.id ? edited : piece,
             )
-          : [...current.pieces, edited],
+          : provisional
+            ? [
+                ...current.pieces,
+                ...state.provisional.map((piece) => {
+                  const { id, ...garment } = piece;
+                  return {
+                    ...(id === provisional.id ? edited : garment),
+                    adoptedFromPieceId: id,
+                  };
+                }),
+              ]
+            : [...current.pieces, edited],
       );
     } catch (error) {
       session.report(error);
@@ -368,7 +407,7 @@ export function CreatePage({
           ? `${state.provisional.length} provisional pieces`
           : description
             ? label(description.status)
-            : "Starts after verification",
+            : "Starts after the photo and occasion are ready",
     },
     {
       label: "Review with confidence",
@@ -381,7 +420,7 @@ export function CreatePage({
           ? "Ready"
           : confidence
             ? label(confidence.status)
-            : "Starts independently",
+            : "Starts after the photo and occasion are ready",
     },
   ];
 
@@ -422,47 +461,10 @@ export function CreatePage({
         </p>
       )}
       {step === "upload" && (
-        <section
-          className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone bg-paper px-4 py-3"
-          aria-labelledby="inventory-choice-title"
-        >
-          <div>
-            <h2 id="inventory-choice-title" className="text-sm font-medium">
-              Wardrobe for this look
-            </h2>
-            <p className="mt-1 text-xs text-secondary">
-              {state.inventoryMode === "sample"
-                ? "Example pieces stay separate from your wardrobe."
-                : "Matching uses active pieces marked owned in your wardrobe."}
-            </p>
-            {inventoryLocked && (
-              <p className="mt-1 text-xs text-secondary">
-                The wardrobe source is fixed for this look after matching
-                starts.
-              </p>
-            )}
-          </div>
-          <div
-            className="flex flex-wrap gap-2"
-            role="group"
-            aria-label="Wardrobe source"
-          >
-            <Chip
-              selected={state.inventoryMode === "live"}
-              disabled={!writesEnabled || busy || inventoryLocked}
-              onClick={() => session.setInventoryMode("live")}
-            >
-              Your wardrobe
-            </Chip>
-            <Chip
-              selected={state.inventoryMode === "sample"}
-              disabled={!writesEnabled || busy || inventoryLocked}
-              onClick={() => session.setInventoryMode("sample")}
-            >
-              Sample inventory
-            </Chip>
-          </div>
-        </section>
+        <p className="mt-4 text-sm text-secondary">
+          Matching compares all wardrobe items, including examples, archived
+          pieces and saved candidates. Ownership labels stay visible.
+        </p>
       )}
       {state.error && (
         <div
@@ -517,14 +519,20 @@ export function CreatePage({
               : null
           }
           status={state.uploadStatus}
-          readOnly={!writesEnabled}
+          readOnly={!writesEnabled || state.prefilling}
           errorMessage={state.error}
           occasion={
             look ? look.occasion : (state.draft?.payload.occasion ?? null)
           }
           preferences={presentPreferences(state.preferences)}
           tasks={tasks}
-          analyzeDisabled={busy || !look}
+          analyzeDisabled={
+            busy ||
+            state.prefilling ||
+            !look ||
+            !look.occasion?.trim() ||
+            state.contextSaving
+          }
           onChooseFile={(file) => void choose(file)}
           onRemove={
             writesEnabled ? () => setConfirmation("discard") : undefined
@@ -539,7 +547,9 @@ export function CreatePage({
               : undefined
           }
           onPreferences={() => router.push(preferencesHref)}
-          onAnalyze={() => go("review")}
+          onAnalyze={() => {
+            go("review");
+          }}
           onRetry={() => {
             if (state.file) void upload(state.file);
             else retryInit();
@@ -550,6 +560,17 @@ export function CreatePage({
         <ReviewPieces
           imageUrl={look.inspirationImage?.url ?? ""}
           pieces={displayedPieces}
+          provisional={!look.pieces.length && state.provisional.length > 0}
+          retryDescriptionLabel={
+            description?.canRestart ? "Analyze again" : "Retry descriptions"
+          }
+          descriptionError={
+            description?.canRestart
+              ? "An updated analysis is available. Analyze again to use the corrected garment schema."
+              : description?.status === "failed" && !description.canRetry
+                ? "The response could not be validated. Review any provisional pieces, add pieces manually, or use a different photo."
+                : undefined
+          }
           descriptionStatus={
             completeDescription
               ? "ready"
@@ -563,7 +584,9 @@ export function CreatePage({
           matchStatus={operationStatus(matching, matchesReady)}
           onBack={() => go("upload")}
           onMatch={
-            hasEditorDraft || (!writesEnabled && !matchesReady)
+            hasEditorDraft ||
+            !completeDescription ||
+            (!writesEnabled && !matchesReady)
               ? undefined
               : () => {
                   if (!matching && !matchesReady)
@@ -577,7 +600,12 @@ export function CreatePage({
               : undefined
           }
           onEditPiece={
-            writesEnabled && completeDescription ? setEditor : undefined
+            writesEnabled &&
+            (completeDescription ||
+              (description?.status === "failed" &&
+                state.provisional.length > 0))
+              ? setEditor
+              : undefined
           }
           onRemovePiece={
             writesEnabled && completeDescription
@@ -585,12 +613,12 @@ export function CreatePage({
               : undefined
           }
           onRetryDescription={
-            writesEnabled
+            writesEnabled && (description?.canRetry || description?.canRestart)
               ? () => retryTask("inspiration_description")
               : undefined
           }
           onRetryConfidence={
-            writesEnabled
+            writesEnabled && (confidence?.canRetry || confidence?.canRestart)
               ? () => retryTask("inspiration_confidence")
               : undefined
           }
@@ -695,7 +723,7 @@ export function CreatePage({
             }
             onSetPreferences={() => router.push(preferencesHref)}
             onAddWardrobe={
-              state.inventoryMode === "live"
+              state.inventoryMode !== "sample"
                 ? () => router.push("/wardrobe")
                 : undefined
             }
@@ -706,6 +734,11 @@ export function CreatePage({
         </>
       )}
       <PieceEditor
+        adoptionCount={
+          editor && state.provisional.some((piece) => piece.id === editor.id)
+            ? state.provisional.length
+            : undefined
+        }
         open={editor !== undefined}
         piece={editor}
         pieceNumber={

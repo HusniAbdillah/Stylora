@@ -28,8 +28,17 @@ export const operationSchema = z
       "superseded",
     ]),
     inputRevision: z.number().int().positive(),
-    inventoryMode: z.enum(["live", "sample"]).nullable().default(null),
+    inventoryMode: z
+      .enum(["live", "sample", "combined"])
+      .nullable()
+      .default(null),
     errorCode: z.string().nullable(),
+    assetId: z.uuid().nullable().optional(),
+    runtimeVersion: z.string().nullable().optional(),
+    currentRuntimeVersion: z.string().optional(),
+    canRetry: z.boolean().default(false),
+    canRestart: z.boolean().default(false),
+    retryBlockedReason: z.string().nullable().optional(),
     optionType: z
       .enum(["closest", "from_wardrobe", "fresh_alternative"])
       .nullable()
@@ -50,6 +59,8 @@ const wardrobeItemSchema = z
     id: z.uuid(),
     name: z.string(),
     sourceType: z.string(),
+    inventoryStatus: z.enum(["owned", "saved_candidate"]).optional(),
+    archivedAt: z.string().nullable().optional(),
     image: imageSchema,
   })
   .nullable();
@@ -65,7 +76,10 @@ export const canonicalPieceSchema = garmentSchema
   .passthrough();
 export const lookSchema = z.object({
   activeDraftId: z.uuid().nullable().optional(),
-  inventoryMode: z.enum(["live", "sample"]).nullable().default(null),
+  inventoryMode: z
+    .enum(["live", "sample", "combined"])
+    .nullable()
+    .default(null),
   id: z.uuid(),
   title: z.string(),
   occasion: z.string().nullable(),
@@ -84,7 +98,10 @@ export const lookSchema = z.object({
         id: z.uuid(),
         pieceId: z.uuid(),
         outcome: z.enum(["owned_match", "wardrobe_alternative", "missing"]),
-        inventoryMode: z.enum(["live", "sample"]).nullable().default(null),
+        inventoryMode: z
+          .enum(["live", "sample", "combined"])
+          .nullable()
+          .default(null),
         wardrobeItem: wardrobeItemSchema,
         explanation: explanationSchema,
         sharedAttributes: z.json(),
@@ -100,7 +117,10 @@ export const lookSchema = z.object({
       .object({
         id: z.uuid(),
         optionType: z.enum(["closest", "from_wardrobe", "fresh_alternative"]),
-        inventoryMode: z.enum(["live", "sample"]).nullable().default(null),
+        inventoryMode: z
+          .enum(["live", "sample", "combined"])
+          .nullable()
+          .default(null),
         title: z.string(),
         concept: z.string(),
         explanation: explanationSchema,

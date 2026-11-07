@@ -1,6 +1,6 @@
 BEGIN;
 DO $$
-DECLARE w uuid:=gen_random_uuid(); foreign_w uuid:=gen_random_uuid(); d uuid:=gen_random_uuid(); a uuid:=gen_random_uuid(); l public.looks; op public.workflow_operations; done public.workflow_operations; ev public.workflow_operation_events; item uuid:=gen_random_uuid(); piece uuid:=gen_random_uuid(); n integer;
+DECLARE w uuid:=gen_random_uuid(); foreign_w uuid:=gen_random_uuid(); d uuid:=gen_random_uuid(); a uuid:=gen_random_uuid(); l public.looks; op public.workflow_operations; done public.workflow_operations; ev public.workflow_operation_events; item uuid:=gen_random_uuid(); piece uuid:=gen_random_uuid(); n integer; prior_sequence bigint;
 BEGIN
  INSERT INTO public.workspaces(id,name) VALUES(w,'__owner2_smoke_'||w),(foreign_w,'__owner2_foreign_'||foreign_w);
  INSERT INTO public.user_preferences(workspace_id) VALUES(w);
@@ -12,8 +12,10 @@ BEGIN
  l:=public.save_inspiration_pieces(w,l.id,l.revision,jsonb_build_array(jsonb_build_object('id',piece,'name','Synthetic top','category','top','position',0)));
  op:=public.start_workflow_operation(w,'inspiration_description','look',l.id,l.revision,repeat('c',64),jsonb_build_object('lookId',l.id,'lookRevision',l.revision));
  op:=public.claim_workflow_operation(w,op.id,l.revision);
+ SELECT coalesce(max(sequence),0) INTO prior_sequence FROM public.workflow_operation_events WHERE workspace_id=w AND operation_id=op.id;
+ IF prior_sequence<1 OR NOT EXISTS(SELECT 1 FROM public.workflow_operation_events WHERE workspace_id=w AND operation_id=op.id AND event_type='started') THEN RAISE EXCEPTION 'claim did not publish its started event'; END IF;
  ev:=public.append_create_event(w,op.id,op.attempt_count,'started','{}');
- IF ev.sequence<>1 THEN RAISE EXCEPTION 'event sequence invalid'; END IF;
+ IF ev.sequence<>prior_sequence+1 THEN RAISE EXCEPTION 'event sequence invalid'; END IF;
  BEGIN PERFORM public.finish_create_operation(w,op.id,op.attempt_count+1,'{}','{}'); RAISE EXCEPTION 'stale attempt accepted'; EXCEPTION WHEN serialization_failure THEN NULL; END;
  FOR n IN 1..3 LOOP PERFORM public.reserve_create_provider_call(w,op.id,op.attempt_count); PERFORM public.release_create_provider_call(w,op.id,op.attempt_count); END LOOP;
  BEGIN PERFORM public.reserve_create_provider_call(w,op.id,op.attempt_count); RAISE EXCEPTION 'request budget ignored'; EXCEPTION WHEN program_limit_exceeded THEN NULL; END;

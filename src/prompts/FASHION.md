@@ -177,8 +177,11 @@ dependent advice without deleting the inspiration or reviewed items.
 
 Evaluate in this order:
 
-1. Confirm the candidate exists, is active, and is marked owned. Check category
-   role and functional compatibility.
+1. Confirm the candidate exists in the supplied workspace inventory. Normal
+   owned-only tasks require active owned items. Combined Create comparison also
+   includes sample items, archived rows and saved candidates; keep their status
+   explicit. Candidates can be alternatives but never owned matches or owned
+   outfit slots. Check category role and functional compatibility.
 2. Check explicit occasion, coverage, footwear, and other practical constraints.
    Reject known contradictions.
 3. Compare subcategory, construction, silhouette, length, and fit. Determine
