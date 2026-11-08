@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { setTimeout as delay } from "node:timers/promises";
 import { readFileSync } from "node:fs";
 import { parseDatabaseConfig } from "../src/lib/config/runtime-schema.ts";
@@ -42,13 +43,29 @@ const headers = {
   Authorization: `Bearer ${secret}`,
   "Content-Type": "application/json",
 };
-const probe = await fetch(endpoint, {
-  headers,
-  redirect: "error",
-  signal: AbortSignal.timeout(15_000),
-});
-if (!probe.ok || (await probe.json()).data?.executionMode !== "worker")
-  throw new Error("Application does not accept this worker configuration.");
+let ready = false;
+for (let attempt = 0; attempt < 3; attempt++) {
+  let probe;
+  try {
+    probe = await fetch(endpoint, {
+      headers,
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    /* A cold development build can exceed the first probe deadline. */
+  }
+  if (probe?.ok) {
+    if ((await probe.json()).data?.executionMode !== "worker")
+      throw new Error("Application executor mode does not match this worker.");
+    ready = true;
+    break;
+  }
+  if (probe && ![502, 503, 504].includes(probe.status))
+    throw new Error("Application does not accept this worker configuration.");
+  if (attempt < 2) await delay(1_000);
+}
+if (!ready) throw new Error("Application worker readiness timed out.");
 const client = createClient(config.url, config.secretKey, {
   auth: {
     persistSession: false,
@@ -70,12 +87,7 @@ function allowedSubjects() {
   const ids = JSON.parse(
     readFileSync(process.env.STYLORA_WORKER_SUBJECTS_FILE, "utf8"),
   );
-  if (
-    !Array.isArray(ids) ||
-    ids.some((id) => typeof id !== "string" || !/^[a-f0-9-]{36}$/i.test(id))
-  )
-    throw new Error("Invalid worker evaluation allowlist.");
-  return ids;
+  return z.array(z.uuid()).max(500).parse(ids);
 }
 const limits = { text: 3, image: 1 };
 let scanFailures = 0;

@@ -142,7 +142,9 @@ export async function failOperation(
       p_operation_id: claim.operationId,
       p_attempt_count: claim.attemptCount,
       p_input_fingerprint: claim.inputFingerprint,
-      p_status: code === "INPUT_SUPERSEDED" ? "superseded" : "failed",
+      p_status: ["INPUT_SUPERSEDED", "CAPSULE_SUPERSEDED"].includes(code)
+        ? "superseded"
+        : "failed",
       p_safe_error_code: code,
       p_result_ref: {
         retryable: failure.retryable && canRetryOperationCode(code),
