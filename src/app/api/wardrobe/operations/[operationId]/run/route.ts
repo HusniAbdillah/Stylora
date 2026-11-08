@@ -2,7 +2,7 @@ import { executeWardrobeAnalysis } from "@/features/wardrobe/analysis";
 import { wardrobeRoute } from "@/features/wardrobe/http";
 import {
   executorResponse,
-  usesWorkflowWorker,
+  usesBackgroundExecution,
 } from "@/features/operations/execution-mode";
 import { readOperation, operationStatus } from "@/features/operations/server";
 export const maxDuration = 300;
@@ -11,7 +11,7 @@ export async function POST(
   { params }: { params: Promise<{ operationId: string }> },
 ) {
   const { operationId } = await params;
-  if (usesWorkflowWorker())
+  if (usesBackgroundExecution())
     return executorResponse(
       await wardrobeRoute(async () => {
         const operation = await readOperation(operationId);

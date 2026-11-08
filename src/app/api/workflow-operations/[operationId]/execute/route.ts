@@ -2,7 +2,7 @@ import { apiRoute } from "@/lib/api";
 import { executeOperation } from "@/features/operations/create";
 import {
   executorResponse,
-  usesWorkflowWorker,
+  usesBackgroundExecution,
 } from "@/features/operations/execution-mode";
 import { getOperation } from "@/features/operations/create";
 export const maxDuration = 300;
@@ -13,7 +13,7 @@ export async function POST(
   return executorResponse(
     await apiRoute(async () => {
       const { operationId } = await context.params;
-      return usesWorkflowWorker()
+      return usesBackgroundExecution()
         ? getOperation(operationId)
         : executeOperation(operationId);
     }),

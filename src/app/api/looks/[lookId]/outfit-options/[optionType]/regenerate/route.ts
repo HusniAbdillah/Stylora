@@ -5,7 +5,7 @@ import { startLookOperation } from "@/features/operations/create";
 import { optionTypeSchema } from "@/features/outfits/schema";
 import {
   executorResponse,
-  usesWorkflowWorker,
+  usesBackgroundExecution,
 } from "@/features/operations/execution-mode";
 export const maxDuration = 300;
 export async function POST(
@@ -39,7 +39,7 @@ export async function POST(
         {
           kind: "option_regeneration",
           inventoryMode: input.inventoryMode,
-          execute: !usesWorkflowWorker() && input.execute,
+          execute: !usesBackgroundExecution() && input.execute,
           intentId: input.intentId,
         },
         optionTypeSchema.parse(optionType),

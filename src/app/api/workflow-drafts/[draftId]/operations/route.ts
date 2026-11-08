@@ -2,7 +2,7 @@ import { apiRoute } from "@/lib/api";
 import { startDraftOperation } from "@/features/operations/create";
 import {
   executorResponse,
-  usesWorkflowWorker,
+  usesBackgroundExecution,
 } from "@/features/operations/execution-mode";
 export const maxDuration = 300;
 export async function POST(
@@ -14,7 +14,7 @@ export async function POST(
       const body: unknown = await request.json();
       return startDraftOperation(
         (await context.params).draftId,
-        usesWorkflowWorker() &&
+        usesBackgroundExecution() &&
           body &&
           typeof body === "object" &&
           !Array.isArray(body)

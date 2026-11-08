@@ -7,7 +7,7 @@ import {
 } from "@/features/operations/server";
 import {
   executorResponse,
-  usesWorkflowWorker,
+  usesBackgroundExecution,
 } from "@/features/operations/execution-mode";
 
 export const maxDuration = 300;
@@ -18,7 +18,7 @@ export async function POST(
 ) {
   try {
     const { operationId } = await context.params;
-    const operation = usesWorkflowWorker()
+    const operation = usesBackgroundExecution()
       ? await readOperation(operationId)
       : await runSavedAvatar(operationId);
     if (operation.kind !== "saved_avatar")

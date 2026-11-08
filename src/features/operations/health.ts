@@ -1,6 +1,7 @@
 import "server-only";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
-import { usesWorkflowWorker } from "./execution-mode";
+import { workflowExecutionMode } from "./execution-mode";
+import { queueConfigured } from "./queue-config";
 import { OperationError } from "./errors";
 
 export async function workflowWorkerHealth() {
@@ -20,7 +21,19 @@ export async function workflowWorkerHealth() {
 }
 
 export async function assertWorkflowExecutorAvailable() {
-  if (!usesWorkflowWorker()) return;
+  const mode = workflowExecutionMode();
+  if (mode === "inline") return;
+  if (mode === "queue") {
+    if (!queueConfigured())
+      throw new OperationError(
+        "EXECUTOR_UNCONFIGURED",
+        "Background tasks are temporarily unavailable. Your draft is saved. Try again shortly.",
+        503,
+        true,
+        30,
+      );
+    return;
+  }
   if (!(await workflowWorkerHealth()).available)
     throw new OperationError(
       "EXECUTOR_OFFLINE",

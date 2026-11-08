@@ -2,7 +2,7 @@ import { ApiError, apiRoute } from "@/lib/api";
 import { OperationError } from "@/features/operations/errors";
 import {
   executorResponse,
-  usesWorkflowWorker,
+  usesBackgroundExecution,
 } from "@/features/operations/execution-mode";
 import { previewPollStatus } from "@/features/preview/poll-status";
 import {
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   return executorResponse(
     await previewResponse(async () =>
       generatePreviewImage(await request.json(), {
-        execute: !usesWorkflowWorker(),
+        execute: !usesBackgroundExecution(),
       }),
     ),
   );

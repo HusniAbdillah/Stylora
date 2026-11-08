@@ -32,6 +32,13 @@ type RequestSnapshot = {
   envelope?: z.infer<typeof nestedSchema>["data"];
   previewDraftId?: string;
 };
+type AllocatedRequest = { response: Response; previewDraftId?: string };
+
+function backgroundResponse(response: Response) {
+  return ["worker", "queue"].includes(
+    response.headers.get("x-stylora-executor") ?? "",
+  );
+}
 
 async function responseOperation(
   response: Response,
@@ -63,21 +70,24 @@ async function executeRequest(
   key: string,
   url: string,
   init: Omit<RequestInit, "signal">,
+  allocated?: AllocatedRequest,
 ) {
   const deadline = Date.now() + 300_000;
-  let response = await fetch(url, {
-    method: "POST",
-    ...init,
-    cache: "no-store",
-    signal: AbortSignal.timeout(295_000),
-  });
-  const workerManaged = response.headers.get("x-stylora-executor") === "worker";
+  let response =
+    allocated?.response ??
+    (await fetch(url, {
+      method: "POST",
+      ...init,
+      cache: "no-store",
+      signal: AbortSignal.timeout(295_000),
+    }));
+  const backgroundManaged = backgroundResponse(response);
   let snapshot = await responseOperation(response);
   const knownId = z.uuid().safeParse(key);
   let operationId =
     snapshot?.operation.id ?? (knownId.success ? knownId.data : undefined);
   let envelope = snapshot?.envelope;
-  let previewDraftId = snapshot?.previewDraftId;
+  let previewDraftId = snapshot?.previewDraftId ?? allocated?.previewDraftId;
   if (!operationId || (!response.ok && response.status !== 409))
     return response;
 
@@ -145,7 +155,7 @@ async function executeRequest(
     const expired =
       typeof operation.leaseUntil === "string" &&
       Date.parse(operation.leaseUntil) <= Date.now();
-    if (!workerManaged && (operation.status === "queued" || expired)) {
+    if (!backgroundManaged && (operation.status === "queued" || expired)) {
       response = await fetch(url, {
         method: "POST",
         ...init,
@@ -175,14 +185,15 @@ async function executeRequest(
   return response;
 }
 
-export async function startOperationRequest(
+async function operationRequest(
   operationId: string,
   url: string,
   init: Omit<RequestInit, "signal"> = { method: "POST" },
+  allocated?: AllocatedRequest,
 ): Promise<Response> {
   let pending = pendingRequests.get(operationId);
   if (!pending) {
-    pending = executeRequest(operationId, url, init)
+    pending = executeRequest(operationId, url, init, allocated)
       .then(async (response) => {
         await reportOperationResponse(response, operationId);
         return response;
@@ -201,6 +212,14 @@ export async function startOperationRequest(
     pendingRequests.set(operationId, pending);
   }
   return (await pending).clone();
+}
+
+export function startOperationRequest(
+  operationId: string,
+  url: string,
+  init: Omit<RequestInit, "signal"> = { method: "POST" },
+): Promise<Response> {
+  return operationRequest(operationId, url, init);
 }
 
 export function requestOperation(
@@ -227,6 +246,21 @@ export async function retryOperationRequest(
   if (!response.ok) {
     await reportOperationResponse(response, operationId);
     return response;
+  }
+  if (backgroundResponse(response)) {
+    const preview =
+      executeUrl === "/api/previews"
+        ? z.object({ draftId: z.uuid() }).safeParse(body)
+        : undefined;
+    return operationRequest(
+      operationId,
+      executeUrl,
+      { method: "POST" },
+      {
+        response,
+        previewDraftId: preview?.success ? preview.data.draftId : undefined,
+      },
+    );
   }
   return requestOperation(operationId, executeUrl, body);
 }

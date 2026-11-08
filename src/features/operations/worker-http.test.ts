@@ -4,6 +4,7 @@ const executor = vi.hoisted(() => ({ authorize: vi.fn(), run: vi.fn() }));
 vi.mock("./execution-mode", () => ({
   authorizeWorkflowWorker: executor.authorize,
   usesWorkflowWorker: () => true,
+  workflowExecutionMode: () => "worker",
 }));
 vi.mock("./worker", () => ({ executeQueuedOperation: executor.run }));
 import { GET, POST } from "@/app/api/internal/workflow-worker/route";

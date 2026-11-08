@@ -8,6 +8,7 @@ import { executeQueuedOperation } from "@/features/operations/worker";
 import {
   authorizeWorkflowWorker,
   usesWorkflowWorker,
+  workflowExecutionMode,
 } from "@/features/operations/execution-mode";
 
 export const runtime = "nodejs";
@@ -26,7 +27,7 @@ function unauthorized() {
 export async function GET(request: Request) {
   if (!authorizeWorkflowWorker(request)) return unauthorized();
   return apiRoute(async () => ({
-    executionMode: usesWorkflowWorker() ? "worker" : "inline",
+    executionMode: workflowExecutionMode(),
     workspaceId: getWorkspaceDatabase().workspaceId,
     worker: await workflowWorkerHealth(),
   }));
@@ -35,7 +36,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!authorizeWorkflowWorker(request)) return unauthorized();
   return operationResponse(async () => {
-    if (!usesWorkflowWorker()) return { executionMode: "inline" };
+    if (!usesWorkflowWorker())
+      return { executionMode: workflowExecutionMode() };
     const body = z
       .strictObject({ operationId: z.uuid() })
       .safeParse(await readJson(request));

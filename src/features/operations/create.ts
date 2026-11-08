@@ -25,7 +25,8 @@ import {
   safeProviderError,
   fashionValidationFailure,
 } from "@/lib/ai/provider";
-import { usesWorkflowWorker } from "./execution-mode";
+import { usesBackgroundExecution } from "./execution-mode";
+import { scheduleWorkflowDispatch } from "./queue-wake";
 import { waitForDailyProviderBudget } from "./provider-budget";
 import { assertWorkflowExecutorAvailable } from "./health";
 import { workflowProviderLimits } from "./limits";
@@ -413,6 +414,7 @@ export async function startLookOperation(
     p_model: model,
   });
   if (error) throw sqlFailure(error);
+  scheduleWorkflowDispatch();
   return parsed.execute
     ? executeOperation(data.id)
     : toOperation(data, fingerprint);
@@ -988,7 +990,8 @@ export async function controlOperation(id: string, action: "retry" | "cancel") {
       "The operation cannot be changed in its current state.",
       409,
     );
-  return action === "retry" && !usesWorkflowWorker()
+  if (action === "retry") scheduleWorkflowDispatch();
+  return action === "retry" && !usesBackgroundExecution()
     ? executeOperation(id)
     : projectOperation(data);
 }

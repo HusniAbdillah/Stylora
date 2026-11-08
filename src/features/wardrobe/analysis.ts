@@ -35,7 +35,7 @@ import {
   startOperation,
 } from "@/features/operations/server";
 import { draftPayloadSchema, revisionSchema } from "./schema";
-import { usesWorkflowWorker } from "@/features/operations/execution-mode";
+import { workflowExecutionMode } from "@/features/operations/execution-mode";
 import {
   getWardrobeDraft,
   readWardrobeDraftRow,
@@ -329,7 +329,7 @@ export async function getWardrobeAnalysis(draftId: string) {
     return {
       operation: null,
       leaseExpired: false,
-      executionMode: usesWorkflowWorker() ? "worker" : "inline",
+      executionMode: workflowExecutionMode(),
     };
   const operation = await readOperation(data.id);
   let provisionalCount = 0;
@@ -355,7 +355,7 @@ export async function getWardrobeAnalysis(draftId: string) {
   }
   return {
     operation: operationStatus(operation),
-    executionMode: usesWorkflowWorker() ? "worker" : "inline",
+    executionMode: workflowExecutionMode(),
     provisionalCount,
     leaseExpired:
       data.lease_until !== null && Date.parse(data.lease_until) <= Date.now(),

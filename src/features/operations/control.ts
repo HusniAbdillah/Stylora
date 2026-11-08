@@ -6,6 +6,7 @@ import {
 } from "@/lib/supabase/server";
 import { OperationError, readOperation } from "./server";
 import { operationRowSchema } from "./schema";
+import { scheduleWorkflowDispatch } from "./queue-wake";
 
 async function controlOperation(
   name: "retry_workflow_operation" | "cancel_workflow_operation",
@@ -48,6 +49,7 @@ async function controlOperation(
       "OPERATION_CONTROL_UNAVAILABLE",
       "This action is waiting for database support.",
     );
+  if (name === "retry_workflow_operation") scheduleWorkflowDispatch();
   return operationRowSchema.parse(data);
 }
 

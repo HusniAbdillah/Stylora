@@ -7,6 +7,7 @@ import {
 import { canRetryOperationCode, OperationError } from "./errors";
 import { workflowProviderLimits } from "./limits";
 import { assertWorkflowExecutorAvailable } from "./health";
+import { scheduleWorkflowDispatch } from "./queue-wake";
 import { waitForDailyProviderBudget } from "./provider-budget";
 import {
   checkpointOperationResult,
@@ -103,6 +104,7 @@ export async function startOperation(
     p_model: request.model,
   });
   if (error) databaseError(error.code);
+  scheduleWorkflowDispatch();
   return operationRowSchema.parse(data);
 }
 

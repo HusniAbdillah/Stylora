@@ -82,7 +82,9 @@ export function WardrobeIntakeFlow({
           );
           if (
             response.ok &&
-            response.headers.get("x-stylora-executor") === "worker"
+            ["worker", "queue"].includes(
+              response.headers.get("x-stylora-executor") ?? "",
+            )
           ) {
             if (current.current) setWatchingDraft(current.current.id);
             return;
@@ -196,12 +198,13 @@ export function WardrobeIntakeFlow({
         const state = await wardrobeRequest<{
           operation: { id: string; status: string } | null;
           leaseExpired: boolean;
-          executionMode?: "worker" | "inline";
+          executionMode?: "worker" | "inline" | "queue";
           provisionalCount?: number;
         }>(`/drafts/${watchingDraft}/analyze`);
         if (!active) return;
-        if (state.executionMode === "worker")
-          setProvisionalCount(state.provisionalCount ?? 0);
+        const backgroundManaged =
+          state.executionMode === "worker" || state.executionMode === "queue";
+        if (backgroundManaged) setProvisionalCount(state.provisionalCount ?? 0);
         if (state.operation?.status === "succeeded") {
           const saved = await wardrobeRequest<WardrobeDraft>(
             `/drafts/${watchingDraft}`,
@@ -220,7 +223,7 @@ export function WardrobeIntakeFlow({
           setWatchingDraft(undefined);
           setBusy(false);
         } else if (
-          state.executionMode !== "worker" &&
+          !backgroundManaged &&
           (state.operation.status === "queued" ||
             (state.leaseExpired &&
               ["running", "partial"].includes(state.operation.status)))
@@ -230,7 +233,7 @@ export function WardrobeIntakeFlow({
         } else if (
           state.operation &&
           ["queued", "running", "partial"].includes(state.operation.status) &&
-          (!state.leaseExpired || state.executionMode === "worker")
+          (!state.leaseExpired || backgroundManaged)
         ) {
           setStage("analyzing");
           setBusy(true);

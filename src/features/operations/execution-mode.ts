@@ -2,9 +2,11 @@ import "server-only";
 import { timingSafeEqual } from "node:crypto";
 import { OperationError } from "./errors";
 
-export function usesWorkflowWorker(): boolean {
+export type WorkflowExecutionMode = "inline" | "worker" | "queue";
+
+export function workflowExecutionMode(): WorkflowExecutionMode {
   const mode = process.env.STYLORA_EXECUTION_MODE ?? "inline";
-  if (mode !== "inline" && mode !== "worker")
+  if (mode !== "inline" && mode !== "worker" && mode !== "queue")
     throw new OperationError(
       "EXECUTOR_CONFIGURATION_INVALID",
       "Task execution is unavailable.",
@@ -14,7 +16,15 @@ export function usesWorkflowWorker(): boolean {
       "EXECUTOR_UNCONFIGURED",
       "Background execution is unavailable.",
     );
-  return mode === "worker";
+  return mode;
+}
+
+export function usesWorkflowWorker(): boolean {
+  return workflowExecutionMode() === "worker";
+}
+
+export function usesBackgroundExecution(): boolean {
+  return workflowExecutionMode() !== "inline";
 }
 
 function workerSecret() {
@@ -38,8 +48,10 @@ export function authorizeWorkflowWorker(request: Request): boolean {
 }
 
 export function executorResponse(response: Response): Response {
-  if (response.ok && usesWorkflowWorker()) {
-    response.headers.set("X-Stylora-Executor", "worker");
+  if (!response.ok) return response;
+  const mode = workflowExecutionMode();
+  if (mode !== "inline") {
+    response.headers.set("X-Stylora-Executor", mode);
     if (response.status === 200) {
       return new Response(response.body, {
         status: 202,

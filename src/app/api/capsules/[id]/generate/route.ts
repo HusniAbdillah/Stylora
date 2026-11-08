@@ -2,7 +2,7 @@ import { apiRoute } from "@/lib/api";
 import { generateCapsule } from "@/features/capsules/generate";
 import {
   executorResponse,
-  usesWorkflowWorker,
+  usesBackgroundExecution,
 } from "@/features/operations/execution-mode";
 
 export const maxDuration = 300;
@@ -12,7 +12,9 @@ export async function POST(
 ) {
   return executorResponse(
     await apiRoute(async () =>
-      generateCapsule((await params).id, { execute: !usesWorkflowWorker() }),
+      generateCapsule((await params).id, {
+        execute: !usesBackgroundExecution(),
+      }),
     ),
   );
 }
