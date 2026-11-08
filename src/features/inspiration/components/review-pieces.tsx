@@ -169,7 +169,9 @@ export function ConfidencePanel({
           Review with confidence
         </h2>
         <Badge tone="neutral">
-          {review.status === "ready" ? (
+          {review.stale ? (
+            "Previous review"
+          ) : review.status === "ready" ? (
             <>
               <span className="sm:hidden">Ready</span>
               <span className="hidden sm:inline">Separate analysis</span>
@@ -181,6 +183,11 @@ export function ConfidencePanel({
           )}
         </Badge>
       </div>
+      {pending && review.stale && (
+        <p className="mt-3 text-xs text-secondary" role="status">
+          Updating the review. The previous results stay visible below.
+        </p>
+      )}
       {pending && !review.insights?.length && (
         <div className="mt-5 space-y-3" aria-busy="true">
           <div className="h-4 w-2/3 animate-pulse rounded bg-sand motion-reduce:animate-none" />
@@ -206,8 +213,7 @@ export function ConfidencePanel({
           )}
         </div>
       )}
-      {(review.status === "ready" ||
-        (pending && Boolean(review.insights?.length))) && (
+      {(review.status === "ready" || Boolean(review.insights?.length)) && (
         <>
           {review.palette?.length ? (
             <>

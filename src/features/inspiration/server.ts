@@ -31,7 +31,7 @@ import { listInventory } from "@/features/matching/backend";
 import { buildFashionPrompt } from "@/prompts/fashion";
 import { getFashionTaskSettings } from "@/lib/ai/task-settings";
 import {
-  createKindSchema, createInputSnapshot, createOperationFingerprint, createOperationPolicy,
+  createKindSchema, createInputSnapshot, createOperationFingerprint, createOperationPolicy, createResultMatchesRuntime,
 } from "@/features/operations/create-policy";
 
 type PieceRow = Database["public"]["Tables"]["inspiration_pieces"]["Row"];
@@ -420,13 +420,20 @@ export async function getLook(lookId: string) {
       ),
     ),
   );
-  function inputsStale(metadata: unknown, includesInventory: boolean) {
+  function inputsStale(metadata: unknown, includesInventory: boolean,
+    kind: "inspiration_confidence" | "wardrobe_match" | "outfit_options" | "option_regeneration") {
     const parsedMetadata = inputMetadataSchema.safeParse(metadata);
     if (
       !parsedMetadata.success ||
       parsedMetadata.data.preferenceFingerprint !== personalization.fingerprint
     )
       return true;
+    try {
+      if (!createResultMatchesRuntime(metadata, getFashionTaskSettings(kind), buildFashionPrompt(kind).versions))
+        return true;
+    } catch {
+      return true;
+    }
     if (!includesInventory) return false;
     const mode = parsedMetadata.data.inventoryMode;
     return (
@@ -513,7 +520,7 @@ export async function getLook(lookId: string) {
           sourceType: review.source_type,
           stale:
             review.source_revision !== look.revision ||
-            inputsStale(review.input_metadata, false),
+            inputsStale(review.input_metadata, false, "inspiration_confidence"),
         }
       : null,
     matches: (matches.data ?? []).map((match) => ({
@@ -541,7 +548,7 @@ export async function getLook(lookId: string) {
       sourceType: match.source_type,
       stale:
         match.source_revision !== look.revision ||
-        inputsStale(match.input_metadata, true),
+        inputsStale(match.input_metadata, true, "wardrobe_match"),
     })),
     outfitOptions: (options.data ?? []).map((option) => ({
       id: option.id,
@@ -559,7 +566,7 @@ export async function getLook(lookId: string) {
       sourceType: option.source_type,
       stale:
         option.source_revision !== look.revision ||
-        inputsStale(option.provider_metadata, true),
+        inputsStale(option.provider_metadata, true, z.object({ task: z.literal("option_regeneration") }).safeParse(option.provider_metadata).success ? "option_regeneration" : "outfit_options"),
       items: (slots.data ?? [])
         .filter((slot) => slot.option_id === option.id)
         .map((slot) => ({

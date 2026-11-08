@@ -18,6 +18,7 @@ export type DetectedPiece = {
 
 export type ConfidenceReview = {
   status: "queued" | "running" | "ready" | "failed" | "unavailable";
+  stale?: boolean;
   palette?: ColorSwatch[];
   insights?: { title: string; description: string }[];
   occasions?: string[];

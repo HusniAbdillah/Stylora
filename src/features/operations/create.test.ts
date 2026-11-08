@@ -298,6 +298,23 @@ describe("Create allocation and execution gates", () => {
     ).toBeLessThanOrEqual(240000);
     expect(row.status).toBe("superseded");
     expect(mocks.requestFashion).not.toHaveBeenCalled();
+    const scope = mocks.scope.mock.calls[0][0];
+    await scope.reserveCall();
+    await scope.releaseCall();
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "reserve_workflow_provider_call",
+      expect.objectContaining({
+        p_input_fingerprint: row.input_fingerprint,
+        p_text_daily_limit: 150,
+        p_image_daily_limit: 50,
+      }),
+    );
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "release_workflow_provider_call",
+      expect.objectContaining({
+        p_input_fingerprint: row.input_fingerprint,
+      }),
+    );
   });
   it("rechecks explicit discard after the provider result and before commit", async () => {
     mocks.requestFashion.mockImplementation(async () => {

@@ -5,6 +5,7 @@ import {
   createInputSnapshot,
   createOperationFingerprint,
   createOperationPolicy,
+  createResultMatchesRuntime,
   matchesCoverCurrentInput,
 } from "./create-policy";
 
@@ -19,6 +20,60 @@ const operation = {
 };
 
 describe("Create operation recovery policy", () => {
+  it("invalidates cached results when model controls or prompt assembly change, independent of JSON key order", () => {
+    const settings = {
+      version: "fashion-request.v1" as const,
+      model: "fixture-model",
+      reasoningEffort: "low" as const,
+      maxOutputTokens: 24000,
+    };
+    const versions = {
+      promptAssemblyHash: "fixture-prompt",
+      promptVersion: "fixture-version",
+      schemaVersion: "fashion-item.v1",
+    };
+    const metadata = {
+      providerSettings: settings,
+      model: settings.model,
+      ...versions,
+      handlerVersion: CREATE_RUNTIME_VERSION,
+    };
+    expect(
+      createResultMatchesRuntime(
+        Object.fromEntries(Object.entries(metadata).reverse()),
+        settings,
+        versions,
+      ),
+    ).toBe(true);
+    expect(
+      createResultMatchesRuntime(
+        metadata,
+        { ...settings, model: "changed-model" },
+        versions,
+      ),
+    ).toBe(false);
+    expect(
+      createResultMatchesRuntime(
+        metadata,
+        { ...settings, reasoningEffort: "none" },
+        versions,
+      ),
+    ).toBe(false);
+    expect(
+      createResultMatchesRuntime(
+        metadata,
+        { ...settings, maxOutputTokens: 16000 },
+        versions,
+      ),
+    ).toBe(false);
+    expect(
+      createResultMatchesRuntime(metadata, settings, {
+        ...versions,
+        promptAssemblyHash: "new-prompt",
+      }),
+    ).toBe(false);
+    expect(createResultMatchesRuntime({}, settings, versions)).toBe(false);
+  });
   it("requires one committed match per piece for the exact inventory and preferences", () => {
     const expected = {
       inventoryMode: "combined" as const,

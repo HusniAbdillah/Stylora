@@ -111,9 +111,21 @@ export function presentConfidence(
   operation: CreateOperation | undefined,
 ): ConfidenceReview {
   const review = look?.confidenceReview;
-  if (review && !review.stale)
+  if (review)
     return {
-      status: "ready",
+      status: review.stale
+        ? operation?.status === "failed"
+          ? "failed"
+          : operation?.status === "running" || operation?.status === "partial"
+            ? "running"
+            : operation?.status === "queued"
+              ? "queued"
+              : "unavailable"
+        : "ready",
+      stale: review.stale,
+      errorMessage: review.stale
+        ? "Previous review. Refresh for the latest results."
+        : undefined,
       insights: review.insights,
       occasions: review.occasions,
       reasons: review.explanation.whyThis.map((why) => why.reason),
@@ -139,9 +151,7 @@ export function presentConfidence(
           : operation?.status === "queued"
             ? "queued"
             : "unavailable",
-    errorMessage: review?.stale
-      ? "Your inputs changed. Refresh this analysis for the current version."
-      : "Confidence review is not available for this version yet.",
+    errorMessage: "Confidence review is not available for this version yet.",
   };
 }
 
@@ -173,9 +183,14 @@ export function presentPreferences(
 export function presentMatches(
   look: CreateLook,
   mode?: "live" | "sample" | "combined",
+  includeStale = false,
 ): WardrobeMatch[] {
   return look.matches
-    .filter((match) => !match.stale && (!mode || match.inventoryMode === mode))
+    .filter(
+      (match) =>
+        (includeStale || !match.stale) &&
+        (!mode || match.inventoryMode === mode),
+    )
     .map((match) => ({
       id: match.id,
       outcome: match.outcome,
@@ -251,10 +266,13 @@ export function presentIdeas(
   look: CreateLook,
   operations: CreateOperation[],
   mode?: "live" | "sample" | "combined",
+  includeStale = false,
 ): OutfitIdea[] {
   return look.outfitOptions
     .filter(
-      (option) => !option.stale && (!mode || option.inventoryMode === mode),
+      (option) =>
+        (includeStale || !option.stale) &&
+        (!mode || option.inventoryMode === mode),
     )
     .map((option) => {
       const regeneration = operations.find(

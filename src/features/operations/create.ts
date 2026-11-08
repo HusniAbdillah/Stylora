@@ -45,6 +45,7 @@ import {
   createInputSnapshot,
   createOperationFingerprint,
   createOperationPolicy,
+  createResultMatchesRuntime,
   matchesCoverCurrentInput,
 } from "./create-policy";
 
@@ -266,6 +267,14 @@ async function currentMatches(
       data ?? [],
       pieces.map((piece) => piece.id),
       expected,
+    ) ||
+    data?.some(
+      (row) =>
+        !createResultMatchesRuntime(
+          row.input_metadata,
+          getFashionTaskSettings("wardrobe_match"),
+          buildFashionPrompt("wardrobe_match").versions,
+        ),
     )
   )
     throw new ApiError(
@@ -480,8 +489,17 @@ export async function executeOperation(id: string) {
   if (error) throw sqlFailure(error);
   if (op.status !== "running") return projectOperation(op);
   const snapshot = snapshotSchema.parse(op.input);
-  const deadline = Date.now() + 240_000;
-  const signal = AbortSignal.timeout(240_000);
+  const remaining = Math.max(
+    1,
+    Math.min(
+      240_000,
+      op.lease_until
+        ? Date.parse(op.lease_until) - Date.now() - 40_000
+        : 240_000,
+    ),
+  );
+  const deadline = Date.now() + remaining;
+  const signal = AbortSignal.timeout(remaining);
   let metadata: unknown = {};
   let checkpointed = false;
   return withFashionOperation(
@@ -494,10 +512,13 @@ export async function executeOperation(id: string) {
         for (let wait = 0; wait < 10; wait++) {
           signal.throwIfAborted();
           const { error: reserveError } = await context.client
-            .rpc("reserve_create_provider_call", {
+            .rpc("reserve_workflow_provider_call", {
               p_workspace_id: context.workspaceId,
               p_operation_id: id,
               p_attempt: op.attempt_count,
+              p_input_fingerprint: op.input_fingerprint,
+              p_text_daily_limit: limits.textDailyLimit,
+              p_image_daily_limit: limits.imageDailyLimit,
             })
             .abortSignal(signal);
           if (!reserveError) return;
@@ -522,10 +543,11 @@ export async function executeOperation(id: string) {
       },
       releaseCall: async () => {
         const { error: releaseError } = await context.client
-          .rpc("release_create_provider_call", {
+          .rpc("release_workflow_provider_call", {
             p_workspace_id: context.workspaceId,
             p_operation_id: id,
             p_attempt: op.attempt_count,
+            p_input_fingerprint: op.input_fingerprint,
           })
           .abortSignal(AbortSignal.timeout(10000));
         if (releaseError) throw sqlFailure(releaseError);
@@ -806,6 +828,7 @@ export async function executeOperation(id: string) {
         }
         const resultMetadata = {
           ...z.record(z.string(), z.json()).parse(metadata),
+          handlerVersion: CREATE_RUNTIME_VERSION,
           preferenceFingerprint: snapshot.preferenceFingerprint ?? null,
           inventoryFingerprint:
             z

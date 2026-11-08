@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { Json } from "@/types/database";
-import type { FashionTaskSettings } from "@/lib/ai/task-settings";
+import {
+  fashionTaskSettingsSchema,
+  type FashionTaskSettings,
+} from "@/lib/ai/task-settings";
 import { fingerprintOperationInput } from "./fingerprint";
 
 export const CREATE_RUNTIME_VERSION = "owner2-create.v9";
@@ -12,6 +15,40 @@ export const createKindSchema = z.enum([
   "option_regeneration",
 ]);
 export type CreateKind = z.infer<typeof createKindSchema>;
+
+export function createResultMatchesRuntime(
+  metadata: unknown,
+  settings: FashionTaskSettings,
+  versions: {
+    promptAssemblyHash: string;
+    promptVersion: string;
+    schemaVersion: string;
+  },
+) {
+  const parsed = z
+    .object({
+      providerSettings: fashionTaskSettingsSchema,
+      model: z.string(),
+      promptAssemblyHash: z.string(),
+      promptVersion: z.string(),
+      schemaVersion: z.string(),
+      handlerVersion: z.literal(CREATE_RUNTIME_VERSION),
+    })
+    .safeParse(metadata);
+  return (
+    parsed.success &&
+    parsed.data.model === settings.model &&
+    fingerprintOperationInput(parsed.data) ===
+      fingerprintOperationInput({
+        providerSettings: settings,
+        model: settings.model,
+        promptAssemblyHash: versions.promptAssemblyHash,
+        promptVersion: versions.promptVersion,
+        schemaVersion: versions.schemaVersion,
+        handlerVersion: CREATE_RUNTIME_VERSION,
+      })
+  );
+}
 
 export function matchesCoverCurrentInput(
   rows: { piece_id: string; input_metadata: unknown }[],

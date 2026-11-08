@@ -101,6 +101,7 @@ export type ProviderMetadata = {
   providerSettings: FashionTaskSettings;
   slotReleaseFailed: boolean;
   requests: ProviderReceipt[];
+  task: FashionRequest<z.ZodType>["task"];
 };
 
 type FashionOperationContext = {
@@ -736,6 +737,7 @@ export async function requestFashion<T extends z.ZodType>(
         data: result.data,
         metadata: {
           ...versions,
+          task: request.task,
           model,
           requestId: details.requestId ?? result.responseId,
           latencyMs: Date.now() - started,
