@@ -11,6 +11,7 @@ const rowSchema = z.object({
   status: operationStatusSchema,
   subjectType: z.string(),
   subjectId: z.uuid(),
+  safeErrorCode: z.string().nullable().optional(),
   updatedAt: z.iso.datetime({ offset: true }),
 });
 type Row = z.infer<typeof rowSchema>;
@@ -103,7 +104,11 @@ export function acceptOperationActivity(input: unknown, writesEnabled = false) {
       id: `operation:${row.id}`,
       label: labels[row.kind],
       state,
-      detail: details[state],
+      detail:
+        state === "queued" &&
+        row.safeErrorCode?.toUpperCase() === "PROVIDER_DAILY_BUDGET_EXHAUSTED"
+          ? "Waiting for the daily AI limit to reset at 00:00 UTC. Your draft is saved."
+          : details[state],
       href: destination(row),
       onRetry:
         writesEnabled &&
