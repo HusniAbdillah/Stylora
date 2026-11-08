@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { attributesSchema, garmentSchema } from "@/lib/ai/fashion-schema";
 import { OperationError } from "@/features/operations/errors";
-import { categorySchema, type CapsuleDraftState } from "./schema";
+import {
+  capsuleBriefSchema,
+  categorySchema,
+  type CapsuleDraftState,
+} from "./schema";
 
 const text = z.string().trim().min(1).max(600);
 export const missingBriefSchema = z.strictObject({
@@ -78,6 +82,7 @@ const diagnosticFields = new Set([
   ...Object.keys(capsuleGenerationSchema.shape.additions.element.shape),
   ...Object.keys(missingBriefSchema.shape),
   ...Object.keys(attributesSchema.shape),
+  ...Object.keys(capsuleBriefSchema.shape),
   "reason",
   "evidenceItemIds",
   "input",
@@ -108,27 +113,35 @@ const diagnosticFields = new Set([
   "deadlineMs",
   "facts",
   "type",
+  "allowedSignals",
+  "preferences",
+  "instructions",
+  "error",
+  "code",
 ]);
 export function capsuleDiagnostics(
   issues: readonly { code: string; path: readonly PropertyKey[] }[],
 ): CapsuleDiagnostic[] {
-  return issues.slice(0, 10).map((issue) => ({
-    code: /^[A-Za-z0-9_]{1,80}$/.test(issue.code)
-      ? issue.code
-      : "VALIDATION_FAILED",
-    path:
-      issue.path
-        .slice(0, 10)
-        .map((part) =>
-          typeof part === "number"
-            ? `[${Math.min(999, Math.max(0, part))}]`
-            : diagnosticFields.has(String(part))
-              ? String(part)
-              : "*",
-        )
-        .join(".")
-        .replace(/\.\[/g, "[") || "output",
-  }));
+  return issues.slice(0, 10).map((issue) => {
+    let path = "";
+    for (const part of issue.path.slice(0, 10)) {
+      const field =
+        typeof part === "number"
+          ? `[${Number.isFinite(part) ? Math.min(999, Math.max(0, Math.trunc(part))) : 0}]`
+          : diagnosticFields.has(String(part))
+            ? String(part)
+            : "field";
+      const next = path + (path && !field.startsWith("[") ? "." : "") + field;
+      if (next.length > 160) break;
+      path = next;
+    }
+    return {
+      code: /^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(issue.code)
+        ? issue.code
+        : "VALIDATION_FAILED",
+      path: path || "output",
+    };
+  });
 }
 export class CapsuleOutputError extends OperationError {
   providerAttempts = 0;

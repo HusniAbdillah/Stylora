@@ -210,6 +210,45 @@ describe("workflow worker dispatch", () => {
     expect(client.from).not.toHaveBeenCalled();
   });
 
+  it.each([true, false])(
+    "persists known pre-claim failures instead of endlessly retrying transport: retryable %s",
+    async (retryable) => {
+      setup(operation({ kind: "saved_avatar", subject_type: "saved_look" }));
+      mocks.avatar.mockRejectedValue(
+        new OperationError(
+          "AVATAR_SNAPSHOT_UNAVAILABLE",
+          "Unavailable",
+          503,
+          retryable,
+        ),
+      );
+      mocks.run.mockImplementation(async (_id, handler) => {
+        await expect(handler.execute()).rejects.toMatchObject({
+          code: "AVATAR_SNAPSHOT_UNAVAILABLE",
+          status: 503,
+          retryable,
+        });
+        return operation({ status: "failed" });
+      });
+      expect(await executeQueuedOperation(operationId)).toEqual({
+        id: operationId,
+        status: "failed",
+      });
+      expect(mocks.run).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("leaves an unknown infrastructure error to transport recovery", async () => {
+    setup(operation({ kind: "saved_avatar" }));
+    mocks.avatar.mockRejectedValue(
+      new Error("unclassified infrastructure failure"),
+    );
+    await expect(executeQueuedOperation(operationId)).rejects.toThrow(
+      "unclassified infrastructure failure",
+    );
+    expect(mocks.run).not.toHaveBeenCalled();
+  });
+
   it.each(["queued", "running", "partial"] as const)(
     "retires an older runtime only with a queued or expired %s predicate",
     async (status) => {

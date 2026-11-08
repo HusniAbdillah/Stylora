@@ -53,12 +53,63 @@ const avatarInputSchema = z
     message: "Regeneration requires a request ID.",
   });
 
+function databaseDiagnostics(
+  error: { code?: string; message?: string },
+  path: string,
+) {
+  const code = error.code ?? "";
+  const diagnostics = [
+    {
+      code: /^[A-Z0-9]{5}$/.test(code)
+        ? `DATABASE_SQLSTATE_${code}`
+        : /^PGRST\d{3}$/.test(code)
+          ? `DATABASE_${code}`
+          : "DATABASE_ERROR_UNKNOWN",
+      path,
+    },
+  ];
+  if (
+    error.message &&
+    [
+      "STYLORA_OPERATION_INPUT_IMMUTABLE",
+      "STYLORA_OPERATION_SUBJECT_MISMATCH",
+      "STYLORA_SUBJECT_NOT_FOUND",
+    ].includes(error.message)
+  )
+    diagnostics.push({ code: error.message, path });
+  return diagnostics;
+}
+
+function retryableDatabaseError(code = "") {
+  return /^(08[A-Z0-9]{3}|40001|40P01|53[A-Z0-9]{3}|57014|PGRST00[0-3])$/.test(
+    code,
+  );
+}
+
 export function shouldReuseSavedAvatar(input: unknown): boolean {
   return avatarInputSchema.parse(input).intent !== "regenerate";
 }
 
 export async function runSavedAvatar(operationId: string) {
   const context = getWorkspaceDatabase();
+  let persistenceDiagnostics: { code: string; path: string }[] | undefined;
+  function databaseFailure(
+    error: { code?: string; message?: string },
+    code: string,
+    message: string,
+    path: string,
+  ) {
+    persistenceDiagnostics = databaseDiagnostics(error, path);
+    return Object.assign(
+      new OperationError(
+        code,
+        message,
+        503,
+        retryableDatabaseError(error.code),
+      ),
+      { diagnostics: persistenceDiagnostics },
+    );
+  }
   const operation = await readOperation(operationId);
   if (
     operation.kind !== "saved_avatar" ||
@@ -76,7 +127,14 @@ export async function runSavedAvatar(operationId: string) {
     .eq("workspace_id", context.workspaceId)
     .eq("id", operation.subject_id)
     .maybeSingle();
-  if (error || !snapshot)
+  if (error)
+    throw databaseFailure(
+      error,
+      "AVATAR_SNAPSHOT_UNAVAILABLE",
+      "The saved look could not be loaded. Try again.",
+      "saved_look_snapshots",
+    );
+  if (!snapshot)
     throw new OperationError(
       "SAVED_LOOK_NOT_FOUND",
       "This saved look is unavailable.",
@@ -108,9 +166,11 @@ export async function runSavedAvatar(operationId: string) {
         .limit(1)
         .maybeSingle();
       if (history.error)
-        throw new OperationError(
+        throw databaseFailure(
+          history.error,
           "AVATAR_CONTEXT_UNAVAILABLE",
           "The captured image settings are unavailable.",
+          "workflow_operation_events.savedAvatarRenderContext",
         );
       captured = z
         .object({ savedAvatarRenderContext: z.unknown().optional() })
@@ -187,6 +247,24 @@ export async function runSavedAvatar(operationId: string) {
           claim,
           true,
         );
+        const recorded = await context.client
+          .rpc("stylora_record_operation_event", {
+            p_workspace_id: context.workspaceId,
+            p_operation_id: claim.operationId,
+            p_event_type: "started",
+            p_payload: z.json().parse({
+              inputFingerprint: claim.inputFingerprint,
+              savedAvatarRenderContext: renderContext,
+            }),
+          })
+          .abortSignal(AbortSignal.timeout(15000));
+        if (recorded.error)
+          throw databaseFailure(
+            recorded.error,
+            "AVATAR_CONTEXT_PERSIST_FAILED",
+            "The image settings could not be captured. Try again.",
+            "workflow_operation_events.savedAvatarRenderContext",
+          );
         const { data, error } = await context.client
           .from("workflow_operations")
           .update({
@@ -200,34 +278,25 @@ export async function runSavedAvatar(operationId: string) {
           .eq("workspace_id", context.workspaceId)
           .eq("id", claim.operationId)
           .eq("attempt_count", claim.attemptCount)
+          .eq("input_revision", claim.inputRevision)
           .eq("input_fingerprint", claim.inputFingerprint)
           .eq("status", "running")
           .gt("lease_until", new Date().toISOString())
           .is("cancel_requested_at", null)
           .select("id")
           .maybeSingle();
-        if (error || !data)
+        if (error)
+          throw databaseFailure(
+            error,
+            "AVATAR_CONTEXT_PERSIST_FAILED",
+            "The image settings could not be captured. Try again.",
+            "workflow_operations.renderContext",
+          );
+        if (!data)
           throw new OperationError(
             "AVATAR_OPERATION_CHANGED",
             "The image request changed. Reopen the saved look.",
             409,
-          );
-        const recorded = await context.client
-          .rpc("stylora_record_operation_event", {
-            p_workspace_id: context.workspaceId,
-            p_operation_id: claim.operationId,
-            p_event_type: "started",
-            p_payload: z.json().parse({
-              inputFingerprint: claim.inputFingerprint,
-              savedAvatarRenderContext: renderContext,
-            }),
-          })
-          .abortSignal(AbortSignal.timeout(15000));
-        if (recorded.error)
-          throw new OperationError(
-            "AVATAR_CONTEXT_PERSIST_FAILED",
-            "The image settings could not be captured. Request a new image.",
-            503,
           );
         claim.signal.throwIfAborted();
         return renderAndStoreAvatar({
@@ -242,7 +311,12 @@ export async function runSavedAvatar(operationId: string) {
         });
       },
       async fail(claim, failure) {
-        await failOperation(claim, failure);
+        await failOperation(claim, {
+          ...failure,
+          ...(persistenceDiagnostics
+            ? { diagnostics: persistenceDiagnostics }
+            : {}),
+        });
         if (!renderContext) return;
         const finished = await readOperation(claim.operationId);
         if (
@@ -268,12 +342,14 @@ export async function runSavedAvatar(operationId: string) {
           .is("cancel_requested_at", null)
           .select("id")
           .maybeSingle();
-        if (saved.error || !saved.data)
-          throw new OperationError(
-            "AVATAR_CONTEXT_PERSIST_FAILED",
-            "The image settings could not be preserved. Request a new image.",
-            503,
-          );
+        if (saved.error)
+          console.warn("saved_avatar_context_preservation_failed", {
+            operationId: claim.operationId,
+            diagnostics: databaseDiagnostics(
+              saved.error,
+              "workflow_operations.renderContext",
+            ),
+          });
       },
       async commit(claim, output) {
         const { data, error } = await context.client

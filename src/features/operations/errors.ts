@@ -22,6 +22,10 @@ export function canRetryOperationCode(code: string): boolean {
       "CHECKPOINT_COMMIT_PENDING",
       "CHECKPOINT_UNAVAILABLE",
       "PROVIDER_DAILY_BUDGET_EXHAUSTED",
+      "AVATAR_CONTEXT_PERSIST_FAILED",
+      "AVATAR_CONTEXT_UNAVAILABLE",
+      "AVATAR_SNAPSHOT_UNAVAILABLE",
+      "CAPSULE_CONTEXT_UNAVAILABLE",
     ].includes(code) || /^OPENAI_HTTP_(429|500|502|503|504)$/.test(code)
   );
 }

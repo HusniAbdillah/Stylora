@@ -297,7 +297,11 @@ export async function runOperation<T>(
   } catch (failure) {
     const providerFailure = z
       .object({
-        code: z.string().regex(/^(OPENAI|CAPSULE)_[A-Z0-9_]{1,100}$/),
+        code: z
+          .string()
+          .regex(
+            /^(?:(OPENAI|CAPSULE)_[A-Z0-9_]{1,100}|PROVIDER_(SERVER_ERROR|RATE_LIMITED))$/,
+          ),
         retryable: z.boolean(),
         retryAfterSeconds: z.number().int().min(0).max(86400).optional(),
         diagnostics: z

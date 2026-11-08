@@ -80,8 +80,12 @@ async function request(
   signal?: AbortSignal,
   beforeRequest?: () => Promise<void>,
 ) {
+  const deadline = Date.now() + timeout;
   const key = apiKey();
   await beforeRequest?.();
+  const remaining = deadline - Date.now();
+  if (remaining <= 0 || signal?.aborted)
+    throw new OpenAIUnavailableError("OPENAI_DEADLINE_EXCEEDED");
   let response: Response;
   try {
     response = await fetch(`https://api.openai.com/v1/${path}`, {
@@ -92,8 +96,8 @@ async function request(
       },
       body,
       signal: signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(timeout)])
-        : AbortSignal.timeout(timeout),
+        ? AbortSignal.any([signal, AbortSignal.timeout(remaining)])
+        : AbortSignal.timeout(remaining),
       cache: "no-store",
     });
   } catch (error) {
@@ -101,17 +105,32 @@ async function request(
     throw new OpenAIUnavailableError("OPENAI_CONNECTION_FAILED", true);
   }
   if (!response.ok) {
+    const quotaExhausted =
+      response.status === 429 &&
+      z
+        .object({ error: z.object({ code: z.literal("insufficient_quota") }) })
+        .safeParse(await response.json().catch(() => null)).success;
     const retryHeader = response.headers.get("retry-after");
     const numericDelay = retryHeader === null ? NaN : Number(retryHeader);
     const retryDelay = Number.isFinite(numericDelay)
       ? numericDelay
       : (Date.parse(retryHeader ?? "") - Date.now()) / 1000;
     const failure = new OpenAIUnavailableError(
-      `OPENAI_HTTP_${response.status}`,
-      response.status === 429 || response.status >= 500,
-      Number.isFinite(retryDelay)
+      quotaExhausted
+        ? "OPENAI_QUOTA_EXHAUSTED"
+        : `OPENAI_HTTP_${response.status}`,
+      !quotaExhausted && (response.status === 429 || response.status >= 500),
+      !quotaExhausted && Number.isFinite(retryDelay)
         ? Math.min(86400, Math.max(0, Math.ceil(retryDelay)))
         : undefined,
+      [
+        {
+          code: quotaExhausted
+            ? "INSUFFICIENT_QUOTA"
+            : `HTTP_${response.status}`,
+          path: quotaExhausted ? "error.code" : "response",
+        },
+      ],
     );
     failure.providerRequestId = safeRequestId(
       response.headers.get("x-request-id"),
@@ -123,6 +142,7 @@ async function request(
 
 const textResponse = z.object({
   status: z.string(),
+  error: z.object({ code: z.string() }).nullable().optional(),
   incomplete_details: z
     .object({ reason: z.string().optional() })
     .nullable()
@@ -199,6 +219,32 @@ export function parseFashionJsonOutput<T>(
       undefined,
       [{ code: "REFUSAL", path: "output" }],
     );
+  if (envelope.data.status === "failed") {
+    const code = envelope.data.error?.code;
+    const transient =
+      code === "server_error"
+        ? "PROVIDER_SERVER_ERROR"
+        : code === "rate_limit_exceeded"
+          ? "PROVIDER_RATE_LIMITED"
+          : null;
+    const terminal =
+      code === "invalid_prompt"
+        ? "INVALID_PROMPT"
+        : code === "insufficient_quota"
+          ? "INSUFFICIENT_QUOTA"
+          : "RESPONSE_FAILED";
+    throw new OpenAIUnavailableError(
+      transient ?? "OPENAI_RESPONSE_FAILED",
+      transient !== null,
+      undefined,
+      [
+        {
+          code: transient ?? terminal,
+          path: code ? "error.code" : "status",
+        },
+      ],
+    );
+  }
   if (envelope.data.status !== "completed") {
     const truncated =
       envelope.data.incomplete_details?.reason === "max_output_tokens";
@@ -208,7 +254,11 @@ export function parseFashionJsonOutput<T>(
       undefined,
       [
         {
-          code: truncated ? "MAX_OUTPUT_TOKENS" : "INCOMPLETE_RESPONSE",
+          code: truncated
+            ? "MAX_OUTPUT_TOKENS"
+            : envelope.data.incomplete_details?.reason === "content_filter"
+              ? "CONTENT_FILTERED"
+              : "INCOMPLETE_RESPONSE",
           path: "status",
         },
       ],

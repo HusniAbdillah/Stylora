@@ -188,6 +188,18 @@ survive loss of an HTTP request. See
 
 ## Release verification
 
+`GET /api/health` reports `runtime.commit`, the image and text models, avatar
+and Capsule prompt versions, and `executor.mode` with `executor.configured`.
+Compare the commit with the source of the active Production deployment. Missing
+runtime fields indicate that this diagnostic version is not being served.
+Queue configuration is not proof of message delivery. A writing deployment
+returns 503 when executor or model configuration is unavailable; read-only
+browsing does not require an executor. No credentials are returned.
+
+Fluid Compute is explicitly enabled in `vercel.json`. Its private queue triggers
+must still appear in the actual deployment. A successful build or an updated
+environment does not establish that the Production domain points to that build.
+
 Record the environment, exact commit, commands, provider budget and cleanup in
 [PROGRESS-NEW.md](PROGRESS-NEW.md). Run these checks against a dedicated test
 workspace before changing the demo workspace:

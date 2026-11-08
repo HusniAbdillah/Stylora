@@ -238,7 +238,11 @@ export function SavedDetailWorkspace({
           body: JSON.stringify(regeneration.current),
         }),
       );
-      setMessage("Preparing a new image. The previous image stays visible.");
+      setMessage(
+        look.avatarUrl
+          ? "Preparing a new image. The previous image stays visible."
+          : "Preparing a new image.",
+      );
       polling.refresh();
       await startOperationRequest(
         result.media.operationId,

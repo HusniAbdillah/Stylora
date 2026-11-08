@@ -56,6 +56,7 @@ import {
   capsuleOutputFixture,
 } from "./generation-fixtures";
 import { OperationError } from "@/features/operations/errors";
+import { ApiError } from "@/lib/api";
 import type {
   Operation,
   StartOperationInput,
@@ -473,6 +474,44 @@ describe("Capsule captured worker execution", () => {
     expect(controls.generate).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
   });
+  it("keeps temporary dependency-read failures retryable before provider work", async () => {
+    await generateCapsule(capsuleId, { execute: false });
+    controls.capsule.mockRejectedValueOnce(
+      new ApiError("capsule_read_failed", "Fixture read failure.", 503, true),
+    );
+    expect(await runCapsuleOperation(operationId)).toMatchObject({
+      status: "failed",
+      safe_error_code: "CAPSULE_CONTEXT_UNAVAILABLE",
+      result_ref: { retryable: true },
+    });
+    expect(controls.generate).not.toHaveBeenCalled();
+    expect(providerCount).toBe(0);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it.each([
+    [404, "superseded", "CAPSULE_SUPERSEDED"],
+    [409, "superseded", "CAPSULE_SUPERSEDED"],
+    [422, "failed", "CAPSULE_CONTEXT_INVALID"],
+  ])(
+    "keeps dependency status %s terminal without paid work",
+    async (status, state, code) => {
+      await generateCapsule(capsuleId, { execute: false });
+      controls.capsule.mockRejectedValueOnce(
+        new ApiError(
+          "capsule_context_invalid",
+          "Fixture context failure.",
+          Number(status),
+        ),
+      );
+      expect(await runCapsuleOperation(operationId)).toMatchObject({
+        status: state,
+        safe_error_code: code,
+        result_ref: { retryable: false },
+      });
+      expect(controls.generate).not.toHaveBeenCalled();
+      expect(providerCount).toBe(0);
+    },
+  );
   it("does not commit a result after the Capsule changes during generation", async () => {
     await generateCapsule(capsuleId, { execute: false });
     controls.generate.mockImplementationOnce(async (input) => {

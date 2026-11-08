@@ -5,10 +5,7 @@ import {
   validateExplanation,
   type MatchContext,
 } from "@/features/matching/backend";
-import {
-  isOwnedInventoryItem,
-  type MatchItem,
-} from "@/features/matching/gates";
+import type { MatchItem } from "@/features/matching/gates";
 import type { MatchResult } from "@/features/matching/schema";
 import {
   createEvidenceProjection,
@@ -16,8 +13,9 @@ import {
 } from "@/features/matching/evidence";
 import {
   ABSENT_PREFERENCES_GUIDANCE,
+  eligibleOwnedOutfitItems,
   hasSuppliedPreferences,
-  validateOptionComposition,
+  optionCompositionIssues,
   type OutfitOption,
   type OutfitOptionType,
 } from "./schema";
@@ -47,30 +45,28 @@ export async function generateOptions(
     );
   const evidence = createEvidenceProjection(input);
   const suppliedPreferences = hasSuppliedPreferences(input.preferences);
+  function validateOptions(options: OutfitOption[]) {
+    const issues = optionCompositionIssues(
+      options,
+      input.pieces,
+      input.inventory,
+      input.optionType,
+      input,
+    );
+    if (issues.length)
+      throw fashionValidationFailure("invalid_outfit_composition", issues);
+    for (const option of options)
+      validateExplanation(
+        option.explanation,
+        input.pieces,
+        input.inventory,
+        input,
+      );
+  }
   const response = await requestFashion({
     task: input.optionType ? "option_regeneration" : "outfit_options",
     schema: outfitProviderSchema(input, evidence.schema),
-    validate: ({ options }) => {
-      const errors = validateOptionComposition(
-        options,
-        input.pieces,
-        input.inventory,
-        input.optionType,
-        input,
-      );
-      if (errors.length)
-        throw fashionValidationFailure(
-          "invalid_outfit_composition",
-          errors.map((code) => ({ code, path: "options" })),
-        );
-      for (const option of options)
-        validateExplanation(
-          option.explanation,
-          input.pieces,
-          input.inventory,
-          input,
-        );
-    },
+    validate: ({ options }) => validateOptions(options),
     context: {
       itemData:
         "Return options as an object with exactly the requested direction keys, not an array; each value describes that direction. The server attaches the corresponding optionType. The piece and inventory indexes carry identity and ownership. All populated canonical garment facts are supplied once in evidenceCatalog rows. For a missingBrief emit schemaVersion fashion-item.v1 and garment in the compact attribute-entry shape, with coreEvidence and attribute evidence source derived. The server maps this projection to canonical flat attributes; proposed briefs are not observed catalog garments.",
@@ -99,9 +95,9 @@ export async function generateOptions(
       ),
       inventory: input.inventory.map(projectRecommendationIndex),
       inventoryMode: input.inventoryMode ?? "live",
-      allowedOwnedIds: input.inventory
-        .filter((item) => isOwnedInventoryItem(item, input.inventoryMode))
-        .map((item) => item.id),
+      allowedOwnedIds: eligibleOwnedOutfitItems(input.inventory, input).map(
+        (item) => item.id,
+      ),
       preferences: input.preferences,
       preferenceContext: {
         supplied: suppliedPreferences,
@@ -115,28 +111,6 @@ export async function generateOptions(
     },
   });
   input.onProviderMetadata?.(response.metadata);
-  const errors = validateOptionComposition(
-    response.data.options,
-    input.pieces,
-    input.inventory,
-    input.optionType,
-    {
-      preferences: input.preferences,
-      occasion: input.occasion,
-      inventoryMode: input.inventoryMode,
-    },
-  );
-  if (errors.length)
-    throw fashionValidationFailure(
-      "invalid_outfit_composition",
-      errors.map((code) => ({ code, path: "options" })),
-    );
-  for (const option of response.data.options)
-    validateExplanation(
-      option.explanation,
-      input.pieces,
-      input.inventory,
-      input,
-    );
+  validateOptions(response.data.options);
   return response.data.options;
 }

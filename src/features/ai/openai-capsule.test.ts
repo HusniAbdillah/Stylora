@@ -347,6 +347,132 @@ describe("Capsule provider protocol", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+  it.each([
+    ["server_error", "PROVIDER_SERVER_ERROR"],
+    ["rate_limit_exceeded", "PROVIDER_RATE_LIMITED"],
+  ])(
+    "classifies a failed %s response without a correction request",
+    async (code, expected) => {
+      const fetchMock = intercept().mockResolvedValue(
+        Response.json(
+          {
+            status: "failed",
+            error: { code, message: "Private provider details." },
+            output: [],
+          },
+          { headers: { "x-request-id": "req_failed_fixture" } },
+        ),
+      );
+      const beforeRequest = vi.fn().mockResolvedValue(undefined);
+      const afterRequest = vi.fn().mockResolvedValue(undefined);
+      const beforeCorrection = vi.fn();
+      await expect(
+        generateFashionJson({
+          ...request(),
+          beforeRequest,
+          afterRequest,
+          beforeCorrection,
+        }),
+      ).rejects.toMatchObject({
+        code: expected,
+        retryable: true,
+        diagnostics: [{ code: expected, path: "error.code" }],
+        providerAttempts: 1,
+        providerMetadata: {
+          providerAttempts: 1,
+          requests: [
+            { requestId: "req_failed_fixture", responseStatus: "failed" },
+          ],
+        },
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(beforeRequest).toHaveBeenCalledExactlyOnceWith(1);
+      expect(afterRequest).toHaveBeenCalledTimes(1);
+      expect(beforeCorrection).not.toHaveBeenCalled();
+    },
+  );
+  it.each(["invalid_prompt", "insufficient_quota", "Private failure value"])(
+    "keeps failed %s responses terminal and sanitized",
+    async (code) => {
+      const fetchMock = intercept().mockResolvedValue(
+        Response.json({
+          status: "failed",
+          error: { code, message: "Private provider details." },
+          output: [],
+        }),
+      );
+      const failure = await generateFashionJson(request()).catch(
+        (error: unknown) => error,
+      );
+      expect(failure).toMatchObject({
+        code: "OPENAI_RESPONSE_FAILED",
+        retryable: false,
+        providerAttempts: 1,
+      });
+      expect(JSON.stringify(failure)).not.toContain("Private");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("includes provider reservation time in the request deadline", async () => {
+    const fetchMock = intercept();
+    const start = Date.now();
+    const now = vi.spyOn(Date, "now").mockReturnValue(start);
+    try {
+      await expect(
+        generateFashionJson({
+          ...request(),
+          beforeRequest: async () => {
+            now.mockReturnValue(start + 100001);
+          },
+        }),
+      ).rejects.toMatchObject({ code: "OPENAI_DEADLINE_EXCEEDED" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      now.mockRestore();
+    }
+  });
+  it.each([
+    ["insufficient_quota", "OPENAI_QUOTA_EXHAUSTED", false],
+    ["rate_limit_exceeded", "OPENAI_HTTP_429", true],
+  ] as const)(
+    "distinguishes HTTP429 %s without exposing its body",
+    async (code, expectedCode, retryable) => {
+      const fetchMock = intercept().mockResolvedValue(
+        Response.json(
+          { error: { code, message: "Private billing or request details." } },
+          {
+            status: 429,
+            headers: {
+              "x-request-id": "req_limit_fixture",
+              "retry-after": "30",
+            },
+          },
+        ),
+      );
+      const failure = await generateFashionJson(request()).catch(
+        (error: unknown) => error,
+      );
+      expect(failure).toMatchObject({
+        code: expectedCode,
+        retryable,
+        providerAttempts: 1,
+        providerRequestId: "req_limit_fixture",
+        providerMetadata: { providerAttempts: 1 },
+        diagnostics: [
+          {
+            code: retryable ? "HTTP_429" : "INSUFFICIENT_QUOTA",
+            path: retryable ? "response" : "error.code",
+          },
+        ],
+      });
+      expect(failure).toHaveProperty(
+        "retryAfterSeconds",
+        retryable ? 30 : undefined,
+      );
+      expect(JSON.stringify(failure)).not.toContain("Private");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
   it("keeps legacy jobs on their original single-request settings", async () => {
     const fetchMock = intercept().mockResolvedValue(
       Response.json(completed({ outfits: [] })),

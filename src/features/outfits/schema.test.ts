@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { MatchItem } from "@/features/matching/gates";
 import {
   ABSENT_PREFERENCES_GUIDANCE,
+  eligibleOwnedOutfitItems,
+  optionCompositionIssues,
   validateOptionComposition,
   type OutfitOption,
 } from "./schema";
@@ -65,6 +67,121 @@ const absentPreferences: Record<string, string | string[]>[] = [
 ];
 
 describe("outfit composition boundaries", () => {
+  it("distinguishes proposed garment subtypes without treating renamed copies as new outfits", () => {
+    const proposed = outfit();
+    proposed.optionType = "closest";
+    proposed.items[1] = {
+      ...proposed.items[1],
+      itemKind: "missing",
+      wardrobeItemId: null,
+      missingBrief: {
+        schemaVersion: "fashion-item.v1",
+        name: "Proposed navy trousers",
+        category: "bottom",
+        subcategory: "trousers",
+        description: "A proposed navy lower garment.",
+        attributes: {
+          primaryColor: "navy",
+          styleTags: ["minimal", "tailored"],
+        },
+        observations: [],
+        confidence: null,
+        uncertainty: ["Proposed garment."],
+      },
+    };
+    const alternative = structuredClone(proposed);
+    alternative.optionType = "fresh_alternative";
+    alternative.items[1].missingBrief!.subcategory = "skirt";
+    const wardrobe = { ...outfit(), status: "unavailable" as const, items: [] };
+    expect(
+      validateOptionComposition(
+        [proposed, wardrobe, alternative],
+        [],
+        [inventory[0]],
+      ),
+    ).toEqual([]);
+    alternative.items[1].missingBrief = {
+      ...alternative.items[1].missingBrief!,
+      subcategory: " TROUSERS ",
+      name: "A different title for the same garment",
+      attributes: {
+        styleTags: ["TAILORED", " minimal "],
+        primaryColor: " Navy ",
+      },
+    };
+    expect(
+      validateOptionComposition(
+        [proposed, wardrobe, alternative],
+        [],
+        [inventory[0]],
+      ),
+    ).toEqual(["duplicate_composition"]);
+  });
+
+  it("identifies the precise direction and owned slot requiring a correction", () => {
+    const incomplete = outfit();
+    incomplete.optionType = "closest";
+    incomplete.items = [
+      incomplete.items[0],
+      { ...incomplete.items[0], slotId: "top_2" },
+    ];
+    const shoes: MatchItem = { ...inventory[0], category: "shoes" };
+    expect(
+      optionCompositionIssues([incomplete], [shoes], inventory, "closest"),
+    ).toEqual([
+      { code: "incomplete_clothing_coverage", path: "options.closest.items" },
+      { code: "missing_footwear_role", path: "options.closest.items" },
+      {
+        code: "duplicate_physical_item",
+        path: "options.closest.items.1.wardrobeItemId",
+      },
+    ]);
+  });
+
+  it("keeps one-piece, footwear and practical constraints enforced with actionable paths", () => {
+    const dress: MatchItem = { ...inventory[0], category: "dress" };
+    const shoes: MatchItem = {
+      ...inventory[0],
+      id: "91fc631a-4211-44be-9ab3-af582fa579c2",
+      category: "shoes",
+      attributes: { heelHeightClass: "high" },
+    };
+    const conflicting = outfit();
+    conflicting.items[0].category = "dress";
+    conflicting.items.push({
+      ...conflicting.items[0],
+      category: "shoes",
+      slotId: "shoes_1",
+      wardrobeItemId: shoes.id,
+    });
+    const owned = [dress, inventory[1], shoes];
+    const constraints = {
+      preferences: { footwearComfort: ["Flats only"] },
+      occasion: null,
+    };
+    expect(
+      eligibleOwnedOutfitItems(owned, constraints).map((item) => item.id),
+    ).toEqual([topId, bottomId]);
+    expect(
+      optionCompositionIssues(
+        [conflicting],
+        [shoes],
+        owned,
+        "from_wardrobe",
+        constraints,
+      ),
+    ).toEqual([
+      {
+        code: "conflicting_one_piece_and_bottom",
+        path: "options.from_wardrobe.items",
+      },
+      {
+        code: "practical_constraint_contradiction",
+        path: "options.from_wardrobe.items.2.wardrobeItemId",
+      },
+    ]);
+  });
+
   it.each(suppliedPreferences)(
     "rejects the observed closest absence claim when preferences are supplied: %j",
     (preferences) => {

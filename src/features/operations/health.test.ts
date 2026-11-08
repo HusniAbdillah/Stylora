@@ -10,8 +10,56 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("./execution-mode", () => ({ workflowExecutionMode: mocks.mode }));
 vi.mock("./queue-config", () => ({ queueConfigured: mocks.queueConfigured }));
-import { assertWorkflowExecutorAvailable } from "./health";
+import {
+  assertWorkflowExecutorAvailable,
+  workflowExecutorReadiness,
+} from "./health";
+import { OperationError } from "./errors";
 beforeEach(() => vi.resetAllMocks());
+
+describe("readiness diagnostics", () => {
+  it("reports configured inline execution without querying a worker", async () => {
+    mocks.mode.mockReturnValue("inline");
+    expect(await workflowExecutorReadiness(true)).toEqual({
+      mode: "inline",
+      configured: true,
+      errorCode: null,
+    });
+    expect(mocks.database).not.toHaveBeenCalled();
+  });
+  it.each([true, false])(
+    "reports queue configuration without claiming delivery: %s",
+    async (configured) => {
+      mocks.mode.mockReturnValue("queue");
+      mocks.queueConfigured.mockReturnValue(configured);
+      expect(await workflowExecutorReadiness(true)).toEqual({
+        mode: "queue",
+        configured,
+        errorCode: configured ? null : "EXECUTOR_UNCONFIGURED",
+      });
+      expect(mocks.database).not.toHaveBeenCalled();
+    },
+  );
+  it("reports invalid execution settings without exposing the env value", async () => {
+    mocks.mode.mockImplementation(() => {
+      throw new OperationError("EXECUTOR_CONFIGURATION_INVALID", "fixture");
+    });
+    expect(await workflowExecutorReadiness(true)).toEqual({
+      mode: "unavailable",
+      configured: false,
+      errorCode: "EXECUTOR_CONFIGURATION_INVALID",
+    });
+  });
+  it("does not query worker health when database configuration is missing", async () => {
+    mocks.mode.mockReturnValue("worker");
+    expect(await workflowExecutorReadiness(false)).toEqual({
+      mode: "worker",
+      configured: false,
+      errorCode: "EXECUTOR_OFFLINE",
+    });
+    expect(mocks.database).not.toHaveBeenCalled();
+  });
+});
 describe("consumer availability", () => {
   it("keeps inline execution independent of consumer health", async () => {
     mocks.mode.mockReturnValue("inline");
