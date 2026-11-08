@@ -17,6 +17,7 @@ import {
   CAPSULE_SOURCE_VERSIONS,
   TEXT_MODEL,
   generateFashionJson,
+  type CapsuleProviderMetadata,
 } from "@/features/ai/openai";
 import {
   startOperation,
@@ -26,6 +27,7 @@ import {
   readOperation,
   OperationError,
   type OperationClaim,
+  failOperation,
 } from "@/features/operations/server";
 import { getCapsuleDraft } from "./drafts";
 import { getCapsule } from "./queries";
@@ -350,6 +352,136 @@ export async function runCapsuleOperation(operationId: string) {
     return operation;
   await assertWorkflowRpc("commit_capsule_generation");
   const id = operation.subject_id;
+  let latestProviderMetadata: CapsuleProviderMetadata | undefined;
+  function ownedAttempt(claim: OperationClaim) {
+    return context.client
+      .from("workflow_operations")
+      .select("provider_call_count")
+      .eq("workspace_id", context.workspaceId)
+      .eq("id", claim.operationId)
+      .eq("attempt_count", claim.attemptCount)
+      .eq("input_fingerprint", claim.inputFingerprint)
+      .eq("status", "running")
+      .is("cancel_requested_at", null)
+      .gt("lease_until", new Date().toISOString())
+      .abortSignal(claim.signal);
+  }
+  async function reserveProviderRequest(claim: OperationClaim) {
+    const current = await ownedAttempt(claim).maybeSingle();
+    if (current.error)
+      throw new OperationError(
+        "PROVIDER_NETWORK_ERROR",
+        "The Capsule request ledger could not be read.",
+        503,
+        true,
+      );
+    if (!current.data)
+      throw new OperationError(
+        "CAPSULE_OPERATION_CHANGED",
+        "This Capsule request changed or was cancelled.",
+        409,
+      );
+    const parsedCount = z
+      .number()
+      .int()
+      .nonnegative()
+      .safeParse(current.data.provider_call_count);
+    if (!parsedCount.success)
+      throw new OperationError(
+        "CAPSULE_PROVIDER_LEDGER_INVALID",
+        "This Capsule request ledger is invalid.",
+        409,
+      );
+    const count = parsedCount.data;
+    if (count >= 3)
+      throw new OperationError(
+        "CAPSULE_PROVIDER_BUDGET_EXHAUSTED",
+        "This Capsule operation reached its request limit.",
+        429,
+      );
+    const reserved = await context.client
+      .from("workflow_operations")
+      .update({ provider_call_count: count + 1 })
+      .eq("workspace_id", context.workspaceId)
+      .eq("id", claim.operationId)
+      .eq("attempt_count", claim.attemptCount)
+      .eq("input_fingerprint", claim.inputFingerprint)
+      .eq("provider_call_count", count)
+      .eq("status", "running")
+      .is("cancel_requested_at", null)
+      .gt("lease_until", new Date().toISOString())
+      .abortSignal(claim.signal)
+      .select("id")
+      .maybeSingle();
+    if (reserved.error)
+      throw new OperationError(
+        "PROVIDER_NETWORK_ERROR",
+        "The Capsule request could not be reserved.",
+        503,
+        true,
+      );
+    if (!reserved.data)
+      throw new OperationError(
+        "CAPSULE_OPERATION_CHANGED",
+        "This Capsule request changed before reservation.",
+        409,
+      );
+  }
+  async function persistProviderMetadata(claim: OperationClaim) {
+    if (!latestProviderMetadata) return;
+    const current = await context.client
+      .from("workflow_operations")
+      .select("result_ref,status,provider_call_count")
+      .eq("workspace_id", context.workspaceId)
+      .eq("id", claim.operationId)
+      .eq("attempt_count", claim.attemptCount)
+      .eq("input_fingerprint", claim.inputFingerprint)
+      .in("status", ["succeeded", "failed", "cancelled", "superseded"])
+      .abortSignal(AbortSignal.timeout(10000))
+      .maybeSingle();
+    if (current.error)
+      throw new OperationError(
+        "CAPSULE_METADATA_UNAVAILABLE",
+        "Capsule provider metadata could not be recorded.",
+      );
+    if (!current.data) return;
+    const reference = z
+      .record(z.string(), z.json())
+      .parse(current.data.result_ref ?? {});
+    const provider = z.json().parse({
+      ...latestProviderMetadata,
+      workflowAttempt: claim.attemptCount,
+      operationCallCount: current.data.provider_call_count,
+      usageScope: "workflow_attempt",
+    });
+    const requestId = [...latestProviderMetadata.requests]
+      .reverse()
+      .find((request) => request.requestId)?.requestId;
+    const query = context.client
+      .from("workflow_operations")
+      .update({
+        result_ref: { ...reference, provider },
+        ...(requestId ? { provider_request_id: requestId } : {}),
+      })
+      .eq("workspace_id", context.workspaceId)
+      .eq("id", claim.operationId)
+      .eq("attempt_count", claim.attemptCount)
+      .eq("input_fingerprint", claim.inputFingerprint)
+      .eq("status", current.data.status);
+    const update = await (
+      current.data.result_ref === null
+        ? query.is("result_ref", null)
+        : query.eq("result_ref", JSON.stringify(current.data.result_ref))
+    )
+      .abortSignal(AbortSignal.timeout(10000))
+      .select("id")
+      .maybeSingle();
+    if (update.error)
+      throw new OperationError(
+        "CAPSULE_METADATA_UNAVAILABLE",
+        "Capsule provider metadata could not be recorded.",
+      );
+  }
   async function metadata(claim: OperationClaim) {
     const result = await context.client
       .from("workflow_operations")
@@ -467,6 +599,10 @@ export async function runCapsuleOperation(operationId: string) {
             : capsuleGenerationSchema,
         ),
         signal: claim.signal,
+        beforeRequest: () => reserveProviderRequest(claim),
+        onProviderMetadata: async (metadata) => {
+          latestProviderMetadata = metadata;
+        },
         beforeCorrection: () =>
           assertCurrent(claim, captured, capturedMetadata),
         validate: (value) =>
@@ -477,7 +613,7 @@ export async function runCapsuleOperation(operationId: string) {
             captured.allowedSignals,
           ),
       });
-      return { value: response.value, captured, capturedMetadata };
+      return { ...response, captured, capturedMetadata };
     },
     commit: async (claim, output) => {
       await assertCurrent(claim, output.captured, output.capturedMetadata);
@@ -525,6 +661,11 @@ export async function runCapsuleOperation(operationId: string) {
           "Your capsule changed before generation finished. Your newer choices are kept.",
           409,
         );
+      await persistProviderMetadata(claim);
+    },
+    fail: async (claim, failure) => {
+      await failOperation(claim, failure);
+      await persistProviderMetadata(claim);
     },
   });
 }

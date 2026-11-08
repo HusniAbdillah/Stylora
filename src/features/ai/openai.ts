@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { buildFashionPrompt, getFashionVersions } from "@/prompts/fashion";
+import { OperationError } from "@/features/operations/errors";
 import {
   getImageRenderSettings,
   imageRenderSettingsSchema,
@@ -48,6 +49,7 @@ export const CAPSULE_PROMPT_VERSION = `stylora-fashion-v1.capsule-3.${CAPSULE_SO
 
 export class OpenAIUnavailableError extends Error {
   providerAttempts = 0;
+  providerRequestId: string | null = null;
   constructor(
     public readonly code: string,
     public readonly retryable = false,
@@ -78,13 +80,16 @@ async function request(
   timeout: number,
   json = true,
   signal?: AbortSignal,
+  beforeRequest?: () => Promise<void>,
 ) {
+  const key = apiKey();
+  await beforeRequest?.();
   let response: Response;
   try {
     response = await fetch(`https://api.openai.com/v1/${path}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey()}`,
+        Authorization: `Bearer ${key}`,
         ...(json ? { "Content-Type": "application/json" } : {}),
       },
       body,
@@ -103,13 +108,17 @@ async function request(
     const retryDelay = Number.isFinite(numericDelay)
       ? numericDelay
       : (Date.parse(retryHeader ?? "") - Date.now()) / 1000;
-    throw new OpenAIUnavailableError(
+    const failure = new OpenAIUnavailableError(
       `OPENAI_HTTP_${response.status}`,
       response.status === 429 || response.status >= 500,
       Number.isFinite(retryDelay)
         ? Math.min(86400, Math.max(0, Math.ceil(retryDelay)))
         : undefined,
     );
+    failure.providerRequestId = safeRequestId(
+      response.headers.get("x-request-id"),
+    );
+    throw failure;
   }
   return response;
 }
@@ -129,6 +138,41 @@ const textResponse = z.object({
     }),
   ),
 });
+const usageSchema = z.object({
+  input_tokens: z.number().int().nonnegative(),
+  output_tokens: z.number().int().nonnegative(),
+  total_tokens: z.number().int().nonnegative(),
+  input_tokens_details: z
+    .object({ cached_tokens: z.number().int().nonnegative().optional() })
+    .optional(),
+  output_tokens_details: z
+    .object({ reasoning_tokens: z.number().int().nonnegative().optional() })
+    .optional(),
+});
+type CapsuleUsage = z.infer<typeof usageSchema>;
+export type CapsuleProviderMetadata = {
+  model: string;
+  promptVersion: string;
+  schemaVersion: string;
+  knowledgeVersion: string;
+  providerAttempts: number;
+  latencyMs: number;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  } | null;
+  requests: {
+    attempt: number;
+    requestId: string | null;
+    latencyMs: number;
+    responseStatus: string;
+    usage: CapsuleUsage | null;
+  }[];
+};
+function safeRequestId(value: string | null) {
+  return value && /^[A-Za-z0-9_-]{1,200}$/.test(value) ? value : null;
+}
 
 export function parseFashionJsonOutput<T>(
   value: unknown,
@@ -215,7 +259,10 @@ export async function generateFashionJson<T>(input: {
   config?: CapsuleGenerationConfig;
   legacy?: boolean;
   beforeCorrection?: () => Promise<void>;
+  beforeRequest?: (attempt: number) => Promise<void>;
+  onProviderMetadata?: (metadata: CapsuleProviderMetadata) => Promise<void>;
 }) {
+  const started = Date.now();
   const target = z
     .object({
       brief: z.object({ targetOutfits: z.number().int().min(3).max(6) }),
@@ -230,11 +277,46 @@ export async function generateFashionJson<T>(input: {
   );
   const deadline = Date.now() + (input.legacy ? 110000 : config.deadlineMs);
   const maximum = input.legacy ? 1 : config.maxProviderRequests;
+  const requests: CapsuleProviderMetadata["requests"] = [];
+  function providerMetadata(): CapsuleProviderMetadata {
+    const usage =
+      requests.length && requests.every((entry) => entry.usage)
+        ? requests.reduce(
+            (total, entry) => ({
+              input_tokens: total.input_tokens + entry.usage!.input_tokens,
+              output_tokens: total.output_tokens + entry.usage!.output_tokens,
+              total_tokens: total.total_tokens + entry.usage!.total_tokens,
+            }),
+            { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+          )
+        : null;
+    return {
+      model: config.model,
+      promptVersion: input.legacy
+        ? FASHION_PROMPT_VERSION
+        : CAPSULE_PROMPT_VERSION,
+      schemaVersion: FASHION_SCHEMA_VERSION,
+      knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
+      providerAttempts: requests.length,
+      latencyMs: Math.max(0, Date.now() - started),
+      usage,
+      requests: [...requests],
+    };
+  }
   let feedback: { code: string; diagnostics: CapsuleDiagnostic[] } | undefined;
   for (let attempt = 1; attempt <= maximum; attempt++) {
     const remaining = deadline - Date.now();
     if (remaining < 1000 || input.signal?.aborted)
-      throw new OpenAIUnavailableError("OPENAI_DEADLINE_EXCEEDED");
+      throw Object.assign(
+        new OpenAIUnavailableError("OPENAI_DEADLINE_EXCEEDED"),
+        {
+          providerAttempts: requests.length,
+          providerMetadata: providerMetadata(),
+        },
+      );
+    let requestStarted = false;
+    let responseRecorded = false;
+    const requestStartedAt = Date.now();
     try {
       const response = await request(
         "responses",
@@ -275,12 +357,16 @@ export async function generateFashionJson<T>(input: {
         Math.min(input.legacy ? 110000 : 100000, remaining),
         true,
         input.signal,
+        async () => {
+          await input.beforeRequest?.(attempt);
+          requestStarted = true;
+        },
       );
       let envelope: unknown;
       try {
         envelope = await response.json();
       } catch (error) {
-        throw new OpenAIUnavailableError(
+        const failure = new OpenAIUnavailableError(
           error instanceof SyntaxError
             ? "OPENAI_RESPONSE_JSON_INVALID"
             : "OPENAI_CONNECTION_FAILED",
@@ -296,7 +382,37 @@ export async function generateFashionJson<T>(input: {
             },
           ],
         );
+        failure.providerRequestId = safeRequestId(
+          response.headers.get("x-request-id"),
+        );
+        throw failure;
       }
+      const info = z
+        .object({
+          status: z
+            .enum([
+              "completed",
+              "incomplete",
+              "failed",
+              "cancelled",
+              "queued",
+              "in_progress",
+            ])
+            .optional(),
+          usage: usageSchema.nullable().optional(),
+        })
+        .safeParse(envelope);
+      requests.push({
+        attempt,
+        requestId: safeRequestId(response.headers.get("x-request-id")),
+        latencyMs: Math.max(0, Date.now() - requestStartedAt),
+        responseStatus: info.success
+          ? (info.data.status ?? "unknown")
+          : "unknown",
+        usage: info.success ? (info.data.usage ?? null) : null,
+      });
+      responseRecorded = true;
+      await input.onProviderMetadata?.(providerMetadata());
       const value = parseFashionJsonOutput(envelope, input.validate);
       return {
         value,
@@ -309,19 +425,54 @@ export async function generateFashionJson<T>(input: {
         sourceVersions: input.legacy
           ? capsulePrompt.versions
           : CAPSULE_SOURCE_VERSIONS,
-        providerRequestId: response.headers.get("x-request-id"),
+        providerRequestId: safeRequestId(response.headers.get("x-request-id")),
         providerAttempts: attempt,
+        providerMetadata: providerMetadata(),
       };
     } catch (error) {
+      if (requestStarted && !responseRecorded) {
+        requests.push({
+          attempt,
+          requestId:
+            error instanceof OpenAIUnavailableError
+              ? error.providerRequestId
+              : null,
+          latencyMs: Math.max(0, Date.now() - requestStartedAt),
+          responseStatus: "request_failed",
+          usage: null,
+        });
+        await input.onProviderMetadata?.(providerMetadata());
+      }
+      if (
+        error instanceof OperationError &&
+        !(error instanceof CapsuleOutputError)
+      )
+        throw Object.assign(error, {
+          providerAttempts: requests.length,
+          providerMetadata: providerMetadata(),
+        });
       const failure =
         error instanceof OpenAIUnavailableError ||
         error instanceof CapsuleOutputError
           ? error
           : new OpenAIUnavailableError("OPENAI_VALIDATION_FAILED");
-      failure.providerAttempts = attempt;
+      failure.providerAttempts = requests.length;
       const correctable =
         failure instanceof CapsuleOutputError
-          ? !["CAPSULE_CONTEXT_INVALID"].includes(failure.code)
+          ? [
+              "CAPSULE_SCHEMA_INVALID",
+              "CAPSULE_OUTPUT_COUNT_INVALID",
+              "CAPSULE_ADDITION_KEY_DUPLICATE",
+              "CAPSULE_REFERENCE_DUPLICATE",
+              "CAPSULE_REFERENCE_INVALID",
+              "CAPSULE_ADDITION_REFERENCE_INVALID",
+              "CAPSULE_SIGNAL_INVALID",
+              "CAPSULE_EVIDENCE_INVALID",
+              "CAPSULE_OUTFIT_INCOMPLETE",
+              "CAPSULE_OUTFITS_NOT_DISTINCT",
+              "CAPSULE_REQUIRED_ITEM_MISSING",
+              "CAPSULE_REUSE_EVIDENCE_INVALID",
+            ].includes(failure.code)
           : failure.code === "OPENAI_OUTPUT_SCHEMA_INVALID";
       if (
         !correctable ||
@@ -329,7 +480,7 @@ export async function generateFashionJson<T>(input: {
         deadline - Date.now() < 15000 ||
         input.signal?.aborted
       )
-        throw failure;
+        throw Object.assign(failure, { providerMetadata: providerMetadata() });
       await input.beforeCorrection?.();
       feedback = { code: failure.code, diagnostics: failure.diagnostics };
     }
