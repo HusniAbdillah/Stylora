@@ -477,7 +477,7 @@ export async function getLook(lookId: string) {
       inputRevision: operation.input_revision, inputFingerprint: operation.input_fingerprint,
       attemptCount: operation.attempt_count, promptVersion: operation.prompt_version,
       schemaVersion: operation.schema_version, model: operation.model,
-      resultRef: operation.result_ref, errorCode: operation.safe_error_code,
+      resultRef: operation.result_ref, errorCode: operation.safe_error_code?.toLowerCase() ?? null,
       createdAt: operation.created_at, completedAt: operation.completed_at,
       subjectId: operation.subject_id, leaseUntil: operation.lease_until,
       inventoryMode: captured.success ? captured.data.inventoryMode : null,

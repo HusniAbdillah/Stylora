@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CREATE_RUNTIME_VERSION,
   createOperationFingerprint,
+  createOperationPolicy,
 } from "./create-policy";
 import { buildFashionPrompt } from "@/prompts/fashion";
 
@@ -86,7 +87,7 @@ const base = {
   provider_call_count: 0,
   result_ref: null as unknown,
   lease_until: null,
-  safe_error_code: null,
+  safe_error_code: null as string | null,
   model: providerSettings.model,
   prompt_version: "fixture",
   schema_version: "fixture",
@@ -213,7 +214,10 @@ beforeEach(() => {
     },
   );
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 describe("Create allocation and execution gates", () => {
   it.each([null, "", "   "])(
@@ -362,8 +366,13 @@ describe("Create allocation and execution gates", () => {
       checkpointed: true,
       retryable: true,
     });
+    expect(row.safe_error_code).toBe("CHECKPOINT_COMMIT_PENDING");
     expect(checkpoint).not.toBeNull();
-    row = { ...row, status: "queued", provider_call_count: 3 };
+    row = { ...row, provider_call_count: 3 };
+    vi.stubEnv("STYLORA_EXECUTION_MODE", "worker");
+    vi.stubEnv("STYLORA_WORKER_SECRET", "x".repeat(43));
+    const deferred = await controlOperation(operationId, "retry");
+    expect(deferred.status).toBe("queued");
     await executeOperation(operationId);
     expect(row.status).toBe("succeeded");
     expect(mocks.requestFashion).toHaveBeenCalledTimes(1);
@@ -392,11 +401,58 @@ describe("Create allocation and execution gates", () => {
     await executeOperation(operationId);
     expect(row).toMatchObject({
       status: "failed",
-      safe_error_code: "operation_checkpoint_invalid",
+      safe_error_code: "OPERATION_CHECKPOINT_INVALID",
       result_ref: { retryable: false, checkpointed: true },
     });
     expect(mocks.requestFashion).not.toHaveBeenCalled();
     expect(mocks.download).not.toHaveBeenCalled();
+  });
+  it("persists a real provider Retry-After with a canonical rate-limit failure for worker deferral", async () => {
+    const provider =
+      await vi.importActual<typeof import("@/lib/ai/provider")>(
+        "@/lib/ai/provider",
+      );
+    mocks.scope.mockImplementation(provider.withFashionOperation);
+    mocks.requestFashion.mockImplementation(provider.requestFashion);
+    vi.stubEnv("OPENAI_API_KEY", "synthetic-test-key");
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: "rate_limit_exceeded" } }),
+          {
+            status: 429,
+            headers: {
+              "Retry-After": "600",
+              "x-request-id": "synthetic-request",
+            },
+          },
+        ),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const result = await executeOperation(operationId);
+    expect(row).toMatchObject({
+      status: "failed",
+      safe_error_code: "PROVIDER_RATE_LIMITED",
+      result_ref: {
+        retryable: true,
+        retryAfter: expect.any(String),
+        provider: { httpStatus: 429, retryAfterMs: 600000 },
+      },
+    });
+    expect(result.errorCode).toBe("provider_rate_limited");
+    const policy = createOperationPolicy(row, row.input_fingerprint);
+    expect(policy).toMatchObject({
+      canRetry: false,
+      retryBlockedReason: "retry_backoff",
+    });
+    expect(Date.parse(policy.retryAfter ?? "")).toBeGreaterThan(
+      Date.now() + 590000,
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await expect(controlOperation(operationId, "retry")).rejects.toMatchObject({
+      code: "operation_retry_unavailable",
+    });
   });
   it("returns a queued retry for worker mode without executing in the request", async () => {
     await startLookOperation(lookId, {
@@ -408,6 +464,7 @@ describe("Create allocation and execution gates", () => {
       status: "failed",
       provider_call_count: 1,
       result_ref: { retryable: true },
+      safe_error_code: "PROVIDER_TIMEOUT",
     };
     vi.stubEnv("STYLORA_EXECUTION_MODE", "worker");
     vi.stubEnv("STYLORA_WORKER_SECRET", "x".repeat(43));

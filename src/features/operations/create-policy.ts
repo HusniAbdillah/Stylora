@@ -5,6 +5,7 @@ import {
   type FashionTaskSettings,
 } from "@/lib/ai/task-settings";
 import { fingerprintOperationInput } from "./fingerprint";
+import { isRetryableCreateFailureCode } from "./create-failure";
 
 export const CREATE_RUNTIME_VERSION = "owner2-create.v9";
 export const createKindSchema = z.enum([
@@ -163,11 +164,13 @@ type OperationPolicyInput = {
   attempt_count: number;
   provider_call_count: number;
   result_ref: unknown;
+  safe_error_code?: string | null;
 };
 
 export function createOperationPolicy(
   op: OperationPolicyInput,
   currentFingerprint: string | null,
+  now = Date.now(),
 ) {
   const captured = z
     .object({
@@ -175,9 +178,13 @@ export function createOperationPolicy(
       runtimeVersion: z.string().optional(),
     })
     .safeParse(op.input);
-  const retryable = z
-    .object({ retryable: z.literal(true) })
-    .safeParse(op.result_ref).success;
+  const retryable =
+    z.object({ retryable: z.literal(true) }).safeParse(op.result_ref).success &&
+    isRetryableCreateFailureCode(op.safe_error_code);
+  const deferred = z
+    .object({ retryAfter: z.iso.datetime() })
+    .safeParse(op.result_ref);
+  const retryAfter = deferred.success ? deferred.data.retryAfter : null;
   const checkpointed = z
     .object({ checkpointed: z.literal(true) })
     .safeParse(op.result_ref).success;
@@ -202,7 +209,9 @@ export function createOperationPolicy(
                 ? "provider_call_limit"
                 : !retryable
                   ? "non_retryable"
-                  : null;
+                  : retryAfter && Date.parse(retryAfter) > now
+                    ? "retry_backoff"
+                    : null;
   return {
     assetId: captured.success ? (captured.data.assetId ?? null) : null,
     runtimeVersion,
@@ -210,6 +219,7 @@ export function createOperationPolicy(
     currentInputFingerprint: currentFingerprint,
     canRetry: retryBlockedReason === null,
     retryBlockedReason,
+    retryAfter,
     canRestart:
       terminal &&
       currentFingerprint !== null &&

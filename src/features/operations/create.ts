@@ -39,6 +39,7 @@ import {
   persistCreateCheckpoint,
 } from "./create-checkpoint";
 import { validateCreateResult } from "./create-result";
+import { createFailureState } from "./create-failure";
 import {
   CREATE_RUNTIME_VERSION,
   createKindSchema,
@@ -116,7 +117,7 @@ function toOperation(op: Operation, currentFingerprint: string | null = null) {
     inputFingerprint: op.input_fingerprint,
     attemptCount: op.attempt_count,
     resultRef: op.result_ref,
-    errorCode: op.safe_error_code,
+    errorCode: op.safe_error_code?.toLowerCase() ?? null,
     model: op.model,
     promptVersion: op.prompt_version,
     schemaVersion: op.schema_version,
@@ -502,6 +503,7 @@ export async function executeOperation(id: string) {
   const signal = AbortSignal.timeout(remaining);
   let metadata: unknown = {};
   let checkpointed = false;
+  let committing = false;
   return withFashionOperation(
     {
       operationId: op.id,
@@ -872,6 +874,7 @@ export async function executeOperation(id: string) {
           );
           checkpointed = true;
         }
+        committing = true;
         const { data: finished, error: finishError } = await context.client
           .rpc("finish_create_operation", {
             p_workspace_id: context.workspaceId,
@@ -884,40 +887,49 @@ export async function executeOperation(id: string) {
         if (finishError) throw sqlFailure(finishError);
         return projectOperation(finished);
       } catch (failure) {
-        const safe = signal.aborted
-          ? new ApiError(
-              "provider_timeout",
-              "The analysis took too long. Check its status before retrying.",
-              504,
-              true,
-            )
-          : failure instanceof ApiError
+        const safe =
+          failure instanceof ApiError
             ? failure
-            : new ApiError(
-                "operation_failed",
-                "The analysis could not finish. Check its status and retry.",
-                502,
-                true,
-              );
-        await append(
-          op,
-          safe.code === "input_superseded" ? "superseded" : "failed",
-          { code: safe.code, retryable: safe.retryable },
-        ).catch(() => undefined);
+            : signal.aborted
+              ? new ApiError(
+                  "provider_timeout",
+                  "The analysis took too long. Check its status before retrying.",
+                  504,
+                  true,
+                )
+              : new ApiError(
+                  "operation_failed",
+                  "The analysis could not finish. Check its status and retry.",
+                  502,
+                  true,
+                );
+        const provider = safeProviderError(failure);
+        const persisted = createFailureState(safe, {
+          checkpointed,
+          committing,
+          provider,
+        });
+        await append(op, persisted.status, {
+          code: persisted.code,
+          retryable: persisted.retryable,
+        }).catch(() => undefined);
         const { error: updateError } = await context.client
           .from("workflow_operations")
           .update({
-            status: safe.code === "input_superseded" ? "superseded" : "failed",
+            status: persisted.status,
             lease_until: null,
             completed_at: new Date().toISOString(),
-            safe_error_code: safe.code,
+            safe_error_code: persisted.code,
             result_ref: asJson({
-              retryable: safe.retryable,
+              retryable: persisted.retryable,
+              ...(persisted.retryAfter
+                ? { retryAfter: persisted.retryAfter }
+                : {}),
               checkpointed,
               safeMessage:
                 safe.code === "provider_unavailable" ? safe.message : null,
               metadata,
-              provider: safeProviderError(failure),
+              provider,
             }),
           })
           .eq("workspace_id", context.workspaceId)

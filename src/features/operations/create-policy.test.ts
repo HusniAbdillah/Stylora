@@ -17,6 +17,7 @@ const operation = {
   attempt_count: 1,
   provider_call_count: 1,
   result_ref: { retryable: true },
+  safe_error_code: "PROVIDER_TIMEOUT",
 };
 
 describe("Create operation recovery policy", () => {
@@ -128,6 +129,30 @@ describe("Create operation recovery policy", () => {
     expect(
       createOperationPolicy({ ...operation, status: "running" }, "current")
         .canRetry,
+    ).toBe(false);
+  });
+  it("keeps canonical retry classification and the stored Retry-After deadline", () => {
+    const now = Date.UTC(2026, 10, 8, 5);
+    const retryAfter = new Date(now + 60000).toISOString();
+    const deferred = {
+      ...operation,
+      safe_error_code: "PROVIDER_RATE_LIMITED",
+      result_ref: { retryable: true, retryAfter },
+    };
+    expect(createOperationPolicy(deferred, "current", now)).toMatchObject({
+      canRetry: false,
+      retryBlockedReason: "retry_backoff",
+      retryAfter,
+    });
+    expect(
+      createOperationPolicy(deferred, "current", now + 60000).canRetry,
+    ).toBe(true);
+    expect(
+      createOperationPolicy(
+        { ...deferred, safe_error_code: "provider_timeout" },
+        "current",
+        now + 60000,
+      ).canRetry,
     ).toBe(false);
   });
   it("keeps invalid output terminal until inputs or runtime change", () => {
