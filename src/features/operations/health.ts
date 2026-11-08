@@ -43,3 +43,34 @@ export async function assertWorkflowExecutorAvailable() {
       30,
     );
 }
+
+export async function workflowExecutorReadiness(databaseConfigured: boolean) {
+  try {
+    const mode = workflowExecutionMode();
+    if (mode === "inline") return { mode, configured: true, errorCode: null };
+    if (mode === "queue") {
+      const configured = queueConfigured();
+      return {
+        mode,
+        configured,
+        errorCode: configured ? null : "EXECUTOR_UNCONFIGURED",
+      };
+    }
+    const configured =
+      databaseConfigured && (await workflowWorkerHealth()).available;
+    return {
+      mode,
+      configured,
+      errorCode: configured ? null : "EXECUTOR_OFFLINE",
+    };
+  } catch (error) {
+    return {
+      mode: "unavailable" as const,
+      configured: false,
+      errorCode:
+        error instanceof OperationError
+          ? error.code
+          : "EXECUTOR_HEALTH_UNAVAILABLE",
+    };
+  }
+}
