@@ -217,7 +217,7 @@ export async function getLookContext(lookId: string, signal = AbortSignal.timeou
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("id", lookId)
-    .maybeSingle().abortSignal(signal);
+    .abortSignal(signal).maybeSingle();
   if (error)
     throw new ApiError(
       "look_read_failed",

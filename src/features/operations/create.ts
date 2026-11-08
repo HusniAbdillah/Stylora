@@ -81,8 +81,8 @@ async function readOperation(id: string) {
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("id", id)
-    .maybeSingle()
-    .abortSignal(AbortSignal.timeout(15000));
+    .abortSignal(AbortSignal.timeout(15000))
+    .maybeSingle();
   if (error) throw sqlFailure(error);
   if (!data)
     throw new ApiError(
