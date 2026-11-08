@@ -3,6 +3,7 @@ import { lookSchema } from "./client-contract";
 import {
   presentConfidence,
   presentIdeas,
+  presentInputSignals,
   presentMatches,
 } from "./presentation";
 
@@ -71,6 +72,79 @@ const look = lookSchema.parse({
 });
 
 describe("Create analysis history", () => {
+  it("uses supplied human preference labels and combines fields for the same choice", () => {
+    const signals = [
+      "skinSwatchHex",
+      "skinSwatchId",
+      "bodyIllustrationGroup",
+      "bodyIllustrationId",
+      "undertone",
+      "fit",
+      "styles",
+      "contrast",
+      "unknownInternalKey",
+    ];
+    expect(
+      presentInputSignals(signals, {
+        skinSwatchId: "depth_03",
+        skinSwatchHex: "#CFA080",
+        bodyIllustrationGroup: "women",
+        bodyIllustrationId: "pear",
+        undertone: "warm",
+        fit: "relaxed",
+        styles: ["minimal"],
+        contrast: "unsure",
+      }),
+    ).toEqual([
+      "Skin tone",
+      "Body reference",
+      "Undertone",
+      "Fit preference",
+      "Clothing style",
+    ]);
+    expect(
+      presentInputSignals(["styles", "fit", "undertone"], {
+        styles: [],
+        fit: null,
+      }),
+    ).toEqual([]);
+  });
+  it("uses the same labels for idea input summaries and preserves model uncertainty text", () => {
+    const uncertainty = "Fixture model uncertainty remains verbatim.";
+    const current = lookSchema.parse({
+      ...look,
+      outfitOptions: [
+        {
+          ...look.outfitOptions[0],
+          stale: false,
+          explanation: {
+            ...explanation,
+            inputsUsed: [
+              "inspiration",
+              "wardrobe",
+              "occasion",
+              "skinSwatchId",
+              "skinSwatchHex",
+              "bodyIllustrationGroup",
+              "bodyIllustrationId",
+              "fit",
+            ],
+            uncertainty: [uncertainty],
+          },
+        },
+      ],
+    });
+    const [idea] = presentIdeas(current, [], "combined");
+    expect(idea.inputsUsed).toEqual([
+      "Inspiration",
+      "Wardrobe",
+      "Occasion",
+      "Skin tone",
+      "Body reference",
+      "Fit preference",
+    ]);
+    expect(idea.uncertainty).toEqual([uncertainty]);
+  });
   it("retains stale confidence content with an explicit previous-review state", () => {
     expect(presentConfidence(look, undefined)).toMatchObject({
       stale: true,

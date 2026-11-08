@@ -27,6 +27,7 @@ import {
   label,
   presentConfidence,
   presentIdeas,
+  presentInputSignals,
   presentMatches,
   presentPiece,
   presentPreferences,
@@ -763,23 +764,22 @@ export function CreatePage({
             hasPreferences={Object.values(state.preferences).some((value) =>
               Array.isArray(value) ? value.length : Boolean(value),
             )}
-            preferencesUsed={[
-              ...new Set(
-                look.outfitOptions
-                  .filter(
-                    (option) =>
-                      !option.stale &&
-                      option.inventoryMode === state.inventoryMode,
-                  )
-                  .flatMap((option) => option.explanation.inputsUsed)
-                  .filter(
-                    (key) =>
-                      key !== "inspiration" &&
-                      key !== "wardrobe" &&
-                      key !== "occasion",
-                  ),
-              ),
-            ].map(label)}
+            preferencesUsed={presentInputSignals(
+              look.outfitOptions
+                .filter(
+                  (option) =>
+                    !option.stale &&
+                    option.inventoryMode === state.inventoryMode,
+                )
+                .flatMap((option) => option.explanation.inputsUsed)
+                .filter(
+                  (key) =>
+                    key !== "inspiration" &&
+                    key !== "wardrobe" &&
+                    key !== "occasion",
+                ),
+              state.preferences,
+            )}
             onBack={() => go("matches")}
             onSuggestAnother={
               writesEnabled && ideasReady

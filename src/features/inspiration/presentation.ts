@@ -19,6 +19,66 @@ export const label = (value: string) =>
     .replaceAll(".", " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replaceAll("_", " ");
+const inputSignalLabels = new Map<string, string>([
+  ["inspiration", "Inspiration"],
+  ["wardrobe", "Wardrobe"],
+  ["occasion", "Occasion"],
+  ["skinSwatchId", "Skin tone"],
+  ["skinSwatchHex", "Skin tone"],
+  ["undertone", "Undertone"],
+  ["contrast", "Contrast"],
+  ["bodyIllustrationGroup", "Body reference"],
+  ["bodyIllustrationId", "Body reference"],
+  ["fit", "Fit preference"],
+  ["styles", "Clothing style"],
+  ["proportions", "Proportion preference"],
+  ["colorFamilies", "Color preference"],
+  ["occasions", "Preferred occasions"],
+  ["climate", "Climate"],
+  ["coverage", "Coverage preference"],
+  ["lengths", "Length preference"],
+  ["layering", "Layering preference"],
+  ["fabricDislikes", "Fabrics to avoid"],
+  ["footwearComfort", "Footwear comfort"],
+  ["careTolerance", "Care preference"],
+]);
+
+export function presentInputSignals(
+  signals: readonly string[],
+  preferences?: PreferencesDraft,
+): string[] {
+  const supplied = preferences
+    ? new Set(
+        Object.entries(preferences)
+          .filter(([, value]) =>
+            (Array.isArray(value) ? value : [value]).some(
+              (entry) =>
+                typeof entry === "string" &&
+                entry.trim() &&
+                !["unsure", "unknown", "skip", "no preference"].includes(
+                  entry.trim().toLowerCase(),
+                ),
+            ),
+          )
+          .map(([key]) => key),
+      )
+    : null;
+  return [
+    ...new Set(
+      signals.flatMap((key) => {
+        const text = inputSignalLabels.get(key);
+        if (
+          !text ||
+          (supplied &&
+            !["inspiration", "wardrobe", "occasion"].includes(key) &&
+            !supplied.has(key))
+        )
+          return [];
+        return [text];
+      }),
+    ),
+  ];
+}
 const strings = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === "string")
@@ -300,7 +360,7 @@ export function presentIdeas(
         title: option.title,
         concept: option.concept,
         reasons: option.explanation.whyThis.map((reason) => reason.reason),
-        inputsUsed: option.explanation.inputsUsed.map(label),
+        inputsUsed: presentInputSignals(option.explanation.inputsUsed),
         differences: option.explanation.differences,
         uncertainty: option.explanation.uncertainty,
         pieces: option.items.map((item) => ({
