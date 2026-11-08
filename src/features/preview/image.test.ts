@@ -20,6 +20,7 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/storage", () => ({
   createWorkspaceSignedUpload: vi.fn(),
   verifyWorkspaceStorageAsset: vi.fn(),
+  readVerifiedWorkspaceStorageAsset: vi.fn(),
 }));
 vi.mock("./visual-direction", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./visual-direction")>();

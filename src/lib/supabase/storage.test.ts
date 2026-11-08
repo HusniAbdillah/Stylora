@@ -12,6 +12,7 @@ import {
   StorageAssetError,
   type StorageUploadInput,
   verifyWorkspaceStorageAsset,
+  readVerifiedWorkspaceStorageAsset,
 } from "./storage";
 
 vi.mock("server-only", () => ({}));
@@ -43,6 +44,7 @@ function setup(asset: ReturnType<typeof assetFixture> | null = assetFixture()) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
+    abortSignal: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue({ data: asset, error: null }),
     insert: vi.fn().mockResolvedValue({ error: null }),
   };
@@ -289,6 +291,72 @@ describe("workspace Storage upload", () => {
 });
 
 describe("workspace Storage reads", () => {
+  it("returns the exact verified bytes from one download and preserves the caller deadline", async () => {
+    const image = await pngFixture();
+    const { query, storage } = setup(assetFixture({ byte_size: image.size }));
+    storage.download.mockResolvedValue({ data: image, error: null });
+    const signal = AbortSignal.timeout(5000);
+    const result = await readVerifiedWorkspaceStorageAsset(assetId, {
+      signal,
+      readyOnly: true,
+    });
+    expect(result.bytes).toEqual(new Uint8Array(await image.arrayBuffer()));
+    expect(result).toMatchObject({
+      width: 2,
+      height: 3,
+      byteSize: image.size,
+      mimeType: "image/png",
+    });
+    expect(query.in).toHaveBeenCalledWith("status", ["ready"]);
+    expect(query.abortSignal).toHaveBeenCalledWith(signal);
+    expect(storage.download).toHaveBeenCalledExactlyOnceWith(
+      assetFixture().storage_path,
+      undefined,
+      { signal },
+    );
+  });
+
+  it("keeps verified bytes out of the public upload verification result", async () => {
+    const image = await pngFixture();
+    const { storage } = setup(
+      assetFixture({ byte_size: image.size, status: "pending" }),
+    );
+    storage.download.mockResolvedValue({ data: image, error: null });
+    const result = await verifyWorkspaceStorageAsset(assetId);
+    expect(Object.keys(result).sort()).toEqual(
+      [
+        "assetId",
+        "bucket",
+        "storagePath",
+        "mimeType",
+        "byteSize",
+        "width",
+        "height",
+      ].sort(),
+    );
+    expect(storage.download).toHaveBeenCalledOnce();
+  });
+
+  it("rejects an expired deadline before any asset lookup or byte download", async () => {
+    const { client, storage } = setup();
+    const reason = new Error("Caller deadline expired");
+    await expect(
+      readVerifiedWorkspaceStorageAsset(assetId, {
+        signal: AbortSignal.abort(reason),
+      }),
+    ).rejects.toBe(reason);
+    expect(client.from).not.toHaveBeenCalled();
+    expect(storage.download).not.toHaveBeenCalled();
+  });
+
+  it("rejects a pending reference before download when ready bytes are required", async () => {
+    const { storage } = setup(assetFixture({ status: "pending" }));
+    await expect(
+      readVerifiedWorkspaceStorageAsset(assetId, { readyOnly: true }),
+    ).rejects.toMatchObject({ code: "INVALID_STORAGE_ASSET" });
+    expect(storage.download).not.toHaveBeenCalled();
+  });
+
   it("scopes ready asset lookup before issuing a short-lived signed read", async () => {
     const { context, query, storage } = setup();
     context.writesEnabled = false;
