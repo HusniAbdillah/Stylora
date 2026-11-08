@@ -278,4 +278,18 @@ describe("avatar image checkpoints", () => {
       retryable: false,
     });
   });
+
+  it("preserves an expired read deadline without marking its stored image unusable", async () => {
+    const controller = new AbortController();
+    const timeout = new DOMException("Read timed out", "TimeoutError");
+    controller.abort(timeout);
+    vi.mocked(readVerifiedWorkspaceStorageAsset).mockRejectedValueOnce(timeout);
+    await expect(
+      restoreAvatarCheckpoint(
+        result,
+        result.renderFingerprint,
+        controller.signal,
+      ),
+    ).rejects.toBe(timeout);
+  });
 });

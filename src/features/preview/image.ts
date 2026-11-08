@@ -140,6 +140,7 @@ export async function restoreAvatarCheckpoint(
         409,
       );
   } catch (failure) {
+    signal.throwIfAborted();
     if (failure instanceof OperationError) throw failure;
     const error = avatarIoError(failure, "AVATAR_CHECKPOINT_UNUSABLE");
     if (error.retryable) throw error;
@@ -232,6 +233,7 @@ export async function renderAndStoreAvatar(input: {
         signal: input.signal,
         readyOnly: true,
       }).catch((failure: unknown) => {
+        input.signal?.throwIfAborted();
         throw avatarIoError(failure, "AVATAR_IMAGE_UNAVAILABLE");
       });
       const bytes = verified.bytes;
@@ -287,7 +289,6 @@ export async function renderAndStoreAvatar(input: {
         throw avatarIoError(failure, "AVATAR_IMAGE_UPLOAD_FAILED");
       },
     );
-    input.signal?.throwIfAborted();
     return { assetId: asset.assetId, renderFingerprint, createdAsset: true };
   } catch (error) {
     await discardPendingAvatar(asset.assetId);

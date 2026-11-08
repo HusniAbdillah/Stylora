@@ -193,4 +193,20 @@ describe("avatar provider metering boundaries", () => {
       warning.mockRestore();
     }
   });
+
+  it("keeps a verified paid result for checkpointing when the execution deadline expires during storage", async () => {
+    setup(false);
+    const controller = new AbortController();
+    mocks.verify.mockImplementationOnce(async () => {
+      controller.abort(new DOMException("Execution expired", "TimeoutError"));
+      return { assetId };
+    });
+    await expect(
+      renderAndStoreAvatar({
+        items: [item],
+        preferences: {},
+        signal: controller.signal,
+      }),
+    ).resolves.toMatchObject({ assetId, createdAsset: true });
+  });
 });
