@@ -209,7 +209,14 @@ export async function previewImageStatus(draftId: string) {
   let job: PreviewJob = { status: "idle" };
   let operationId = operation?.id ?? null;
   if (operation) {
-    if (operation.status === "superseded") operationId = null;
+    if (
+      operation.status === "superseded" ||
+      (operation.status === "failed" &&
+        z
+          .object({ retryable: z.literal(false) })
+          .safeParse(operation.result_ref).success)
+    )
+      operationId = null;
     job = {
       status: previewJobStatus(operation.status),
       superseded: operation.status === "superseded",
@@ -431,6 +438,24 @@ export async function runPreviewOperation(operationId: string) {
             p_render_fingerprint: output.renderFingerprint,
           },
         );
+        if (error?.code === "40001")
+          throw new OperationError(
+            "INPUT_SUPERSEDED",
+            "The preview inputs changed. Reopen the current preview.",
+            409,
+          );
+        if (error?.code === "23514")
+          throw new OperationError(
+            "PREVIEW_COMMIT_REJECTED",
+            "This image cannot be attached. Request a new image.",
+            409,
+          );
+        if (error?.code === "P0002")
+          throw new OperationError(
+            "PREVIEW_COMMIT_NOT_FOUND",
+            "This preview is unavailable. Reopen your saved selection.",
+            404,
+          );
         if (error)
           throw new OperationError(
             "PREVIEW_COMMIT_FAILED",

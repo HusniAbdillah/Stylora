@@ -286,6 +286,24 @@ export async function runSavedAvatar(operationId: string) {
             p_render_fingerprint: output.renderFingerprint,
           })
           .abortSignal(AbortSignal.timeout(15000));
+        if (error?.code === "40001")
+          throw new OperationError(
+            "INPUT_SUPERSEDED",
+            "The image request changed. Reopen the saved look.",
+            409,
+          );
+        if (error?.code === "23514")
+          throw new OperationError(
+            "AVATAR_COMMIT_REJECTED",
+            "This image cannot be attached. Request a new image.",
+            409,
+          );
+        if (error?.code === "P0002")
+          throw new OperationError(
+            "AVATAR_COMMIT_NOT_FOUND",
+            "This saved image request is unavailable. Reopen the saved look.",
+            404,
+          );
         if (error)
           throw new OperationError(
             "AVATAR_COMMIT_FAILED",

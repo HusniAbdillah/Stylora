@@ -86,6 +86,7 @@ function setup() {
     eventFailure: false,
     commitStatus: "succeeded",
     commitFailure: false,
+    commitErrorCode: "08006",
     checkpoint: null as {
       result: Record<string, unknown>;
       metadata: Record<string, unknown>;
@@ -115,6 +116,24 @@ function setup() {
   function query(table: string) {
     let update: Record<string, unknown> | undefined;
     const predicates: ((row: Record<string, unknown>) => boolean)[] = [];
+    async function execute() {
+      if (table === "saved_look_snapshots")
+        return { data: snapshot, error: null };
+      if (table === "workflow_operation_events")
+        return { data: state.events[0] ?? null, error: null };
+      if (table !== "workflow_operations")
+        throw new Error("Unexpected test table");
+      if (update) {
+        if ("input" in update) {
+          state.constraintRejections++;
+          return { data: null, error: { code: "23514" } };
+        }
+        if (!predicates.every((predicate) => predicate(operation)))
+          return { data: null, error: null };
+        Object.assign(operation, update);
+      }
+      return { data: { ...operation }, error: null };
+    }
     const builder = {
       select: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
@@ -142,24 +161,10 @@ function setup() {
         writes.push(value);
         return builder;
       }),
-      maybeSingle: vi.fn(async () => {
-        if (table === "saved_look_snapshots")
-          return { data: snapshot, error: null };
-        if (table === "workflow_operation_events")
-          return { data: state.events[0] ?? null, error: null };
-        if (table !== "workflow_operations")
-          throw new Error("Unexpected test table");
-        if (update) {
-          if ("input" in update) {
-            state.constraintRejections++;
-            return { data: null, error: { code: "23514" } };
-          }
-          if (!predicates.every((predicate) => predicate(operation)))
-            return { data: null, error: null };
-          Object.assign(operation, update);
-        }
-        return { data: { ...operation }, error: null };
-      }),
+      maybeSingle: vi.fn(execute),
+      then: (
+        resolve: (value: Awaited<ReturnType<typeof execute>>) => unknown,
+      ) => execute().then(resolve),
     };
     return builder;
   }
@@ -183,7 +188,7 @@ function setup() {
             payload: args.p_payload as Record<string, unknown>,
           });
       } else if (name === "complete_saved_avatar") {
-        if (state.commitFailure) error = { code: "08006" };
+        if (state.commitFailure) error = { code: state.commitErrorCode };
         else {
           operation.status = state.commitStatus;
           operation.lease_until = null;
@@ -344,6 +349,29 @@ describe("saved-avatar render capture", () => {
     expect(mocks.render).toHaveBeenCalledOnce();
     expect(mocks.restore).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["40001", "INPUT_SUPERSEDED", "superseded"],
+    ["23514", "AVATAR_COMMIT_REJECTED", "failed"],
+    ["P0002", "AVATAR_COMMIT_NOT_FOUND", "failed"],
+  ])(
+    "terminalizes commit fence or integrity rejection (%s) without another model call",
+    async (databaseCode, code, status) => {
+      const { state } = setup();
+      state.commitFailure = true;
+      state.commitErrorCode = databaseCode;
+      const result = await runSavedAvatar(operationId);
+      expect(result.status).toBe(status);
+      expect(result.safe_error_code).toBe(code);
+      if (status === "superseded") expect(result.result_ref).toBeNull();
+      else expect(result.result_ref).toMatchObject({ retryable: false });
+      expect(state.checkpoint).not.toBeNull();
+      await runSavedAvatar(operationId);
+      expect(mocks.render).toHaveBeenCalledOnce();
+      expect(mocks.restore).not.toHaveBeenCalled();
+      expect(mocks.discard).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(["superseded", "cancelled"])(
     "discards only pending output after confirmed %s completion",
