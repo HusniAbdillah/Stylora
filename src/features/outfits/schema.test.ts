@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { MatchItem } from "@/features/matching/gates";
-import { validateOptionComposition, type OutfitOption } from "./schema";
+import {
+  ABSENT_PREFERENCES_GUIDANCE,
+  validateOptionComposition,
+  type OutfitOption,
+} from "./schema";
 
 const topId = "27521082-6561-47ac-a732-ae19901b7849";
 const bottomId = "e76c4e28-79f8-4f4c-8bbd-61b44504ae26";
@@ -49,8 +53,71 @@ const outfit = (): OutfitOption => ({
     rationale: "Uses the supplied owned garment.",
   })),
 });
+const suppliedPreferences: Record<string, string | string[]>[] = [
+  { undertone: "warm" },
+  { styles: ["minimal"] },
+  { fit: "relaxed" },
+];
+const absentPreferences: Record<string, string | string[]>[] = [
+  {},
+  { styles: [], fit: "" },
+  { styles: [" "], fit: " " },
+];
 
 describe("outfit composition boundaries", () => {
+  it.each(suppliedPreferences)(
+    "rejects the observed closest absence claim when preferences are supplied: %j",
+    (preferences) => {
+      const option = { ...outfit(), optionType: "closest" as const };
+      option.explanation.uncertainty = [ABSENT_PREFERENCES_GUIDANCE];
+      expect(
+        validateOptionComposition([option], [], inventory, "closest", {
+          preferences,
+          occasion: null,
+        }),
+      ).toEqual(["supplied_preferences_marked_absent"]);
+      expect(option.explanation.uncertainty).toEqual([
+        ABSENT_PREFERENCES_GUIDANCE,
+      ]);
+    },
+  );
+  it.each(absentPreferences)(
+    "retains the absence guidance when no preference value is supplied: %j",
+    (preferences) => {
+      const option = outfit();
+      option.explanation.uncertainty = [ABSENT_PREFERENCES_GUIDANCE];
+      expect(
+        validateOptionComposition([option], [], inventory, "from_wardrobe", {
+          preferences,
+          occasion: null,
+        }),
+      ).toEqual([]);
+    },
+  );
+  it.each([
+    `Material composition is unverified. ${ABSENT_PREFERENCES_GUIDANCE}`,
+    `${ABSENT_PREFERENCES_GUIDANCE} Stitching is not visible.`,
+  ])("rejects the exact absence claim embedded in uncertainty: %s", (note) => {
+    const option = { ...outfit(), optionType: "closest" as const };
+    option.explanation.uncertainty = [note];
+    expect(
+      validateOptionComposition([option], [], inventory, "closest", {
+        preferences: { fit: "relaxed" },
+        occasion: null,
+      }),
+    ).toEqual(["supplied_preferences_marked_absent"]);
+    expect(option.explanation.uncertainty).toEqual([note]);
+  });
+  it("retains specific uncertainty about an unselected field", () => {
+    const option = outfit();
+    option.explanation.uncertainty = ["Body proportions were not supplied."];
+    expect(
+      validateOptionComposition([option], [], inventory, "from_wardrobe", {
+        preferences: { undertone: "warm" },
+        occasion: null,
+      }),
+    ).toEqual([]);
+  });
   it("accepts complete owned composition and unavailable empty wardrobe direction", () => {
     expect(
       validateOptionComposition([outfit()], [], inventory, "from_wardrobe"),

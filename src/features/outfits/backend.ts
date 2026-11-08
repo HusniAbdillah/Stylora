@@ -15,6 +15,8 @@ import {
   projectRecommendationIndex,
 } from "@/features/matching/evidence";
 import {
+  ABSENT_PREFERENCES_GUIDANCE,
+  hasSuppliedPreferences,
   validateOptionComposition,
   type OutfitOption,
   type OutfitOptionType,
@@ -44,6 +46,7 @@ export async function generateOptions(
       409,
     );
   const evidence = createEvidenceProjection(input);
+  const suppliedPreferences = hasSuppliedPreferences(input.preferences);
   const response = await requestFashion({
     task: input.optionType ? "option_regeneration" : "outfit_options",
     schema: outfitProviderSchema(input, evidence.schema),
@@ -100,6 +103,12 @@ export async function generateOptions(
         .filter((item) => isOwnedInventoryItem(item, input.inventoryMode))
         .map((item) => item.id),
       preferences: input.preferences,
+      preferenceContext: {
+        supplied: suppliedPreferences,
+        instruction: suppliedPreferences
+          ? "Explicit preference selections are supplied in preferences. Use only those actual signals where relevant. Do not claim preferences are absent or ask the user to add preferences globally. Specific unselected fields may remain uncertain."
+          : `No selected preferences are supplied. Use reference-led reasoning and the absent-preferences guidance: ${ABSENT_PREFERENCES_GUIDANCE}`,
+      },
       occasion: input.occasion,
       sourceRevision: input.sourceRevision,
       allowedInputs: evidence.allowedInputs,

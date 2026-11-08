@@ -41,6 +41,18 @@ export const outfitOptionsSchema = z.strictObject({
 });
 export type OutfitOption = z.infer<typeof outfitOptionSchema>;
 export type OutfitOptionType = z.infer<typeof optionTypeSchema>;
+export const ABSENT_PREFERENCES_GUIDANCE =
+  "These ideas use the reference's colors and silhouette. Add your preferences for more personal color and fit guidance.";
+
+export function hasSuppliedPreferences(
+  preferences: Record<string, string | string[]>,
+) {
+  return Object.values(preferences).some((value) =>
+    Array.isArray(value)
+      ? value.some((entry) => entry.trim().length > 0)
+      : value.trim().length > 0,
+  );
+}
 
 export function wardrobeSupportsOutfit(
   pieces: MatchItem[],
@@ -103,7 +115,15 @@ export function validateOptionComposition(
     constraints,
   );
   const compositions = new Set<string>();
+  const suppliedPreferences = hasSuppliedPreferences(constraints.preferences);
   for (const option of options) {
+    if (
+      suppliedPreferences &&
+      option.explanation.uncertainty.some((note) =>
+        note.includes(ABSENT_PREFERENCES_GUIDANCE),
+      )
+    )
+      errors.push("supplied_preferences_marked_absent");
     if (option.status === "unavailable") {
       if (option.optionType !== "from_wardrobe" || option.items.length)
         errors.push("unavailable_option_invalid");

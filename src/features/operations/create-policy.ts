@@ -7,7 +7,7 @@ import {
 import { fingerprintOperationInput } from "./fingerprint";
 import { isRetryableCreateFailureCode } from "./create-failure";
 
-export const CREATE_RUNTIME_VERSION = "owner2-create.v9";
+export const CREATE_RUNTIME_VERSION = "owner2-create.v10";
 export const createKindSchema = z.enum([
   "inspiration_description",
   "inspiration_confidence",
