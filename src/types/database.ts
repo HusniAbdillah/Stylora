@@ -1422,6 +1422,65 @@ export type Database = {
           },
         ]
       }
+      workflow_dispatch_outbox: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          dispatch_generation: number
+          due_at: string
+          id: string
+          is_current: boolean
+          last_error_code: string | null
+          lease_token: string | null
+          lease_until: string | null
+          operation_id: string
+          published_at: string | null
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          dispatch_generation: number
+          due_at: string
+          id?: string
+          is_current?: boolean
+          last_error_code?: string | null
+          lease_token?: string | null
+          lease_until?: string | null
+          operation_id: string
+          published_at?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          dispatch_generation?: number
+          due_at?: string
+          id?: string
+          is_current?: boolean
+          last_error_code?: string | null
+          lease_token?: string | null
+          lease_until?: string | null
+          operation_id?: string
+          published_at?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_dispatch_outbox_workspace_id_operation_id_fkey"
+            columns: ["workspace_id", "operation_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_operations"
+            referencedColumns: ["workspace_id", "id"]
+          },
+        ]
+      }
       workflow_drafts: {
         Row: {
           asset_id: string | null
@@ -2016,6 +2075,35 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claim_workflow_dispatches: {
+        Args: {
+          p_lease_seconds?: number
+          p_limit?: number
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          created_at: string
+          dispatch_generation: number
+          due_at: string
+          id: string
+          is_current: boolean
+          last_error_code: string | null
+          lease_token: string | null
+          lease_until: string | null
+          operation_id: string
+          published_at: string | null
+          state: string
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "workflow_dispatch_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       claim_workflow_operation: {
         Args: {
           p_image_daily_limit?: number
@@ -2339,6 +2427,37 @@ export type Database = {
         }
         Returns: undefined
       }
+      finish_workflow_dispatch: {
+        Args: {
+          p_error_code?: string
+          p_lease_token: string
+          p_outbox_id: string
+          p_success: boolean
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          created_at: string
+          dispatch_generation: number
+          due_at: string
+          id: string
+          is_current: boolean
+          last_error_code: string | null
+          lease_token: string | null
+          lease_until: string | null
+          operation_id: string
+          published_at: string | null
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_dispatch_outbox"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       finish_workflow_operation: {
         Args: {
           p_attempt_count: number
@@ -2391,6 +2510,10 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      reconcile_workflow_dispatches: {
+        Args: { p_limit?: number; p_workspace_id: string }
+        Returns: number
       }
       record_workflow_worker_heartbeat: {
         Args: {
@@ -2754,6 +2877,14 @@ export type Database = {
       stylora_create_draft_active: {
         Args: { p_draft_id?: string; p_look_id: string; p_workspace_id: string }
         Returns: boolean
+      }
+      stylora_enqueue_workflow_dispatch: {
+        Args: {
+          p_force?: boolean
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: string
       }
       stylora_record_operation_event: {
         Args: {
