@@ -17,6 +17,7 @@ import {
 import {
   createWorkspaceSignedUpload,
   verifyWorkspaceStorageAsset,
+  readVerifiedWorkspaceStorageAsset,
 } from "@/lib/supabase/storage";
 import { prepareReferenceImage } from "@/features/ai/reference-image";
 import { avatarIoError } from "./image-errors";
@@ -176,31 +177,13 @@ export async function renderAndStoreAvatar(input: {
           throw new Error("AVATAR_IMAGE_UNAVAILABLE");
         return null;
       }
-      const {
-        data: asset,
-        error,
-        status,
-      } = await client
-        .from("assets")
-        .select("id,status")
-        .eq("workspace_id", workspaceId)
-        .eq("id", item.asset_id)
-        .eq("status", "ready")
-        .maybeSingle();
-      if (error) throw avatarIoError(error, "AVATAR_IMAGE_UNAVAILABLE", status);
-      if (!asset) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
-      const verified = await verifyWorkspaceStorageAsset(asset.id).catch(
-        (failure: unknown) => {
-          throw avatarIoError(failure, "AVATAR_IMAGE_UNAVAILABLE");
-        },
-      );
-      const { data: image, error: downloadError } = await client.storage
-        .from(verified.bucket)
-        .download(verified.storagePath);
-      if (downloadError)
-        throw avatarIoError(downloadError, "AVATAR_IMAGE_UNAVAILABLE");
-      if (!image) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
-      const bytes = new Uint8Array(await image.arrayBuffer());
+      const verified = await readVerifiedWorkspaceStorageAsset(item.asset_id, {
+        signal: input.signal,
+        readyOnly: true,
+      }).catch((failure: unknown) => {
+        throw avatarIoError(failure, "AVATAR_IMAGE_UNAVAILABLE");
+      });
+      const bytes = verified.bytes;
       // A smaller reference uploads and processes faster. If it cannot be
       // decoded here, send the verified original unchanged.
       return prepareReferenceImage(bytes).catch(() => ({

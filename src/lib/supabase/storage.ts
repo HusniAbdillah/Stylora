@@ -121,16 +121,19 @@ async function readAsset(
   context: WorkspaceDatabase,
   assetId: string,
   statuses: StorageStatus[],
+  signal?: AbortSignal,
 ) {
+  signal?.throwIfAborted();
   if (!z.uuid().safeParse(assetId).success) invalidAsset();
 
-  const { data, error, status } = await context.client
+  let query = context.client
     .from("assets")
     .select("id,workspace_id,bucket,storage_path,mime_type,byte_size,status")
     .eq("workspace_id", context.workspaceId)
     .eq("id", assetId)
-    .in("status", statuses)
-    .maybeSingle();
+    .in("status", statuses);
+  if (signal) query = query.abortSignal(signal);
+  const { data, error, status } = await query.maybeSingle();
 
   if (error) {
     throw new StorageAssetError(
@@ -300,12 +303,25 @@ export async function createWorkspaceSignedReads(assetIds: readonly string[]) {
   return urls;
 }
 
-export async function verifyWorkspaceStorageAsset(assetId: string) {
+export async function readVerifiedWorkspaceStorageAsset(
+  assetId: string,
+  options: { signal?: AbortSignal; readyOnly?: boolean } = {},
+) {
   const context = getWorkspaceDatabase();
-  const asset = await readAsset(context, assetId, ["pending", "ready"]);
-  const { data, error } = await context.client.storage
-    .from(asset.bucket)
-    .download(asset.storage_path);
+  const asset = await readAsset(
+    context,
+    assetId,
+    options.readyOnly ? ["ready"] : ["pending", "ready"],
+    options.signal,
+  );
+  options.signal?.throwIfAborted();
+  const storage = context.client.storage.from(asset.bucket);
+  const { data, error } = await (options.signal
+    ? storage.download(asset.storage_path, undefined, {
+        signal: options.signal,
+      })
+    : storage.download(asset.storage_path));
+  options.signal?.throwIfAborted();
   if (error || !data) {
     throw new StorageAssetError(
       "STORAGE_DOWNLOAD_FAILED",
@@ -325,8 +341,10 @@ export async function verifyWorkspaceStorageAsset(assetId: string) {
     );
   }
 
+  const bytes = new Uint8Array(await data.arrayBuffer());
+  options.signal?.throwIfAborted();
   try {
-    const image = sharp(Buffer.from(await data.arrayBuffer()), {
+    const image = sharp(bytes, {
       failOn: "error",
       limitInputPixels: STORAGE_MAX_PIXELS,
       sequentialRead: true,
@@ -343,6 +361,7 @@ export async function verifyWorkspaceStorageAsset(assetId: string) {
       throw new Error("Invalid image format or dimensions");
     }
     await image.stats();
+    options.signal?.throwIfAborted();
 
     return {
       assetId: asset.id,
@@ -352,11 +371,26 @@ export async function verifyWorkspaceStorageAsset(assetId: string) {
       byteSize: data.size,
       width: metadata.width,
       height: metadata.height,
+      bytes,
     };
   } catch {
+    options.signal?.throwIfAborted();
     throw new StorageAssetError(
       "STORAGE_IMAGE_INVALID",
       "The uploaded file is not a supported image.",
     );
   }
+}
+
+export async function verifyWorkspaceStorageAsset(assetId: string) {
+  const verified = await readVerifiedWorkspaceStorageAsset(assetId);
+  return {
+    assetId: verified.assetId,
+    bucket: verified.bucket,
+    storagePath: verified.storagePath,
+    mimeType: verified.mimeType,
+    byteSize: verified.byteSize,
+    width: verified.width,
+    height: verified.height,
+  };
 }
