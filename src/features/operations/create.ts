@@ -26,12 +26,19 @@ import {
   fashionValidationFailure,
 } from "@/lib/ai/provider";
 import { usesWorkflowWorker } from "./execution-mode";
+import { assertWorkflowExecutorAvailable } from "./health";
+import { workflowProviderLimits } from "./limits";
 import { buildFashionPrompt } from "@/prompts/fashion";
 import {
   fashionTaskSettingsSchema,
   getFashionTaskSettings,
 } from "@/lib/ai/task-settings";
 import type { Database, Json } from "@/types/database";
+import {
+  readCreateCheckpoint,
+  persistCreateCheckpoint,
+} from "./create-checkpoint";
+import { validateCreateResult } from "./create-result";
 import {
   CREATE_RUNTIME_VERSION,
   createKindSchema,
@@ -55,7 +62,7 @@ const snapshotSchema = z.object({
   inventoryMode: z.enum(["sample", "live", "combined"]),
   preferenceFingerprint: z.string().optional(),
   optionType: optionTypeSchema.optional(),
-  assetId: z.uuid().optional(),
+  assetId: z.uuid(),
   runtimeVersion: z.string().optional(),
   intentId: z.uuid().optional(),
   draftId: z.uuid().optional(),
@@ -372,6 +379,7 @@ export async function startLookOperation(
     revision = data.revision;
   }
   const prompt = buildFashionPrompt(parsed.kind);
+  await assertWorkflowExecutorAvailable();
   const model = getFashionTaskSettings(parsed.kind).model;
   const fingerprint = createOperationFingerprint({
     kind: parsed.kind,
@@ -457,6 +465,7 @@ export async function executeOperation(id: string) {
     ["succeeded", "failed", "cancelled", "superseded"].includes(pending.status)
   )
     return projectOperation(pending);
+  const limits = workflowProviderLimits();
   const { data: op, error } = await context.client.rpc(
     "claim_workflow_operation",
     {
@@ -464,6 +473,8 @@ export async function executeOperation(id: string) {
       p_operation_id: id,
       p_input_revision: pending.input_revision,
       p_lease_seconds: 280,
+      p_text_daily_limit: limits.textDailyLimit,
+      p_image_daily_limit: limits.imageDailyLimit,
     },
   );
   if (error) throw sqlFailure(error);
@@ -472,12 +483,13 @@ export async function executeOperation(id: string) {
   const deadline = Date.now() + 240_000;
   const signal = AbortSignal.timeout(240_000);
   let metadata: unknown = {};
+  let checkpointed = false;
   return withFashionOperation(
     {
       operationId: op.id,
       providerSettings: snapshot.providerSettings,
       signal,
-      deadline,
+      deadline: deadline - 30_000,
       reserveCall: async () => {
         for (let wait = 0; wait < 10; wait++) {
           signal.throwIfAborted();
@@ -538,7 +550,15 @@ export async function executeOperation(id: string) {
         if (
           JSON.stringify(snapshot.providerSettings) !==
             JSON.stringify(getFashionTaskSettings(kind)) ||
-          op.model !== snapshot.providerSettings.model
+          op.model !== snapshot.providerSettings.model ||
+          createOperationFingerprint({
+            kind,
+            input: z.record(z.string(), z.json()).parse(op.input),
+            versions: buildFashionPrompt(kind).versions,
+            model: op.model,
+            subjectId: op.subject_id,
+            revision: op.input_revision,
+          }) !== op.input_fingerprint
         )
           throw new ApiError(
             "input_superseded",
@@ -564,8 +584,31 @@ export async function executeOperation(id: string) {
             "Preferences changed before this operation started.",
             409,
           );
-        let result: unknown;
+        const inventory = [
+          "wardrobe_match",
+          "outfit_options",
+          "option_regeneration",
+        ].includes(kind)
+          ? await listInventory(snapshot.inventoryMode, signal)
+          : undefined;
         if (
+          inventory &&
+          inventory.fingerprint !==
+            z.object({ inventoryFingerprint: z.string() }).parse(op.input)
+              .inventoryFingerprint
+        )
+          throw new ApiError(
+            "input_superseded",
+            "Wardrobe inventory changed before this operation started.",
+            409,
+          );
+        const saved = await readCreateCheckpoint(op, signal);
+        let result: unknown;
+        if (saved) {
+          result = saved.result;
+          metadata = saved.metadata;
+          checkpointed = true;
+        } else if (
           kind === "inspiration_description" ||
           kind === "inspiration_confidence"
         ) {
@@ -693,15 +736,10 @@ export async function executeOperation(id: string) {
             });
           }
         } else {
-          const inventory = await listInventory(snapshot.inventoryMode, signal);
-          if (
-            inventory.fingerprint !==
-            z.object({ inventoryFingerprint: z.string() }).parse(op.input)
-              .inventoryFingerprint
-          )
+          if (!inventory)
             throw new ApiError(
               "input_superseded",
-              "Wardrobe inventory changed before this operation started.",
+              "The captured inventory is unavailable.",
               409,
             );
           const personalization = { preferences: capturedPreferences };
@@ -781,6 +819,36 @@ export async function executeOperation(id: string) {
           snapshot.draftId,
           signal,
         );
+        try {
+          validateCreateResult(result, {
+            kind,
+            assetId: snapshot.assetId,
+            model: op.model,
+            pieces,
+            inventory: inventory?.items ?? [],
+            preferences: capturedPreferences,
+            occasion: look.occasion,
+            sourceRevision: look.revision,
+            inventoryMode: snapshot.inventoryMode,
+            optionType: snapshot.optionType,
+          });
+        } catch {
+          throw new ApiError(
+            "operation_checkpoint_invalid",
+            "The analysis result did not pass validation. Start a new analysis.",
+            502,
+            false,
+          );
+        }
+        if (!checkpointed) {
+          await persistCreateCheckpoint(
+            op,
+            asJson(result),
+            asJson(resultMetadata),
+            signal,
+          );
+          checkpointed = true;
+        }
         const { data: finished, error: finishError } = await context.client
           .rpc("finish_create_operation", {
             p_workspace_id: context.workspaceId,
@@ -789,7 +857,7 @@ export async function executeOperation(id: string) {
             p_result: asJson(result),
             p_metadata: asJson(resultMetadata),
           })
-          .abortSignal(AbortSignal.timeout(10000));
+          .abortSignal(AbortSignal.any([signal, AbortSignal.timeout(10000)]));
         if (finishError) throw sqlFailure(finishError);
         return projectOperation(finished);
       } catch (failure) {
@@ -822,6 +890,7 @@ export async function executeOperation(id: string) {
             safe_error_code: safe.code,
             result_ref: asJson({
               retryable: safe.retryable,
+              checkpointed,
               safeMessage:
                 safe.code === "provider_unavailable" ? safe.message : null,
               metadata,

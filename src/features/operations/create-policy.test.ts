@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("server-only", () => ({}));
 import {
   CREATE_RUNTIME_VERSION,
   createInputSnapshot,
@@ -60,6 +61,16 @@ describe("Create operation recovery policy", () => {
         .retryBlockedReason,
     ).toBe("provider_call_limit");
     expect(
+      createOperationPolicy(
+        {
+          ...operation,
+          provider_call_count: 3,
+          result_ref: { retryable: true, checkpointed: true },
+        },
+        "current",
+      ).canRetry,
+    ).toBe(true);
+    expect(
       createOperationPolicy({ ...operation, status: "running" }, "current")
         .canRetry,
     ).toBe(false);
@@ -116,6 +127,9 @@ describe("Create operation recovery policy", () => {
         revision: 1,
       });
     expect(fingerprint(input)).toBe(fingerprint({ ...input }));
+    expect(fingerprint(input)).toBe(
+      fingerprint(Object.fromEntries(Object.entries(input).reverse())),
+    );
     expect(fingerprint(input)).not.toBe(
       fingerprint({ ...input, occasion: "Travel" }),
     );

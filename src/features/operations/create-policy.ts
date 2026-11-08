@@ -1,9 +1,9 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Json } from "@/types/database";
 import type { FashionTaskSettings } from "@/lib/ai/task-settings";
+import { fingerprintOperationInput } from "./fingerprint";
 
-export const CREATE_RUNTIME_VERSION = "owner2-create.v8";
+export const CREATE_RUNTIME_VERSION = "owner2-create.v9";
 export const createKindSchema = z.enum([
   "inspiration_description",
   "inspiration_confidence",
@@ -108,19 +108,15 @@ export function createOperationFingerprint(input: {
   subjectId: string;
   revision: number;
 }) {
-  return createHash("sha256")
-    .update(
-      JSON.stringify({
-        kind: input.kind,
-        input: input.input,
-        versions: input.versions,
-        handlerVersion: CREATE_RUNTIME_VERSION,
-        model: input.model,
-        subjectId: input.subjectId,
-        revision: input.revision,
-      }),
-    )
-    .digest("hex");
+  return fingerprintOperationInput({
+    kind: input.kind,
+    input: input.input,
+    versions: input.versions,
+    handlerVersion: CREATE_RUNTIME_VERSION,
+    model: input.model,
+    subjectId: input.subjectId,
+    revision: input.revision,
+  });
 }
 
 type OperationPolicyInput = {
@@ -145,6 +141,9 @@ export function createOperationPolicy(
   const retryable = z
     .object({ retryable: z.literal(true) })
     .safeParse(op.result_ref).success;
+  const checkpointed = z
+    .object({ checkpointed: z.literal(true) })
+    .safeParse(op.result_ref).success;
   const terminal = ["succeeded", "failed", "cancelled", "superseded"].includes(
     op.status,
   );
@@ -162,7 +161,7 @@ export function createOperationPolicy(
             ? "input_changed"
             : op.attempt_count >= 3
               ? "attempt_limit"
-              : op.provider_call_count >= 3
+              : op.provider_call_count >= 3 && !checkpointed
                 ? "provider_call_limit"
                 : !retryable
                   ? "non_retryable"

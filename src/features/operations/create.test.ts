@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CREATE_RUNTIME_VERSION } from "./create-policy";
+import {
+  CREATE_RUNTIME_VERSION,
+  createOperationFingerprint,
+} from "./create-policy";
+import { buildFashionPrompt } from "@/prompts/fashion";
 
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
@@ -10,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   scope: vi.fn(),
   personalization: vi.fn(),
   inventory: vi.fn(),
+  health: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({
@@ -33,6 +38,10 @@ vi.mock("@/features/preferences/server", () => ({
 vi.mock("@/features/matching/backend", () => ({
   calculateMatches: vi.fn(),
   listInventory: mocks.inventory,
+}));
+vi.mock("./health", () => ({ assertWorkflowExecutorAvailable: mocks.health }));
+vi.mock("./limits", () => ({
+  workflowProviderLimits: () => ({ textDailyLimit: 150, imageDailyLimit: 50 }),
 }));
 vi.mock("@/lib/ai/provider", async (original) => ({
   ...(await original<typeof import("@/lib/ai/provider")>()),
@@ -71,8 +80,9 @@ const base = {
     inventoryMode: "combined",
     runtimeVersion: CREATE_RUNTIME_VERSION,
     providerSettings,
+    occasion: null,
   },
-  attempt_count: 1,
+  attempt_count: 0,
   provider_call_count: 0,
   result_ref: null as unknown,
   lease_until: null,
@@ -84,14 +94,28 @@ const base = {
 let row = { ...base };
 let draftStatus = "active";
 let assetStatus = "ready";
+let checkpoint: Record<string, unknown> | null = null;
+let finishFailures = 0;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.requestFashion.mockReset();
+  mocks.health.mockReset().mockResolvedValue(undefined);
   vi.stubEnv("OPENAI_TEXT_MODEL", providerSettings.model);
   vi.stubEnv("OPENAI_DESCRIPTION_MODEL", "");
   row = { ...base };
+  row.input_fingerprint = createOperationFingerprint({
+    kind: "inspiration_description",
+    input: row.input,
+    versions: buildFashionPrompt("inspiration_description").versions,
+    model: row.model,
+    subjectId: row.subject_id,
+    revision: row.input_revision,
+  });
   draftStatus = "active";
   assetStatus = "ready";
+  checkpoint = null;
+  finishFailures = 0;
   mocks.getLookContext.mockResolvedValue({
     look: {
       id: lookId,
@@ -136,14 +160,16 @@ beforeEach(() => {
               ? row
               : table === "workflow_drafts"
                 ? { id: draftId, status: draftStatus }
-                : table === "assets"
-                  ? {
-                      status: assetStatus,
-                      bucket: "inspiration",
-                      storage_path: "fixture",
-                      mime_type: "image/png",
-                    }
-                  : [],
+                : table === "operation_result_checkpoints"
+                  ? checkpoint
+                  : table === "assets"
+                    ? {
+                        status: assetStatus,
+                        bucket: "inspiration",
+                        storage_path: "fixture",
+                        mime_type: "image/png",
+                      }
+                    : [],
         }).then(resolve),
     };
     return query;
@@ -158,10 +184,31 @@ beforeEach(() => {
           kind: String(input.p_kind),
         };
       if (name === "claim_workflow_operation")
-        row = { ...row, status: "running" };
+        row = {
+          ...row,
+          status: "running",
+          attempt_count: row.attempt_count + 1,
+        };
       if (name === "control_create_operation")
         row = { ...row, status: "queued" };
-      const response = Promise.resolve({ data: row, error: null });
+      if (name === "checkpoint_workflow_result")
+        checkpoint = {
+          result: input.p_result,
+          metadata: input.p_metadata,
+          kind: row.kind,
+          prompt_version: row.prompt_version,
+          schema_version: row.schema_version,
+          model: row.model,
+        };
+      let error: { code: string } | null = null;
+      if (name === "finish_create_operation") {
+        if (finishFailures-- > 0) error = { code: "08006" };
+        else row = { ...row, status: "succeeded" };
+      }
+      const response = Promise.resolve({
+        data: name === "checkpoint_workflow_result" ? checkpoint : row,
+        error,
+      });
       return Object.assign(response, { abortSignal: () => response });
     },
   );
@@ -205,6 +252,16 @@ describe("Create allocation and execution gates", () => {
     ).rejects.toMatchObject({ code: "image_not_ready" });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
+  it("does not allocate paid work when the worker heartbeat is unavailable", async () => {
+    mocks.health.mockRejectedValue(new Error("synthetic worker unavailable"));
+    await expect(
+      startLookOperation(lookId, {
+        kind: "inspiration_description",
+        execute: false,
+      }),
+    ).rejects.toThrow("synthetic worker unavailable");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
   it("rejects outfit allocation until all current matches are committed", async () => {
     mocks.getLookContext.mockResolvedValue({
       look: {
@@ -226,7 +283,11 @@ describe("Create allocation and execution gates", () => {
     await executeOperation(operationId);
     expect(mocks.rpc).toHaveBeenCalledWith(
       "claim_workflow_operation",
-      expect.objectContaining({ p_lease_seconds: 280 }),
+      expect.objectContaining({
+        p_lease_seconds: 280,
+        p_text_daily_limit: 150,
+        p_image_daily_limit: 50,
+      }),
     );
     expect(mocks.scope.mock.calls[0][0]).toMatchObject({
       signal: expect.any(AbortSignal),
@@ -254,6 +315,71 @@ describe("Create allocation and execution gates", () => {
     await executeOperation(operationId);
     expect(row.status).toBe("superseded");
     expect(mocks.requestFashion).not.toHaveBeenCalled();
+  });
+  it("recovers a checkpoint after commit failure without another image download or paid call", async () => {
+    const garment = {
+      name: "Fixture shirt",
+      category: "top",
+      subcategory: null,
+      description: "A visible shirt.",
+      attributes: {},
+      confidence: 0.8,
+      uncertainty: [],
+      observations: ["name", "category", "description"].map((path) => ({
+        path,
+        source: "visual_inference",
+        state: "observed",
+        confidence: 0.8,
+        evidence: "Visible in the fixture image.",
+        uncertainty: null,
+      })),
+    };
+    mocks.requestFashion.mockResolvedValue({
+      data: { pieces: [garment] },
+      metadata: { model: row.model },
+    });
+    finishFailures = 1;
+    await executeOperation(operationId);
+    expect(row.status).toBe("failed");
+    expect(row.result_ref).toMatchObject({
+      checkpointed: true,
+      retryable: true,
+    });
+    expect(checkpoint).not.toBeNull();
+    row = { ...row, status: "queued", provider_call_count: 3 };
+    await executeOperation(operationId);
+    expect(row.status).toBe("succeeded");
+    expect(mocks.requestFashion).toHaveBeenCalledTimes(1);
+    expect(mocks.download).toHaveBeenCalledTimes(1);
+    expect(
+      mocks.rpc.mock.calls.filter(
+        ([name]) => name === "checkpoint_workflow_result",
+      ),
+    ).toHaveLength(1);
+    const commits = mocks.rpc.mock.calls.filter(
+      ([name]) => name === "finish_create_operation",
+    );
+    expect(commits).toHaveLength(2);
+    expect(commits[1][1].p_result).toEqual(commits[0][1].p_result);
+    expect(commits[1][1].p_metadata).toEqual(commits[0][1].p_metadata);
+  });
+  it("fails a corrupted checkpoint without falling back to another paid inference", async () => {
+    checkpoint = {
+      result: { pieces: [] },
+      metadata: {},
+      kind: row.kind,
+      prompt_version: row.prompt_version,
+      schema_version: row.schema_version,
+      model: row.model,
+    };
+    await executeOperation(operationId);
+    expect(row).toMatchObject({
+      status: "failed",
+      safe_error_code: "operation_checkpoint_invalid",
+      result_ref: { retryable: false, checkpointed: true },
+    });
+    expect(mocks.requestFashion).not.toHaveBeenCalled();
+    expect(mocks.download).not.toHaveBeenCalled();
   });
   it("returns a queued retry for worker mode without executing in the request", async () => {
     await startLookOperation(lookId, {

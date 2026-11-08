@@ -451,14 +451,18 @@ export async function getLook(lookId: string) {
         ? options.data?.find((entry) => entry.option_type === captured.data.optionType)
         : undefined;
       if ((!needsPieces || (pieces.length > 0 && inventory)) && (!captured.data.optionType || option)) {
-        const input = createInputSnapshot({ kind: kind.data, look, pieces,
-          inventoryMode: captured.data.inventoryMode, personalization, inventory,
-          optionType: captured.data.optionType, intentId: captured.data.intentId,
-          draftId: captured.data.draftId, providerSettings: getFashionTaskSettings(kind.data) });
-        currentFingerprint = createOperationFingerprint({ kind: kind.data, input,
-          versions: buildFashionPrompt(kind.data).versions,
-          model: getFashionTaskSettings(kind.data).model,
-          subjectId: option?.id ?? look.id, revision: option?.revision ?? look.revision });
+        try {
+          const input = createInputSnapshot({ kind: kind.data, look, pieces,
+            inventoryMode: captured.data.inventoryMode, personalization, inventory,
+            optionType: captured.data.optionType, intentId: captured.data.intentId,
+            draftId: captured.data.draftId, providerSettings: getFashionTaskSettings(kind.data) });
+          currentFingerprint = createOperationFingerprint({ kind: kind.data, input,
+            versions: buildFashionPrompt(kind.data).versions,
+            model: getFashionTaskSettings(kind.data).model,
+            subjectId: option?.id ?? look.id, revision: option?.revision ?? look.revision });
+        } catch {
+          currentFingerprint = null;
+        }
       }
     }
     return {
