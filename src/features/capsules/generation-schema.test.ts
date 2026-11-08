@@ -100,8 +100,30 @@ describe("capsule output integrity", () => {
       })),
     );
     expect(diagnostics).toHaveLength(10);
-    expect(diagnostics[0].path).toBe("outfits[0].*");
+    expect(diagnostics[0].path).toBe("outfits[0].field");
     expect(JSON.stringify(diagnostics)).not.toContain("Private body value");
+  });
+  it("keeps redacted diagnostics within the persisted operation contract", () => {
+    const diagnostics = capsuleDiagnostics([
+      {
+        code: "invalid_type",
+        path: ["preferences", "Private selected value"],
+      },
+      {
+        code: "123INVALID",
+        path: Array.from({ length: 10 }, () => "constructionFamily"),
+      },
+    ]);
+    expect(diagnostics[0]).toEqual({
+      code: "invalid_type",
+      path: "preferences.field",
+    });
+    expect(diagnostics[1].code).toBe("VALIDATION_FAILED");
+    for (const diagnostic of diagnostics) {
+      expect(diagnostic.code).toMatch(/^[A-Za-z][A-Za-z0-9_]{0,79}$/);
+      expect(diagnostic.path).toMatch(/^[A-Za-z0-9_.\[\]]{0,160}$/);
+    }
+    expect(JSON.stringify(diagnostics)).not.toContain("Private selected value");
   });
   it("accepts distinct complete outfits using supplied owned IDs", () => {
     expect(

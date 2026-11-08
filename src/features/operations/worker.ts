@@ -105,23 +105,24 @@ export async function executeQueuedOperation(id: string) {
   } catch (error) {
     if (
       !(error instanceof ZodError) &&
-      !(
-        (error instanceof ApiError || error instanceof OperationError) &&
-        error.status === 404
-      )
+      !(error instanceof ApiError || error instanceof OperationError)
     )
       throw error;
     const code =
       error instanceof ZodError
         ? "OPERATION_INPUT_INVALID"
         : error.code.toUpperCase();
+    const retryable =
+      (error instanceof ApiError || error instanceof OperationError) &&
+      error.retryable;
     return operationStatus(
       await runOperation(id, {
         execute: async () => {
           throw new OperationError(
             code,
             "The captured task input is unavailable.",
-            409,
+            error instanceof ZodError ? 409 : error.status,
+            retryable,
           );
         },
         commit: async () => {

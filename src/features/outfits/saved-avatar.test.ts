@@ -84,6 +84,17 @@ function setup() {
     events: [] as { payload: Record<string, unknown> }[],
     constraintRejections: 0,
     eventFailure: false,
+    historyError: null as { code: string; message?: string } | null,
+    snapshotError: null as { code: string; message?: string } | null,
+    snapshotMissing: false,
+    captureErrors: [] as {
+      code: string;
+      message?: string;
+      details?: string;
+      hint?: string;
+    }[],
+    preservationError: null as { code: string; message?: string } | null,
+    beforeCapture: null as (() => void) | null,
     commitStatus: "succeeded",
     commitFailure: false,
     commitErrorCode: "08006",
@@ -118,15 +129,30 @@ function setup() {
     const predicates: ((row: Record<string, unknown>) => boolean)[] = [];
     async function execute() {
       if (table === "saved_look_snapshots")
-        return { data: snapshot, error: null };
+        return {
+          data: state.snapshotMissing || state.snapshotError ? null : snapshot,
+          error: state.snapshotError,
+        };
       if (table === "workflow_operation_events")
-        return { data: state.events[0] ?? null, error: null };
+        return { data: state.events[0] ?? null, error: state.historyError };
       if (table !== "workflow_operations")
         throw new Error("Unexpected test table");
       if (update) {
         if ("input" in update) {
           state.constraintRejections++;
           return { data: null, error: { code: "23514" } };
+        }
+        if ("model" in update) {
+          state.beforeCapture?.();
+          const error = state.captureErrors.shift();
+          if (error) return { data: null, error };
+        } else if (
+          update.result_ref &&
+          typeof update.result_ref === "object" &&
+          "renderContext" in update.result_ref
+        ) {
+          if (state.preservationError)
+            return { data: null, error: state.preservationError };
         }
         if (!predicates.every((predicate) => predicate(operation)))
           return { data: null, error: null };
@@ -177,10 +203,20 @@ function setup() {
         operation.attempt_count++;
         operation.lease_until = new Date(Date.now() + 280_000).toISOString();
       } else if (name === "finish_workflow_operation") {
-        operation.status = String(args.p_status);
-        operation.safe_error_code = String(args.p_safe_error_code);
-        operation.result_ref = args.p_result_ref as Record<string, unknown>;
-        operation.lease_until = null;
+        if (
+          operation.status !== "running" ||
+          operation.attempt_count !== args.p_attempt_count ||
+          operation.input_fingerprint !== args.p_input_fingerprint ||
+          !operation.lease_until ||
+          Date.parse(operation.lease_until) <= Date.now()
+        )
+          error = { code: "40001" };
+        else {
+          operation.status = String(args.p_status);
+          operation.safe_error_code = String(args.p_safe_error_code);
+          operation.result_ref = args.p_result_ref as Record<string, unknown>;
+          operation.lease_until = null;
+        }
       } else if (name === "stylora_record_operation_event") {
         if (state.eventFailure) error = { code: "P0001" };
         else
@@ -220,7 +256,7 @@ function setup() {
   mocks.checkpoint.mockImplementation(async (_claim, output) => {
     state.checkpoint = output;
   });
-  return { state, writes, fences };
+  return { state, writes, fences, client };
 }
 
 function retry(state: ReturnType<typeof setup>["state"]) {
@@ -257,6 +293,7 @@ describe("saved-avatar render capture", () => {
       ["eq", "workspace_id", workspaceId],
       ["eq", "id", operationId],
       ["eq", "attempt_count", 1],
+      ["eq", "input_revision", 1],
       ["eq", "input_fingerprint", "a".repeat(64)],
       ["eq", "status", "running"],
       ["is", "cancel_requested_at", null],
@@ -265,6 +302,197 @@ describe("saved-avatar render capture", () => {
     expect(
       fences.some(([kind, field]) => kind === "gt" && field === "lease_until"),
     ).toBe(true);
+  });
+
+  it("reports an immutable-input database rejection without mistaking it for a stale claim", async () => {
+    const { state } = setup();
+    state.captureErrors.push({
+      code: "23514",
+      message: "STYLORA_OPERATION_INPUT_IMMUTABLE",
+      details: "private snapshot contents",
+      hint: "https://private.example/image?token=secret",
+    });
+    const result = await runSavedAvatar(operationId);
+    expect(result.status).toBe("failed");
+    expect(result.safe_error_code).toBe("AVATAR_CONTEXT_PERSIST_FAILED");
+    expect(result.result_ref).toMatchObject({
+      retryable: false,
+      diagnostics: [
+        {
+          code: "DATABASE_SQLSTATE_23514",
+          path: "workflow_operations.renderContext",
+        },
+        {
+          code: "STYLORA_OPERATION_INPUT_IMMUTABLE",
+          path: "workflow_operations.renderContext",
+        },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toContain("private snapshot contents");
+    expect(JSON.stringify(result)).not.toContain("token=secret");
+    expect(mocks.render).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "08006",
+    "08001",
+    "40001",
+    "40P01",
+    "53000",
+    "53300",
+    "57014",
+    "PGRST000",
+    "PGRST001",
+    "PGRST002",
+    "PGRST003",
+  ])(
+    "retains exact render settings for a transient capture error (%s)",
+    async (code) => {
+      const { state } = setup();
+      state.captureErrors.push({ code });
+      const result = await runSavedAvatar(operationId);
+      expect(result.safe_error_code).toBe("AVATAR_CONTEXT_PERSIST_FAILED");
+      expect(result.result_ref).toMatchObject({ retryable: true });
+      expect(mocks.render).not.toHaveBeenCalled();
+      expect(state.events[0].payload).toMatchObject({
+        savedAvatarRenderContext: { renderSettings: settings },
+      });
+      retry(state);
+      mocks.settings.mockReturnValue({ ...settings, quality: "high" });
+      expect((await runSavedAvatar(operationId)).status).toBe("succeeded");
+      expect(mocks.render).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ renderSettings: settings }),
+      );
+    },
+  );
+
+  it.each(["23514", "42501", "P0001", "PGRST204", "", "untrusted error"])(
+    "does not retry an integrity, permission or unknown database error (%s)",
+    async (code) => {
+      const { state } = setup();
+      state.captureErrors.push({ code, message: "private arbitrary error" });
+      const result = await runSavedAvatar(operationId);
+      expect(result.safe_error_code).toBe("AVATAR_CONTEXT_PERSIST_FAILED");
+      expect(result.result_ref).toMatchObject({ retryable: false });
+      expect(JSON.stringify(result)).not.toContain("private arbitrary error");
+      expect(JSON.stringify(result)).not.toContain("untrusted error");
+      expect(mocks.render).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    "attempt_count",
+    "input_fingerprint",
+    "lease_until",
+    "cancel_requested_at",
+  ])(
+    "rejects a zero-row %s fence miss without calling the provider",
+    async (field) => {
+      const { state, client } = setup();
+      state.beforeCapture = () => {
+        Object.assign(state.operation, {
+          [field]:
+            field === "input_fingerprint"
+              ? "f".repeat(64)
+              : field === "lease_until"
+                ? "2020-01-01T00:00:00Z"
+                : field === "cancel_requested_at"
+                  ? new Date().toISOString()
+                  : 2,
+        });
+        if (field === "cancel_requested_at") {
+          state.operation.status = "cancelled";
+          state.operation.lease_until = null;
+        }
+      };
+      const result = await runSavedAvatar(operationId);
+      expect(client.rpc).toHaveBeenCalledWith(
+        "finish_workflow_operation",
+        expect.objectContaining({
+          p_safe_error_code: "AVATAR_OPERATION_CHANGED",
+          p_attempt_count: 1,
+          p_input_fingerprint: "a".repeat(64),
+          p_result_ref: { retryable: false },
+        }),
+      );
+      expect(result.safe_error_code).toBeNull();
+      expect(result.status).toBe(
+        field === "cancel_requested_at" ? "cancelled" : "running",
+      );
+      expect(client.rpc).not.toHaveBeenCalledWith(
+        "complete_saved_avatar",
+        expect.anything(),
+      );
+      expect(mocks.render).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps the original failed state when supplementary context persistence fails", async () => {
+    const { state } = setup();
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    state.captureErrors.push({
+      code: "23514",
+      message: "STYLORA_OPERATION_INPUT_IMMUTABLE",
+    });
+    state.preservationError = { code: "08006", message: "private failure" };
+    try {
+      const result = await runSavedAvatar(operationId);
+      expect(result.status).toBe("failed");
+      expect(result.safe_error_code).toBe("AVATAR_CONTEXT_PERSIST_FAILED");
+      expect(result.result_ref).toMatchObject({ retryable: false });
+      expect(warning).toHaveBeenCalledWith(
+        "saved_avatar_context_preservation_failed",
+        {
+          operationId,
+          diagnostics: [
+            {
+              code: "DATABASE_SQLSTATE_08006",
+              path: "workflow_operations.renderContext",
+            },
+          ],
+        },
+      );
+      expect(mocks.render).not.toHaveBeenCalled();
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  it("distinguishes snapshot read failures from a missing snapshot", async () => {
+    const { state } = setup();
+    state.snapshotError = { code: "08006", message: "private failure" };
+    await expect(runSavedAvatar(operationId)).rejects.toMatchObject({
+      code: "AVATAR_SNAPSHOT_UNAVAILABLE",
+      status: 503,
+      retryable: true,
+      diagnostics: [
+        { code: "DATABASE_SQLSTATE_08006", path: "saved_look_snapshots" },
+      ],
+    });
+    state.snapshotError = null;
+    state.snapshotMissing = true;
+    await expect(runSavedAvatar(operationId)).rejects.toMatchObject({
+      code: "SAVED_LOOK_NOT_FOUND",
+      status: 404,
+      retryable: false,
+    });
+    expect(mocks.render).not.toHaveBeenCalled();
+  });
+
+  it("retains safe history-read diagnostics without pretending the context is missing", async () => {
+    const { state } = setup();
+    state.historyError = { code: "08006", message: "private failure" };
+    const result = await runSavedAvatar(operationId);
+    expect(result.safe_error_code).toBe("AVATAR_CONTEXT_UNAVAILABLE");
+    expect(result.result_ref).toMatchObject({
+      diagnostics: [
+        {
+          code: "DATABASE_SQLSTATE_08006",
+          path: "workflow_operation_events.savedAvatarRenderContext",
+        },
+      ],
+    });
+    expect(mocks.render).not.toHaveBeenCalled();
   });
 
   it("recovers the same settings after finish and retry erase result references", async () => {

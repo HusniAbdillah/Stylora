@@ -48,6 +48,40 @@ function setupRead() {
 }
 
 describe("operation execution claims", () => {
+  it.each(["PROVIDER_SERVER_ERROR", "PROVIDER_RATE_LIMITED"])(
+    "retains safe diagnostics and retryability for %s",
+    async (code) => {
+      const { read, rpc } = setupRead();
+      read.mockResolvedValueOnce({
+        data: { ...operation, status: "queued" },
+        error: null,
+      });
+      read.mockResolvedValue({
+        data: { ...operation, status: "failed", lease_until: null },
+        error: null,
+      });
+      rpc.mockResolvedValue({
+        data: {
+          ...operation,
+          lease_until: new Date(Date.now() + 280000).toISOString(),
+        },
+        error: null,
+      });
+      const diagnostics = [{ code: "server_error", path: "error.code" }];
+      const fail = vi.fn();
+      await runOperation(operationId, {
+        execute: vi
+          .fn()
+          .mockRejectedValue({ code, retryable: true, diagnostics }),
+        commit: vi.fn(),
+        fail,
+      });
+      expect(fail).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ code, retryable: true, diagnostics }),
+      );
+    },
+  );
   it("finishes failures atomically with the attempt fence and safe retry metadata", async () => {
     const { rpc } = setupRead();
     rpc.mockResolvedValue({

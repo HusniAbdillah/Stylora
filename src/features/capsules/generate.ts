@@ -494,7 +494,14 @@ export async function runCapsuleOperation(operationId: string) {
           "CAPSULE_CONTEXT_INVALID",
           capsuleDiagnostics(error.issues),
         );
-      if (error instanceof ApiError)
+      if (error instanceof ApiError) {
+        if (error.status >= 500 && error.retryable)
+          throw new OperationError(
+            "CAPSULE_CONTEXT_UNAVAILABLE",
+            "Current Capsule inputs could not be loaded. The saved request can retry.",
+            503,
+            true,
+          );
         throw new OperationError(
           error.status === 404 || error.status === 409
             ? "CAPSULE_SUPERSEDED"
@@ -502,6 +509,7 @@ export async function runCapsuleOperation(operationId: string) {
           "Current Capsule inputs could not be verified.",
           error.status,
         );
+      }
       throw error;
     }
     if (
