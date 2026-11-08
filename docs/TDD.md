@@ -259,21 +259,32 @@ and fingerprint makes starts idempotent.
 
 ### 8.2 Execution decision
 
-The build uses Option A from WORKFLOW.md section 5: the operation row is
-created first, the client starts the request from a module-level store, the
-route handler awaits the provider within its time budget and commits the
-validated result; leases restart abandoned work on the next visit. This
-survives in-app navigation, not a server crash. Option B, Supabase Queues with
-a dedicated consumer ([Supabase Queues](https://supabase.com/docs/guides/queues)),
-is the durable target if time allows. Never return success while relying on an
-un-awaited promise, and never treat a queued row as running work.
+`STYLORA_EXECUTION_MODE=inline` retains the request executor for compatibility.
+`worker` mode separates allocation from execution: routes persist the operation
+and acknowledge it with HTTP 202; a separately supervised Node process scans the
+configured workspace and invokes the authenticated internal executor. The
+executor claims through the existing database RPC, awaits the provider within
+the route budget, and commits with attempt, fingerprint and revision fences.
+The browser only reads progress in worker mode. Closing it does not stop work.
+
+The worker uses three text slots and one image slot. The database also enforces
+one live image claim per workspace. Run one worker per workspace: Capsule does
+not yet have a database-wide text-call semaphore across multiple processes.
+Expired leases are recovered without a page visit. Failed tasks require an
+explicit eligible retry; the scanner never blindly replays a paid failure.
+External provider billing is not exactly once after a process crash.
+
+Both the app and worker must remain available. This change provides an executor
+over persisted operations without adding a queue service or migration. It does
+not provision or deploy that executor. See `docs/AI-WORKER.md` for startup,
+recovery, limits and local evaluation. Never treat a queued row as running work.
 
 ### 8.3 Readiness and task graph
 
 | Operation                 | Complete input required                   | Earliest start               | Parallel with               |
 | ------------------------- | ----------------------------------------- | ---------------------------- | --------------------------- |
-| `inspiration_description` | Verified upload, stable occasion          | Upload verified              | Confidence review           |
-| `inspiration_confidence`  | Same image, occasion, preference snapshot | Upload verified              | Description                 |
+| `inspiration_description` | Verified upload, stable optional occasion | Upload verified              | Confidence review           |
+| `inspiration_confidence`  | Same image, optional occasion, preferences | Upload verified              | Description                 |
 | `wardrobe_match`          | Accepted piece revision, owned inventory  | Stable review, no dirty edit | Confidence may still run    |
 | `outfit_options`          | Matches, pieces, inventory, preferences   | Match committed              | —                           |
 | `option_regeneration`     | One option type and current context       | Suggest another              | Other options stay usable   |

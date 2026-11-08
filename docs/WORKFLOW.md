@@ -18,7 +18,7 @@ not authorize cloud changes, deployments or paid usage by itself.
 | Repository           | Created: scaffold, CI and PR template exist. Keep the README setup steps accurate                                     | Owner 1        |
 | Database target      | One new hosted Supabase project in the Singapore region is the only runtime database                                  | Owner 1        |
 | Data isolation       | One `STYLORA_WORKSPACE_ID` per developer plus `demo` and `preview` workspaces in the same project                     | Owner 1        |
-| Background execution | Option A in section 5 for the build, Option B only if Owner 4 is ahead at the 04:00 checkpoint                        | Owners 2 and 4 |
+| Background execution | Inline compatibility mode or separately supervised operation worker; see section 5 and AI-WORKER.md | Owners 2 and 4 |
 | Streaming strategy   | Try provider streaming for 20 minutes; if strict JSON streaming fails, switch to manifest plus per-piece calls        | Owner 2        |
 | Merge windows        | Fixed windows in section 3, squash merge, main always deployable                                                      | Owner 1        |
 | Provider budget      | Cap per developer: 150 OpenAI text calls, 20 image calls, 100 SerpAPI searches; cache everything by input fingerprint | Team           |
@@ -157,10 +157,9 @@ thin route files.
 ## 5. Background work that fits seven hours
 
 PRD R04 to R06 need work to start early, run in parallel and survive
-navigation. A database row is not an executor (TDD section 8). Two honest
-options:
+navigation. A database row is not an executor (TDD section 8).
 
-**Option A, recommended for the build.** Persist an operation row (kind,
+**Inline compatibility mode.** Persist an operation row (kind,
 subject, input fingerprint, revision, status, result reference) before calling
 a provider. The client starts the operation as soon as inputs are complete,
 from a module-level store that is not tied to a page component, so client-side
@@ -172,9 +171,15 @@ next visit restarts it. This survives page changes and tab switches inside the
 app; it does not survive a server function crash. Record that limitation in
 PROGRESS-NEW.md; do not describe it as a durable queue.
 
-**Option B, target if time allows.** Supabase Queues with a dedicated worker
-or an Edge Function consumer, as specified in TDD section 8.2. Start only if
-Option A is merged and green at the 04:00 checkpoint.
+**Worker mode.** Set `STYLORA_EXECUTION_MODE=worker` in the app and a separately
+supervised worker process, using the same dedicated worker secret and workspace.
+Allocation routes acknowledge persisted jobs; browser polling does not execute
+them. `pnpm worker` scans queued and expired-lease operations and calls the
+authenticated internal executor, which still awaits each provider and fenced
+commit. No queue service or new migration is required. Both processes must run;
+setting an environment variable alone does not create an executor. Keep inline
+mode until the worker is running and its deployment is supervised. See
+`docs/AI-WORKER.md` for setup, failure recovery and the single-worker constraint.
 
 Parallel calls: description and Review with confidence are two separate
 requests started together; missing-slot searches run with a pool of three;

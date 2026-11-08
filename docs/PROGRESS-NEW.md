@@ -1,5 +1,74 @@
 # Stylora shared progress reporting
 
+## Owner 4 AI reliability and local worker evaluation, 8 November 2026
+
+- Task O4.1, O4.3, O4.6 and O4.7, with the user-authorized Create and wardrobe
+  audit. Branch `o4/ai-reliability-audit` from main `ba4252d`. One Lane B pull
+  request covers shared execution, private asset reads, runtime configuration
+  and the related feature fixes. No dependency, migration or generated type
+  change. Main remained at `ba4252d` when fetched before delivery.
+- Added a separately running worker over existing persisted operations. Mode is
+  explicit and defaults to inline. Worker mode acknowledges jobs and polls
+  status without browser execution retries. Claims, leases, attempt budgets,
+  captured inputs and commit fences remain database-backed. One worker per
+  workspace; Capsule's global text quota is still process bounded.
+- Create now uses compact constrained output, current-match readiness, optional
+  occasion, bounded request deadlines and one accounted validation correction.
+  Late allocation, draft switching, stale confidence events and partial-result
+  recovery have regression coverage. Capsule captures policy and context,
+  retains safe diagnostic paths, and counts requests before HTTP dispatch.
+- Reproduced a saved-avatar failure on the hosted development schema: its
+  executor attempted to change immutable operation input. Preserved that
+  database guard and moved render capture to fenced metadata plus a durable
+  event that survives retries. A new request then rendered and attached its
+  image successfully. The old failed request was kept as evidence until cleanup.
+- Preview uses validated batch signing and lightweight active polling. Landing
+  streams its demo. Wardrobe sends a separate collection DTO, preserving full
+  canonical detail and API reads. Supabase transport is bounded; loopback dev
+  hydration is supported explicitly. Future Vercel deployments target Tokyo
+  beside the current database; production latency was not remeasured.
+- Live environment: local Next.js on port 3114, separate Node worker, hosted
+  `dev-owner-4`, writes enabled, external run journal and subject allowlist.
+  Run ID `650ec498-e947-4b50-996b-5519878191fa`. Sample fixture source was the
+  repository's wardrobe dataset and design reference images. No personal photo
+  or production workspace was used. Pre-existing items and preferences were
+  preserved. All run-owned fixtures, operations, drafts, saved looks, generated
+  assets and uploaded objects were removed after evaluation.
+- Actual local commands included `node <external>/evaluate.mjs prepare`,
+  `create`, `regenerate`, `wardrobe`, `capsule`, `capsule-ledger`, `preview`,
+  `save`, `save-capsule`, `regenerate-saved-capsule`, `boundaries`, `recovery`,
+  `resume-recovery`, `summary` and the three cleanup phases. `<external>` was
+  the chat artifact directory's `reliability-evaluation` folder, outside git.
+  That controller supplied process-only credentials and started the app plus
+  `node --experimental-strip-types scripts/workflow-worker.mjs`. It reset the
+  allowlist to empty before each worker restart.
+- Real `gpt-6-luna` calls completed description, confidence, matches, all three
+  outfit directions, regeneration, wardrobe intake and two Capsules. Total text
+  calls were eight or nine (the first Capsule predates the new ledger and had
+  a two-request cap), within twelve. Two medium-quality `gpt-image-1.5` calls
+  produced verified PNG assets. Preview save reused the same asset without a
+  render. No marketplace search was spent because these options had no missing
+  slots. See [AI-RELIABILITY-AUDIT.md](AI-RELIABILITY-AUDIT.md) for timings.
+- Fresh-worker recovery retired an obsolete captured Create runtime and an
+  exhausted expired Capsule lease without model calls. Unauthorized executor
+  access returned 401; an existing foreign-workspace operation returned 404.
+  Full table policy tests were not rerun because no database policy changed.
+- `pnpm exec vitest run`: 417 passed, two existing online tests skipped. The
+  latest Capsule projection also passed its 46-test focused suite. Focused
+  storage, worker HTTP, lifecycle, visual-context and collection tests passed.
+  Desktop navigation and real Capsule results were clicked in the local app;
+  the 390 by 844 mobile result view had no horizontal overflow and the viewport
+  override was reset. This is not a full browser regression of every route.
+- `pnpm build` passed, including TypeScript, page generation and route tracing.
+  `make pr-ready` passed lint and typecheck and classified the combined change
+  as Lane B. CI remains the complete GitHub gate. No deployment or merge is part
+  of this task.
+- Remaining limits: independently supervised production worker and queue-age
+  monitoring, database-wide Capsule text quota for multiple workers, and an
+  atomic active-draft check inside `finish_create_operation` for the narrow
+  concurrent discard/commit race. These limits are documented in
+  [AI-WORKER.md](AI-WORKER.md); no unreviewed hosted migration was applied.
+
 ## PR 75 conflict resolution, 7 November 2026
 
 - Rebased `o1/progress-feedback` onto main `a2bf348`. Preserved both owners' progress records, the PWA installation provider and service worker, capsule saving skeleton and duplicate-submit guard, and studio save and image preparation indicators.
