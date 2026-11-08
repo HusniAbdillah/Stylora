@@ -4,13 +4,9 @@ import {
   compactGarmentOutputSchema,
   type Explanation,
 } from "@/lib/ai/fashion-schema";
+import { type InventoryMode, type MatchItem } from "@/features/matching/gates";
 import {
-  isOwnedInventoryItem,
-  itemConstraintConflict,
-  type InventoryMode,
-  type MatchItem,
-} from "@/features/matching/gates";
-import {
+  eligibleOwnedOutfitItems,
   missingBriefSchema,
   outfitItemSchema,
   outfitOptionsSchema,
@@ -31,11 +27,7 @@ export function outfitProviderSchema(
   },
   explanation: z.ZodType<Explanation>,
 ) {
-  const owned = input.inventory.filter(
-    (item) =>
-      isOwnedInventoryItem(item, input.inventoryMode) &&
-      !itemConstraintConflict(item, input.preferences, input.occasion),
-  );
+  const owned = eligibleOwnedOutfitItems(input.inventory, input);
   const types = input.optionType
     ? [input.optionType]
     : optionTypeSchema.options;

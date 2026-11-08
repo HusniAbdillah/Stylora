@@ -101,6 +101,48 @@ const option = () => ({
 });
 
 describe("closed outfit provider contract", () => {
+  it("excludes owned items that contradict practical preferences before inference", () => {
+    const heelsId = "91fc631a-4211-44be-9ab3-af582fa579c2";
+    const schema = outfitProviderSchema(
+      {
+        ...context,
+        optionType: "closest",
+        preferences: { footwearComfort: ["Flats only"] },
+        inventory: [
+          piece,
+          {
+            ...piece,
+            id: heelsId,
+            category: "shoes",
+            subcategory: "pumps",
+            attributes: { heelHeightClass: "high" },
+          },
+        ],
+      },
+      evidence.schema,
+    );
+    expect(schema.safeParse({ options: { closest: option() } }).success).toBe(
+      true,
+    );
+    const original = option();
+    const conflicting = {
+      ...original,
+      items: [
+        ...original.items,
+        {
+          ...original.items[0],
+          slotId: "shoes_1",
+          category: "shoes",
+          pieceId: null,
+          wardrobeItemId: heelsId,
+        },
+      ],
+    };
+    expect(
+      schema.safeParse({ options: { closest: conflicting } }).success,
+    ).toBe(false);
+  });
+
   it("maps compact derived proposals into unchanged canonical brief fields", () => {
     const schema = outfitProviderSchema(
       { ...context, optionType: "closest" },

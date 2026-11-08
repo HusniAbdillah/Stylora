@@ -43,6 +43,11 @@ export type OutfitOption = z.infer<typeof outfitOptionSchema>;
 export type OutfitOptionType = z.infer<typeof optionTypeSchema>;
 export const ABSENT_PREFERENCES_GUIDANCE =
   "These ideas use the reference's colors and silhouette. Add your preferences for more personal color and fit guidance.";
+type OutfitConstraints = {
+  preferences: Record<string, string | string[]>;
+  occasion: string | null;
+  inventoryMode?: InventoryMode;
+};
 
 export function hasSuppliedPreferences(
   preferences: Record<string, string | string[]>,
@@ -54,27 +59,30 @@ export function hasSuppliedPreferences(
   );
 }
 
+export function eligibleOwnedOutfitItems(
+  inventory: MatchItem[],
+  constraints: OutfitConstraints,
+) {
+  return inventory.filter(
+    (item) =>
+      isOwnedInventoryItem(item, constraints.inventoryMode) &&
+      !itemConstraintConflict(
+        item,
+        constraints.preferences,
+        constraints.occasion,
+      ),
+  );
+}
+
 export function wardrobeSupportsOutfit(
   pieces: MatchItem[],
   inventory: MatchItem[],
-  constraints: {
-    preferences: Record<string, string | string[]>;
-    occasion: string | null;
-    inventoryMode?: InventoryMode;
-  },
+  constraints: OutfitConstraints,
 ) {
   const categories = new Set(
-    inventory
-      .filter(
-        (item) =>
-          isOwnedInventoryItem(item, constraints.inventoryMode) &&
-          !itemConstraintConflict(
-            item,
-            constraints.preferences,
-            constraints.occasion,
-          ),
-      )
-      .map((item) => item.category),
+    eligibleOwnedOutfitItems(inventory, constraints).map(
+      (item) => item.category,
+    ),
   );
   return (
     (categories.has("dress") ||
@@ -84,18 +92,14 @@ export function wardrobeSupportsOutfit(
   );
 }
 
-export function validateOptionComposition(
+export function optionCompositionIssues(
   options: OutfitOption[],
   pieces: MatchItem[],
   inventory: MatchItem[],
   requestedType?: OutfitOptionType,
-  constraints: {
-    preferences: Record<string, string | string[]>;
-    occasion: string | null;
-    inventoryMode?: InventoryMode;
-  } = { preferences: {}, occasion: null },
+  constraints: OutfitConstraints = { preferences: {}, occasion: null },
 ) {
-  const errors: string[] = [];
+  const issues: { code: string; path: string }[] = [];
   const expectedTypes = requestedType
     ? [requestedType]
     : optionTypeSchema.options;
@@ -106,7 +110,7 @@ export function validateOptionComposition(
         options.filter((option) => option.optionType === type).length !== 1,
     )
   )
-    errors.push("option_types_invalid");
+    issues.push({ code: "option_types_invalid", path: "options" });
   const inventoryIds = new Map(inventory.map((item) => [item.id, item]));
   const pieceIds = new Map(pieces.map((piece) => [piece.id, piece]));
   const inventorySupportsOutfit = wardrobeSupportsOutfit(
@@ -117,18 +121,21 @@ export function validateOptionComposition(
   const compositions = new Set<string>();
   const suppliedPreferences = hasSuppliedPreferences(constraints.preferences);
   for (const option of options) {
+    const path = `options.${option.optionType}`;
+    const issue = (code: string, field: string) =>
+      issues.push({ code, path: `${path}.${field}` });
     if (
       suppliedPreferences &&
       option.explanation.uncertainty.some((note) =>
         note.includes(ABSENT_PREFERENCES_GUIDANCE),
       )
     )
-      errors.push("supplied_preferences_marked_absent");
+      issue("supplied_preferences_marked_absent", "explanation.uncertainty");
     if (option.status === "unavailable") {
       if (option.optionType !== "from_wardrobe" || option.items.length)
-        errors.push("unavailable_option_invalid");
+        issue("unavailable_option_invalid", "items");
       if (inventorySupportsOutfit)
-        errors.push("wardrobe_direction_incorrectly_unavailable");
+        issue("wardrobe_direction_incorrectly_unavailable", "status");
       continue;
     }
     const slots = new Set<string>();
@@ -138,23 +145,24 @@ export function validateOptionComposition(
       !categories.has("dress") &&
       !(categories.has("top") && categories.has("bottom"))
     )
-      errors.push("incomplete_clothing_coverage");
+      issue("incomplete_clothing_coverage", "items");
     if (
       pieces.some((piece) => piece.category === "shoes") &&
       !categories.has("shoes")
     )
-      errors.push("missing_footwear_role");
+      issue("missing_footwear_role", "items");
     if (categories.has("dress") && categories.has("bottom"))
-      errors.push("conflicting_one_piece_and_bottom");
-    for (const item of option.items) {
-      if (slots.has(item.slotId)) errors.push("duplicate_slot");
+      issue("conflicting_one_piece_and_bottom", "items");
+    for (const [index, item] of option.items.entries()) {
+      const itemPath = `items.${index}`;
+      if (slots.has(item.slotId)) issue("duplicate_slot", `${itemPath}.slotId`);
       slots.add(item.slotId);
       if (
         item.pieceId &&
         (!pieceIds.has(item.pieceId) ||
           pieceIds.get(item.pieceId)?.category !== item.category)
       )
-        errors.push("invalid_piece_reference");
+        issue("invalid_piece_reference", `${itemPath}.pieceId`);
       if (item.itemKind === "owned") {
         const owned = item.wardrobeItemId
           ? inventoryIds.get(item.wardrobeItemId)
@@ -165,9 +173,9 @@ export function validateOptionComposition(
           owned.category !== item.category ||
           item.missingBrief !== null
         )
-          errors.push("invalid_owned_reference");
+          issue("invalid_owned_reference", itemPath);
         if (item.wardrobeItemId && selectedOwned.has(item.wardrobeItemId))
-          errors.push("duplicate_physical_item");
+          issue("duplicate_physical_item", `${itemPath}.wardrobeItemId`);
         if (item.wardrobeItemId) selectedOwned.add(item.wardrobeItemId);
         if (
           owned &&
@@ -177,13 +185,16 @@ export function validateOptionComposition(
             constraints.occasion,
           )
         )
-          errors.push("practical_constraint_contradiction");
+          issue(
+            "practical_constraint_contradiction",
+            `${itemPath}.wardrobeItemId`,
+          );
       } else if (
         item.wardrobeItemId !== null ||
         !item.missingBrief ||
         item.missingBrief.category !== item.category
       )
-        errors.push("invalid_missing_brief");
+        issue("invalid_missing_brief", `${itemPath}.missingBrief`);
       if (
         item.itemKind === "missing" &&
         item.missingBrief &&
@@ -198,24 +209,30 @@ export function validateOptionComposition(
           constraints.occasion,
         )
       )
-        errors.push("practical_constraint_contradiction");
+        issue("practical_constraint_contradiction", `${itemPath}.missingBrief`);
       if (option.optionType === "from_wardrobe" && item.itemKind !== "owned")
-        errors.push("wardrobe_direction_contains_missing");
+        issue("wardrobe_direction_contains_missing", `${itemPath}.itemKind`);
     }
     const composition = option.items
       .map((item) =>
         item.itemKind === "owned"
           ? `owned:${item.wardrobeItemId}`
-          : `missing:${item.category}:${JSON.stringify(
+          : `missing:${item.category}:${item.missingBrief?.subcategory?.trim().toLowerCase() ?? ""}:${JSON.stringify(
               Object.fromEntries(
                 Object.entries(item.missingBrief?.attributes ?? {})
                   .filter(([, value]) => value !== null && value !== undefined)
                   .map(([key, value]) => [
                     key,
                     Array.isArray(value)
-                      ? [...value].sort()
+                      ? value
+                          .map((entry) =>
+                            typeof entry === "string"
+                              ? entry.trim().toLowerCase()
+                              : entry,
+                          )
+                          .sort()
                       : typeof value === "string"
-                        ? value.toLowerCase()
+                        ? value.trim().toLowerCase()
                         : value,
                   ])
                   .sort(([left], [right]) =>
@@ -226,8 +243,28 @@ export function validateOptionComposition(
       )
       .sort()
       .join("|");
-    if (compositions.has(composition)) errors.push("duplicate_composition");
+    if (compositions.has(composition)) issue("duplicate_composition", "items");
     compositions.add(composition);
   }
-  return [...new Set(errors)];
+  return issues;
+}
+
+export function validateOptionComposition(
+  options: OutfitOption[],
+  pieces: MatchItem[],
+  inventory: MatchItem[],
+  requestedType?: OutfitOptionType,
+  constraints: OutfitConstraints = { preferences: {}, occasion: null },
+) {
+  return [
+    ...new Set(
+      optionCompositionIssues(
+        options,
+        pieces,
+        inventory,
+        requestedType,
+        constraints,
+      ).map((issue) => issue.code),
+    ),
+  ];
 }
