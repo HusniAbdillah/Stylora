@@ -449,7 +449,8 @@ export function SavedLookDetail({
           detail
         />
         <div className="mt-3 flex flex-wrap gap-2">
-          {look.avatarUrl && (
+          {(look.avatarUrl ||
+            (look.mediaStatus === "failed" && !look.canRetry)) && (
             <div className="flex items-center gap-2">
               <Button
                 variant="secondary"
@@ -461,7 +462,7 @@ export function SavedLookDetail({
                 }
                 onClick={() => onRegenerateImage?.(look.id)}
               >
-                Regenerate image
+                {look.avatarUrl ? "Regenerate image" : "Generate new image"}
               </Button>
               {!writesEnabled && (
                 <span className="text-xs text-secondary">Read-only</span>
