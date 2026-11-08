@@ -24,6 +24,7 @@ import {
   normalizeAvatarItems,
   avatarRenderFingerprint,
   renderAndStoreAvatar,
+  restoreAvatarCheckpoint,
   discardPendingAvatar,
   getAvatarRenderSettings,
 } from "./image";
@@ -32,6 +33,10 @@ import { buildAvatarVisualDirection } from "./visual-direction";
 import { previewSelectionSchema, slotForPreviewItem } from "./schema";
 import type { PreviewJob } from "./preview-studio";
 import { isCurrentPreviewContext, previewJobStatus } from "./job-status";
+import {
+  reserveWorkflowProviderCall,
+  releaseWorkflowProviderCall,
+} from "@/features/operations/provider-budget";
 
 const generationInput = z.strictObject({
   draftId: z.uuid(),
@@ -361,30 +366,60 @@ export async function runPreviewOperation(operationId: string) {
       "This image request is unavailable.",
       404,
     );
-  return runOperation(operation.id, {
-    execute: async (claim) => {
-      const current = await readPreviewImageInputs(operation.subject_id);
-      if (
-        current.draft.revision !== claim.inputRevision ||
-        current.renderFingerprint !== claim.input.renderFingerprint
-      )
-        throw new OperationError(
-          "INPUT_SUPERSEDED",
-          "The preview inputs changed.",
-          409,
-        );
-      return renderAndStoreAvatar({
-        items: z.array(z.unknown()).parse(claim.input.items),
-        preferences: claim.input.preferences,
-        renderSettings: imageRenderSettingsSchema.parse(
-          claim.input.renderSettings,
-        ),
-        reuse: z.boolean().parse(claim.input.reuse ?? true),
-        signal: claim.signal,
-      });
-    },
-    commit: async (claim, output) => {
-      try {
+  return runOperation<Awaited<ReturnType<typeof renderAndStoreAvatar>>>(
+    operation.id,
+    {
+      checkpoint: {
+        serialize: (output) => ({
+          result: {
+            assetId: output.assetId,
+            renderFingerprint: output.renderFingerprint,
+          },
+          metadata: {},
+        }),
+        restore: async (claim, result, metadata) => {
+          const current = await readPreviewImageInputs(operation.subject_id);
+          if (
+            current.draft.revision !== claim.inputRevision ||
+            current.renderFingerprint !== claim.input.renderFingerprint
+          )
+            throw new OperationError(
+              "INPUT_SUPERSEDED",
+              "The preview inputs changed.",
+              409,
+            );
+          return restoreAvatarCheckpoint(
+            result,
+            current.renderFingerprint,
+            claim.signal,
+            metadata,
+          );
+        },
+      },
+      execute: async (claim) => {
+        const current = await readPreviewImageInputs(operation.subject_id);
+        if (
+          current.draft.revision !== claim.inputRevision ||
+          current.renderFingerprint !== claim.input.renderFingerprint
+        )
+          throw new OperationError(
+            "INPUT_SUPERSEDED",
+            "The preview inputs changed.",
+            409,
+          );
+        return renderAndStoreAvatar({
+          items: z.array(z.unknown()).parse(claim.input.items),
+          preferences: claim.input.preferences,
+          renderSettings: imageRenderSettingsSchema.parse(
+            claim.input.renderSettings,
+          ),
+          reuse: z.boolean().parse(claim.input.reuse ?? true),
+          signal: claim.signal,
+          beforeGenerate: () => reserveWorkflowProviderCall(claim),
+          afterGenerate: () => releaseWorkflowProviderCall(claim),
+        });
+      },
+      commit: async (claim, output) => {
         const { data, error } = await context.client.rpc(
           "complete_preview_operation",
           {
@@ -397,19 +432,16 @@ export async function runPreviewOperation(operationId: string) {
           },
         );
         if (error)
-          throw new ApiError(
-            "preview_commit_failed",
+          throw new OperationError(
+            "PREVIEW_COMMIT_FAILED",
             "The image could not be attached. Retry image.",
             503,
             true,
           );
         const committed = z.object({ status: z.string() }).parse(data);
-        if (committed.status !== "succeeded" && output.createdAsset)
+        if (["superseded", "cancelled"].includes(committed.status))
           await discardPendingAvatar(output.assetId);
-      } catch (error) {
-        if (output.createdAsset) await discardPendingAvatar(output.assetId);
-        throw error;
-      }
+      },
     },
-  });
+  );
 }

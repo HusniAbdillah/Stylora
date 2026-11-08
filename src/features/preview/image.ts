@@ -21,6 +21,7 @@ import {
 } from "@/lib/supabase/storage";
 import { prepareReferenceImage } from "@/features/ai/reference-image";
 import { avatarIoError } from "./image-errors";
+import { OperationError } from "@/features/operations/errors";
 import { buildAvatarVisualDirection } from "./visual-direction";
 import {
   getImageRenderSettings,
@@ -103,6 +104,54 @@ export function avatarRenderFingerprint(
     .digest("hex");
 }
 
+export async function restoreAvatarCheckpoint(
+  result: unknown,
+  expectedFingerprint: string,
+  signal: AbortSignal,
+  metadata: unknown = {},
+) {
+  const parsed = z
+    .strictObject({
+      assetId: z.uuid(),
+      renderFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    })
+    .safeParse(result);
+  if (!parsed.success || !z.strictObject({}).safeParse(metadata).success)
+    throw new OperationError(
+      "AVATAR_CHECKPOINT_UNUSABLE",
+      "The saved image result is invalid. Request a new image.",
+      409,
+    );
+  if (parsed.data.renderFingerprint !== expectedFingerprint)
+    throw new OperationError(
+      "INPUT_SUPERSEDED",
+      "The image inputs changed.",
+      409,
+    );
+  try {
+    const verified = await readVerifiedWorkspaceStorageAsset(
+      parsed.data.assetId,
+      { signal },
+    );
+    if (verified.bucket !== "previews" || verified.mimeType !== "image/png")
+      throw new OperationError(
+        "AVATAR_CHECKPOINT_UNUSABLE",
+        "The saved image result is unavailable.",
+        409,
+      );
+  } catch (failure) {
+    if (failure instanceof OperationError) throw failure;
+    const error = avatarIoError(failure, "AVATAR_CHECKPOINT_UNUSABLE");
+    if (error.retryable) throw error;
+    throw new OperationError(
+      "AVATAR_CHECKPOINT_UNUSABLE",
+      "The saved image result is unavailable. Request a new image.",
+      409,
+    );
+  }
+  return { ...parsed.data, createdAsset: false };
+}
+
 export async function renderAndStoreAvatar(input: {
   items: unknown[];
   preferences: unknown;
@@ -110,6 +159,8 @@ export async function renderAndStoreAvatar(input: {
   reuse?: boolean;
   signal?: AbortSignal;
   renderSettings?: ImageRenderSettings;
+  beforeGenerate?: () => Promise<void>;
+  afterGenerate?: () => Promise<void>;
 }) {
   const items = normalizeAvatarItems(input.items);
   const renderSettings = imageRenderSettingsSchema.parse(
@@ -193,6 +244,7 @@ export async function renderAndStoreAvatar(input: {
     }),
   );
   const images = loaded.filter((image) => image !== null);
+  await input.beforeGenerate?.();
   const generated = await generateFashionImage({
     items: items.map((item) => ({
       ...item,
@@ -207,6 +259,12 @@ export async function renderAndStoreAvatar(input: {
     signal: input.signal,
     allowDescriptionOnly: input.allowIllustrativeItems,
     renderSettings,
+  }).finally(async () => {
+    try {
+      await input.afterGenerate?.();
+    } catch {
+      console.warn(JSON.stringify({ event: "avatar_provider_release_failed" }));
+    }
   });
   const asset = await createWorkspaceSignedUpload({
     bucket: "previews",
