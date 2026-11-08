@@ -2,6 +2,8 @@
 
 ## Owner 4 AI reliability and local worker evaluation, 8 November 2026
 
+### Earlier local-worker checkpoint
+
 - Task O4.1, O4.3, O4.6 and O4.7, with the user-authorized Create and wardrobe
   audit. Branch `o4/ai-reliability-audit` from main `ba4252d`. One Lane B pull
   request covers shared execution, private asset reads, runtime configuration
@@ -68,6 +70,165 @@
   atomic active-draft check inside `finish_create_operation` for the narrow
   concurrent discard/commit race. These limits are documented in
   [AI-WORKER.md](AI-WORKER.md); no unreviewed hosted migration was applied.
+
+### Production-readiness follow-up, 8 November 2026
+
+- Scope: the user-authorized cost, quality, automatic recovery and live-flow
+  audit on `o4/ai-reliability-audit`, for the single PR #77 update. This
+  follow-up includes additive hosted migrations and generated types; the
+  earlier local-worker checkpoint above describes its own prior source and
+  evaluation run.
+- Source: per-task model, reasoning and output limits are validated and captured
+  in operation identity. Create uses canonical JSON fingerprints and its current
+  runtime checks before provider work or checkpoint reuse. Validated private
+  result checkpoints preserve output across transient publication failures.
+  Shared quotas, persisted backoff, canonical retry codes and Retry-After govern
+  recovery. Invalid output, refusal, stale context and invalid configuration
+  retain terminal behavior for unchanged inputs after any eligible correction.
+  Database claims enforce three text slots and one image slot; Create
+  publication checks the active draft atomically. See
+  [AI-WORKER.md](AI-WORKER.md) for the execution and activation contract.
+- Hosted contract: the coordinator confirmed application of
+  `20261108044718_workflow_reliability.sql`,
+  `20261108050029_shopping_request_budget.sql`,
+  `20261108052354_workflow_retry_code_compat.sql` and
+  `20261108054402_preview_cached_image_claim.sql`. These add shared daily
+  request accounting, durable result recovery, retry-code compatibility and
+  cached Preview claims. A running local worker and these hosted changes do
+  not establish app deployment or a supervised production consumer.
+- Create browser regression: selecting an occasion immediately before upload
+  exposed a stale generation flag that left the page saving indefinitely.
+  The fix drains context edits before switching upload generation and settles
+  saving flags by their active intent. Deferred-save and navigation regressions
+  passed. The coordinator's browser retake reached a saved Everyday occasion,
+  five described pieces, a ready confidence review and wardrobe matches.
+- Cost policy: matching may prefetch during stable Review. New automatic outfit
+  generation now requires the current Match, Ideas or Details step, current
+  matches and no dirty editor, busy upload or pending context save. Returning to
+  Review preserves existing jobs and results while pausing new outfit
+  allocations. This policy is reflected in `create-page.tsx` and TDD section
+  8.3. The v9 production-build retake held Review at two existing outfit
+  operations while confidence and matching refreshed (daily text 14 to 16).
+  Entering Matches allocated one new outfit operation (text 17), which produced
+  three directions. Complete owned-only detail needed no search. Returning to
+  Review and reloading retained five pieces and the saved draft with no extra
+  provider call. Runtime v10 later changes only the supplied-preference output
+  guard and context directions; that new guard has regression-test evidence.
+- Live evidence in the external `production-evaluation/browser-journal.json`
+  records successful Create analysis and outfit operations, a Capsule with
+  three outfits and one provider request, saved-avatar work, and successful
+  Preview reuse with zero additional provider calls. The coordinator also
+  exercised wardrobe description followed by Add to wardrobe, and explicit
+  Mark as owned with confirmation for a marketplace candidate. These are
+  individual connected-flow checks, not an exhaustive browser regression.
+- Research evidence: six isolated text comparisons passed their real adapters
+  and domain validators; the measured default remains Luna with low reasoning.
+  Image comparison and the deep-swatch personalization regression are documented
+  in [AI-RESEARCH.md](AI-RESEARCH.md). A valid PNG from prompt v4 failed the visual
+  skin-material requirement. The repaired v5 prompt passed the recorded
+  deep-swatch comparison pair; this does not establish general personalization
+  accuracy. The HTTP journal contains 18 successful local production-server
+  responses across six routes, with three samples each. These are HTTP timings,
+  with no Core Web Vitals or deployed-latency claim.
+- Checks: an intermediate `npm run test` completed with 501 tests passed;
+  final `npm test` completed with 526 passed and two skipped, across 74 passed
+  test files and one skipped file, in 27.96 seconds. The Capsule worker test mock was updated for checkpoint and
+  shared quota contracts; its focused `pnpm exec vitest run
+src/features/capsules/generate.test.ts` passed all 11 tests. Create upload,
+  canonical failure and Retry-After regressions passed their focused 51-test
+  suite, scoped ESLint and `pnpm typecheck`. These checks use synthetic fixtures
+  and mocked transports; they are separate from the real provider and browser
+  evidence above.
+- Real recovery: an external test-only fetch shim returned one 503 from
+  `commit_capsule_generation` after a real Luna response had been validated and
+  checkpointed. The worker was stopped; reads showed attempt 1, one provider
+  call and `CHECKPOINT_COMMIT_PENDING`. After restarting the local app and
+  worker, automatic deferral and checkpoint restoration published three outfits
+  on attempt 2. Provider count stayed one and the daily text ledger stayed 13.
+  The external `recovery-proof.mjs assert` passed. No model response was faked.
+  The harness needed a Windows signal-exit correction before the restart;
+  this was separate from the application recovery mechanism.
+- Final Preview: the built app rendered prompt v5 with the saved depth-6 swatch,
+  warm undertone, rectangle reference and oversized intent. Manual inspection
+  found dark mannequin material and the selected tee, pink jeans and sneakers.
+  Its 93.815-second operation includes deliberately interrupted consumer time;
+  isolated image-provider latency is not persisted. Save returned the existing
+  immutable snapshot with zero extra image calls, and View saved look opened
+  that detail route. The historical saved v4 image was not silently replaced.
+- Share retest: Keep link and Escape cancelled only the nested confirmation.
+  Explicit confirmation revoked the fixture publication and its public page
+  then showed the unavailable state. Native viewport inspection at 390 by 844
+  showed the full figure with `object-contain` and no horizontal overflow.
+  Full-page browser capture produced inconsistent layout, so native viewport
+  capture was used as evidence. The temporary viewport override was reset.
+- Final source checks: `make pr-ready` passed lint and typecheck and reported
+  Lane B. The external process-only production-build controller passed
+  `next build --webpack`, including TypeScript and route generation. The final
+  image commit/status changes passed 22 focused tests and scoped ESLint.
+  All 15 SQL suites passed on disposable PostgreSQL 16; the four new rollback-only
+  suites also passed against the hosted PostgreSQL 17 project. No deployment
+  or merge has been performed. Final cleanup, journey totals and GitHub CI are
+  recorded below after closeout.
+- Capsule edit and deletion: Save capsule returned to the collection. Edit
+  retained all six selected items, one pin and one exclusion. Build required an
+  Apply confirmation even though the edited draft shared its Capsule ID.
+  Cancel kept the edit; Apply generated three combinations with one text call.
+  Deleting each combination required confirmation. The empty state survived
+  reload with no automatic regeneration or additional call; saved snapshots
+  remained intact.
+- Final quality corrections: raw preference keys are now human labels, with
+  swatch and body fields deduplicated and unsupplied signals excluded. The
+  original model prose remains intact. One real option incorrectly emitted the
+  absent-preferences template; the new finite validator rejects that claim
+  when preferences exist and uses the existing bounded correction path.
+  Runtime v10 prevents treating the old validation contract as current.
+- A disconnected Preview request had incorrectly changed image state to failed
+  while background work could still continue. The client now retains its last
+  job state, reports a status advisory and automatically checks again. Known
+  operation GETs retry transport and 502/503/504 responses with bounded backoff
+  and Retry-After; they do not replay POST or model work. Thirteen client tests
+  passed, including interrupted body reads and terminal-error handling.
+- The final production build included the v10 validator and GET recovery.
+  A loopback test proxy then returned one 503 for Preview status at 06:30:58 UTC.
+  Automatic GETs succeeded at 06:31:09 and 06:31:11, before any POST appeared in
+  the recovery receipt. The status advisory cleared without a Retry click.
+  A later bottom selection change at 06:31:34 was persisted, but its origin was
+  not established; it is excluded from recovery and latency claims. Its new
+  image operation spent zero provider calls and waited for the next UTC budget.
+  Activity now explains that wait instead of reporting only a generic queue.
+- At the full four-image evaluation quota, opening the immutable saved Preview
+  composition created a separate draft and reused the ready v5 asset. The
+  operation succeeded with zero provider calls; the UI reached Ready in five
+  seconds. The final desktop screenshot records this composition and selected
+  visual preferences. Browser tabs and viewport overrides were cleaned up.
+- Actual follow-up usage: 17 app text requests, four app image requests and
+  four catalog requests; six isolated text comparisons and four isolated image
+  comparisons. Total 23 text, eight images and four searches, within the final
+  30/8/6 evaluation caps. The app's process limits were 24/4/6. Real provider
+  outcomes and controlled injected failures are distinguished above; no failed
+  image or contradictory recommendation is counted as a quality success.
+- Cleanup completed through the reviewed external `cleanup-production.mjs`
+  plan. The guarded database transaction first passed with ROLLBACK, then
+  committed. Read-only verification found zero remaining target rows across
+  all 18 recorded table groups: 26 operations, 12 drafts, one look, one Capsule,
+  nine options, three saved snapshots/media rows each, one share, nine wardrobe
+  fixtures, 12 products, 15 assets and their recorded children were removed.
+  All 45 pre-existing wardrobe rows and 45 assets remained, including the teal
+  piece involved in the unattributed selection. Original preference values
+  were restored only after the exact fixture values/revision/time matched.
+  The separate guarded Storage phase completed for all 15 scoped fixture paths.
+  Daily usage stayed 17 text, four images and four searches. No reset or refund
+  was applied to usage. No listeners remain on ports 3114 or 3115; the task's
+  app, worker, proxy and disposable SQL-test server are stopped.
+- Final source delivery remains the single PR #77 on `o4/ai-reliability-audit`.
+  `make pr-ready` passed again after the last execution changes and classified
+  Lane B; the final full local suite passed 526 tests with two existing online
+  tests skipped. Production compilation, TypeScript, page generation and route
+  tracing passed. A final six-line Activity wait-message change followed those
+  checks; GitHub CI is the exact-head full check/build gate. Deployed load,
+  device Core Web Vitals, production worker supervision and alert delivery are
+  unverified operational release checks. No merge or deployment is authorized
+  by this closeout; activation instructions are in AI-WORKER.md.
 
 ## PR 75 conflict resolution, 7 November 2026
 

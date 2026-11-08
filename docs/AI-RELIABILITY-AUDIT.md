@@ -2,8 +2,16 @@
 
 Branch: `o4/ai-reliability-audit`, based on `ba4252d`. Scope: Owner 4 operations
 and the related Create, wardrobe and page-loading failures authorized by the
-user. Delivery is one pull request. No production deployment or hosted schema
-change is included.
+user. Delivery is one pull request. The follow-up applied four additive hosted
+migrations, regenerated database types, added shared provider budgets and result
+checkpoints, and tested recovery after an induced commit failure and process
+restart. No production deployment is included.
+
+The provider and page measurements below describe the earlier local-worker
+checkpoint. The follow-up's real browser journeys, hosted policy checks and
+cleanup are recorded in [PROGRESS-NEW.md](PROGRESS-NEW.md). Model comparisons,
+the repaired personalization failure and production-build HTTP timings are in
+[AI-RESEARCH.md](AI-RESEARCH.md).
 
 ## Causes and changes
 
@@ -82,19 +90,22 @@ now allowed without adding a wildcard.
 ## Remaining operational limits
 
 - Production needs an independently supervised worker before enabling worker
-  mode. This change only ran the executor locally. A configuration probe is not
-  a liveness heartbeat; monitor queued age and expired leases.
-- Run one worker per workspace. Capsule has a durable three-request operation
-  ledger, but no database-wide text semaphore across multiple worker processes.
-- Create checks draft state immediately before commit. A strict concurrent
-  discard-versus-commit guarantee still needs an active-draft check inside the
-  existing `finish_create_operation` database transaction. No migration was
-  silently applied for that follow-up.
+  mode. The executor has run locally; the example service has not been installed
+  on a production host. Heartbeats now gate new allocations, but queued age and
+  expired leases still require deployed monitoring.
+- Start with one worker per workspace. The database now enforces three shared
+  text slots and one image slot across consumers, and Create checks active draft
+  state inside its publication transaction. Multiple-worker load and fairness
+  have not been evaluated under production traffic.
 - Recovery after an ambiguous paid-provider interruption cannot guarantee
-  exactly-once billing. No paid request was deliberately killed in this run.
-- The avatar was inspected for composition and visible garment detail. This run
-  did not repeat the earlier cross-preference visual comparison or measure
-  physical fit accuracy.
+  exactly-once billing. The follow-up interrupted publication after a real
+  response had been checkpointed; replay succeeded without a second model call.
+- Visual comparison found and repaired a deep-swatch failure. The tested cases
+  do not establish general preference compliance or physical fit accuracy.
+- Full browser regression, sustained load, device Core Web Vitals, deployed
+  provider behavior and alert delivery remain release checks. Image operation
+  duration includes queued work; isolated image-provider latency and usage are
+  not currently persisted by the application adapter.
 
 See [AI-WORKER.md](AI-WORKER.md) for setup and recovery. Validation commands,
 cleanup and delivery state are recorded in [PROGRESS-NEW.md](PROGRESS-NEW.md).

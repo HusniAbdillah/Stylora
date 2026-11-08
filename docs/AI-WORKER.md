@@ -35,13 +35,13 @@ workspace may execute, including jobs created before the worker started.
 
 ## Concurrency and recovery
 
-Run one worker process per workspace. It has three text slots and one image
-slot, scanned independently so a long image queue does not block text jobs.
-Database image claims are also limited to one per workspace. Create and
-wardrobe provider calls retain their existing database call reservations.
-Capsule's provider path lacks a database-wide text semaphore; multiple worker
-processes can exceed its intended text concurrency. Do not horizontally scale
-this worker until that quota is implemented.
+Start with one supervised worker per workspace. It has three text slots and one
+image slot, scanned independently. The database enforces the same shared limits
+across Create, wardrobe description, Capsule and image consumers, including
+multiple worker processes. Actual provider requests reserve their own slot and
+UTC daily budget immediately before HTTP dispatch. Cached image reuse and
+checkpoint restoration do not reserve a paid call. Operation attempts and
+provider requests each remain bounded to three.
 
 An active lease is never reclaimed. Expired running or partial jobs go through
 the claim RPC, including exhausted attempts so the database can publish their
@@ -51,10 +51,12 @@ worker waits for in-flight requests when gracefully signaled. An abrupt stop
 requires lease expiry before recovery. Provider billing cannot be guaranteed
 exactly once when the result of an interrupted request is unknown.
 
-The scanner does not retry failed jobs automatically. An eligible user retry
-retains operation identity, checks current inputs, observes the stored retry
-delay and preserves the three-attempt limit. Validation failures are terminal
-for unchanged inputs. Create and Capsule may each request one schema/domain
+The scanner automatically defers explicitly retryable failures through an atomic
+RPC. It retains operation identity, checks current inputs, stores exponential
+backoff with jitter and honors provider Retry-After. The due timestamp survives
+worker restarts. Busy claims do not consume attempts. Validation failures,
+refusals, stale inputs and invalid configuration remain terminal for unchanged
+inputs. Create and Capsule may each request one schema/domain
 correction inside a single attempt, with the same captured inputs, safe error
 paths and a shared deadline. Refusals, incomplete output and uncertain network
 failures do not enter this correction loop. Streamed provisional descriptions
@@ -69,10 +71,72 @@ The app's worker secret and mode must match before accepting traffic. Monitor
 attempt counts, safe failure codes, provider latency and token usage. Logs must
 not include request payloads, signed URLs, provider text or credentials.
 
-HTTP 202 means persisted acceptance, not completion or proof that a consumer is
-healthy. The configuration probe verifies credentials and mode only. It is not
-a heartbeat. An independently monitored process and queue-age alert are required
-for production. No infrastructure is deployed by this repository change.
+The worker verifies the app's workspace as well as its mode and secret. It writes
+a scoped heartbeat every 15 seconds; new worker-mode allocations require one
+within 90 seconds. A missing consumer returns 503 with a saved-draft message.
+The protected GET `/api/internal/workflow-worker` reports executor mode,
+workspace and consumer freshness. HTTP 202 still means acceptance, not task
+completion. Alert on oldest queued age above 60 seconds, expired live leases,
+repeated scan failures and exhausted budgets. A recent heartbeat is not a
+completion guarantee. No host or application deployment is performed by these
+repository changes.
+
+Validated results are checkpointed before publication. On a lost commit or
+response, recovery validates the same captured result and publishes it without
+calling the model again. Image checkpoints retain verified pending assets until
+publication. This cannot guarantee exactly-once billing when a provider response
+is lost before a checkpoint can be written.
+
+The database uses UTC daily limits. App and worker should share
+`STYLORA_TEXT_DAILY_LIMIT=150`, `STYLORA_IMAGE_DAILY_LIMIT=20` and
+`STYLORA_SEARCH_DAILY_LIMIT=100`, or explicitly chosen deployment quotas. Existing
+recorded AI requests were conservatively charged to the migration's cutover day;
+operation counters are not reset. Marketplace has its own atomic request budget.
+Cache hits and score-weight changes do not spend another search request.
+
+## Activate on a continuously running host
+
+Vercel request handlers still require a separate consumer process. An example
+systemd unit is in `ops/stylora-worker.service`; it is not installed automatically.
+The hosted schema changes below are applied. App deployment and activation of
+a supervised production consumer remain operational steps to complete.
+
+1. Review and deploy the PR to the app with `STYLORA_EXECUTION_MODE=worker`, a
+   dedicated random worker secret and the chosen quotas. Keep the same hosted
+   workspace configuration on both processes. Do not reuse an OpenAI key as the
+   worker secret.
+2. Place this checkout and its installed production dependencies at
+   `/opt/stylora` on a Node 22 host. Configure the service account `stylora`.
+   Put server-only configuration in `/etc/stylora/worker.env`, readable only by
+   the service account and administrators. Set `STYLORA_WORKER_ORIGIN` to the
+   exact deployed HTTPS origin. Remove evaluation subject-file restrictions.
+3. Install the example unit, then run `systemctl daemon-reload` and
+   `systemctl enable --now stylora-worker`. Check `systemctl status` and
+   `journalctl -u stylora-worker`. Its restart policy recovers a failed process;
+   its shutdown allowance lets in-flight requests drain.
+4. Verify the protected readiness response reports the expected workspace and a
+   fresh worker, then allocate a small task. Navigate away and verify that it
+   finishes once, with an asset or result reference. Monitor actual deployed
+   latency and provider receipts before changing concurrency or quality.
+
+Keep credentials out of command arguments, logs and client-visible variables.
+The following migrations were applied to the configured hosted project during
+this audit, in order:
+
+1. `20261108044718_workflow_reliability.sql` — shared provider quotas, result
+   checkpoints, retry scheduling and worker readiness.
+2. `20261108050029_shopping_request_budget.sql` — marketplace request budgets.
+3. `20261108052354_workflow_retry_code_compat.sql` — compatibility for recorded
+   retry codes.
+4. `20261108054402_preview_cached_image_claim.sql` — allow a verified cached
+   Preview result to be claimed without reserving another image request.
+
+The four new rollback-only policy suites passed on hosted PostgreSQL 17. All 15
+SQL suites also passed on disposable PostgreSQL 16. Do not replay applied
+migrations or reset the project.
+Hosted schema application and local worker evidence do not establish an
+activated production consumer. Record its readiness and completion checks after
+the deployment steps above.
 
 The checked-in Vercel region is `hnd1` (Tokyo), matching the current Supabase
 project's `ap-northeast-1` location. This removes the default US region from

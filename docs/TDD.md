@@ -29,7 +29,7 @@ descriptions and recommendation explanations are distinct typed objects.
 | App        | Next.js App Router, React, strict TypeScript, deployed on Vercel                                                           |
 | Validation | Zod for every request, action, query parameter and provider output                                                         |
 | Data       | Hosted Supabase PostgreSQL and private Storage through the Supabase JS client, server only                                 |
-| AI         | OpenAI API: `gpt-5-mini` for text and vision, `gpt-image-1.5` for images; server-only HTTP transport                       |
+| AI         | OpenAI API: `gpt-6-luna` with low reasoning for text and vision, `gpt-image-2.6-flare` for images; validated task overrides and server-only HTTP transport                       |
 | Shopping   | SerpAPI Google Shopping                                                                                                    |
 | UI         | Tailwind CSS with tokens from the Figma `Stylora / Light` collection, Radix primitives, Motion, Inter and Instrument Serif |
 | Checks     | ESLint, TypeScript, Vitest, Prettier; GitHub Actions on every pull request                                                 |
@@ -134,7 +134,7 @@ explicit adapter.
 ### Shopping, saving and sharing
 
 | Method and path                                                  | Input                                                  | Behavior                                                             |
-| ---------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------- |
+| ----------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------- |
 | POST `/api/looks/[lookId]/products/search`                       | `optionId`, `optionItemId`, optional query and weights | One slot per request; the orchestrator runs slots in parallel        |
 | GET `/api/looks/[lookId]/products`                               | `optionId`                                             | Cached results per slot, factors, score version                      |
 | PUT `/api/looks/[lookId]/selection`                              | `optionId`, `expectedRevision`, slot choices           | Atomic per-slot selection; selection never creates ownership         |
@@ -286,13 +286,19 @@ recovery, limits and local evaluation. Never treat a queued row as running work.
 | `inspiration_description` | Verified upload, stable optional occasion | Upload verified              | Confidence review           |
 | `inspiration_confidence`  | Same image, optional occasion, preferences | Upload verified              | Description                 |
 | `wardrobe_match`          | Accepted piece revision, owned inventory  | Stable review, no dirty edit | Confidence may still run    |
-| `outfit_options`          | Matches, pieces, inventory, preferences   | Match committed              | —                           |
+| `outfit_options`          | Matches, pieces, inventory, preferences   | Matches ready, Match open              | —                           |
 | `option_regeneration`     | One option type and current context       | Suggest another              | Other options stay usable   |
 | `marketplace_search`      | Missing-slot brief, region, query         | Options committed            | Each slot, pool of three    |
 | `wardrobe_description`    | Verified draft image                      | Upload verified              | —                           |
 | `capsule_generation`      | Complete brief and selected owned items   | Wizard inputs stable         | —                           |
 | `preview_image`           | Valid selection and preference snapshot   | Selection stable             | One image job per workspace |
 | `saved_avatar`            | Committed snapshot                        | Save transaction             | Save is already complete    |
+
+Matching may prefetch during Review once a complete revision has no dirty edit.
+Allocate new outfit generation only while on Wardrobe match, Outfit ideas or
+Outfit details, with current matches and no pending upload, context save or
+piece edit. Returning to Review pauses new outfit allocations. Existing jobs
+continue, and saved drafts and results remain available during navigation.
 
 No task starts on an empty form, each keystroke, hover or unverified upload.
 Clicking the forward action navigates and ensures one operation exists; it never

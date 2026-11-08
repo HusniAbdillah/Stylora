@@ -165,8 +165,8 @@ Set the relevant values in `.env.local`:
 | `STYLORA_WORKSPACE_ID` | Existing workspace assigned to this environment. |
 | `DEMO_WRITES_ENABLED` | Defaults to `false`; enable when changes to the assigned shared workspace are intended. |
 | `OPENAI_API_KEY` | Live fashion analysis and image generation. |
-| `OPENAI_TEXT_MODEL` | Text model; the example defaults to `gpt-5-mini`. |
-| `OPENAI_IMAGE_MODEL` | Image model; the example defaults to `gpt-image-1.5`. |
+| `OPENAI_TEXT_MODEL` | Text model; the example defaults to `gpt-6-luna` with low reasoning. |
+| `OPENAI_IMAGE_MODEL` | Image model; the example defaults to `gpt-image-2.6-flare`. |
 | `OPENAI_IMAGE_QUALITY` | Image quality; the example defaults to `medium`. |
 | `SERPAPI_API_KEY` | Missing-piece product search. |
 | `STYLORA_LANDING_SAMPLE_LOOK_ID` | Optional existing look used for the landing sample. |
@@ -188,6 +188,12 @@ invalid database configuration. HTTP 200 confirms configuration shape and report
 provider-key presence; it does not verify database connectivity or provider
 responses. Unconfigured providers return unavailable states rather than silently
 substituting sample results.
+
+For navigation-independent AI work, configure worker mode and start the separate
+consumer. Both processes need the same workspace, dedicated worker secret and
+daily quotas. See [worker setup and deployment](docs/AI-WORKER.md) and the
+[model evaluation](docs/AI-RESEARCH.md). Worker mode refuses new allocations
+without a fresh consumer heartbeat; a job row alone does not execute work.
 
 ## Demo walkthrough
 

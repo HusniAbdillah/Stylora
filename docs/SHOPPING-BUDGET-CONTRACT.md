@@ -1,6 +1,6 @@
 # Shopping request budget
 
-`20261108045620_shopping_request_budget.sql` follows the workflow reliability
+`20261108050029_shopping_request_budget.sql` follows the workflow reliability
 migration. It does not change applied SQL or existing call history.
 
 The migration adds `workflow_provider_daily_budgets.search_calls bigint not null
