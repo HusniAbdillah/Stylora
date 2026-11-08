@@ -252,8 +252,12 @@ export function CapsuleResults({
             {result.subtitle ?? result.title}
           </p>
           <h1 className="mt-2 font-serif text-4xl leading-tight md:text-5xl">
-            {result.outfits.length} outfits from{" "}
-            <em className="text-crimson">{result.pieces.length} pieces.</em>
+            {result.outfits.length}{" "}
+            {result.outfits.length === 1 ? "outfit" : "outfits"} from{" "}
+            <em className="text-crimson">
+              {result.pieces.length}{" "}
+              {result.pieces.length === 1 ? "piece." : "pieces."}
+            </em>
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-secondary">
             Built from your wardrobe text and IDs. Suggestions that need another
