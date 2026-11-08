@@ -5,6 +5,9 @@ import {
   requireWorkspaceWrites,
 } from "@/lib/supabase/server";
 import { canRetryOperationCode, OperationError } from "./errors";
+import { workflowProviderLimits } from "./limits";
+import { assertWorkflowExecutorAvailable } from "./health";
+import { checkpointOperationResult, readOperationCheckpoint, type OperationCheckpoint } from "./checkpoints";
 import {
   operationRowSchema,
   startOperationSchema,
@@ -80,6 +83,7 @@ export async function startOperation(
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
   const request = parsed.data;
+  await assertWorkflowExecutorAvailable();
   const { data, error } = await context.client.rpc("start_workflow_operation", {
     p_workspace_id: context.workspaceId,
     p_kind: request.kind,
@@ -108,6 +112,10 @@ export type OperationClaim = {
 export type OperationHandler<T> = {
   execute(claim: OperationClaim): Promise<T>;
   commit(claim: OperationClaim, output: T): Promise<void>;
+  checkpoint?: {
+    serialize(output: T): OperationCheckpoint;
+    restore(claim: OperationClaim, result: z.core.JSONType, metadata: z.core.JSONType): Promise<T>;
+  };
   fail?(claim: OperationClaim, error: OperationFailure): Promise<void>;
 };
 
@@ -116,6 +124,7 @@ type OperationFailure = {
   retryable: boolean;
   retryAfterSeconds?: number;
   diagnostics?: { code: string; path: string }[];
+  checkpointed?: boolean;
 };
 
 export async function failOperation(
@@ -147,6 +156,7 @@ export async function failOperation(
         : "failed",
       p_safe_error_code: code,
       p_result_ref: {
+        ...(failure.checkpointed ? { checkpointed: true } : {}),
         retryable: failure.retryable && canRetryOperationCode(code),
         ...(retrySeconds === undefined
           ? {}
@@ -202,6 +212,8 @@ export async function runOperation<T>(
     p_operation_id: existing.id,
     p_input_revision: existing.input_revision,
     p_lease_seconds: 280,
+    p_text_daily_limit: workflowProviderLimits().textDailyLimit,
+    p_image_daily_limit: workflowProviderLimits().imageDailyLimit,
   });
   if (error?.code === "55P03") return readOperation(existing.id);
   if (error) databaseError(error.code);
@@ -225,8 +237,15 @@ export async function runOperation<T>(
       ),
     ),
   };
+  let checkpointed = false;
   try {
-    const output = await handler.execute(claim);
+    const stored = handler.checkpoint ? await readOperationCheckpoint(claim) : null;
+    const output = stored && handler.checkpoint
+      ? await handler.checkpoint.restore(claim, stored.result, stored.metadata)
+      : await handler.execute(claim);
+    if (handler.checkpoint && !stored)
+      await checkpointOperationResult(claim, handler.checkpoint.serialize(output));
+    checkpointed = !!handler.checkpoint;
     await handler.commit(claim, output);
     const committed = await readOperation(operation.id);
     if (!["succeeded", "cancelled", "superseded"].includes(committed.status)) {
@@ -273,8 +292,9 @@ export async function runOperation<T>(
               claim.signal.aborted,
             );
     await (handler.fail ?? failOperation)(claim, {
-      code: safeError.code,
-      retryable: safeError.retryable,
+      code: checkpointed && safeError.status >= 500 ? "CHECKPOINT_COMMIT_PENDING" : safeError.code,
+      retryable: checkpointed && safeError.status >= 500 ? true : safeError.retryable,
+      checkpointed,
       retryAfterSeconds: safeError.retryAfterSeconds,
       diagnostics: providerFailure.success
         ? providerFailure.data.diagnostics

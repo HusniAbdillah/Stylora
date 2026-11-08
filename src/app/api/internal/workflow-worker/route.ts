@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { apiRoute } from "@/lib/api";
 import { ApiError, readJson } from "@/lib/http";
+import { getWorkspaceDatabase } from "@/lib/supabase/server";
+import { workflowWorkerHealth } from "@/features/operations/health";
 import { operationResponse } from "@/features/operations/http";
 import { executeQueuedOperation } from "@/features/operations/worker";
 import {
@@ -25,6 +27,8 @@ export async function GET(request: Request) {
   if (!authorizeWorkflowWorker(request)) return unauthorized();
   return apiRoute(async () => ({
     executionMode: usesWorkflowWorker() ? "worker" : "inline",
+    workspaceId: getWorkspaceDatabase().workspaceId,
+    worker: await workflowWorkerHealth(),
   }));
 }
 
