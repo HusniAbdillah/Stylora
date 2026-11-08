@@ -48,6 +48,7 @@ export type FashionRequest<T extends z.ZodType> = {
   context: unknown;
   imageDataUrl?: string;
   onPiece?: (piece: Garment, index: number) => Promise<void> | void;
+  validate?: (data: z.output<T>) => void;
 };
 
 export type ProviderMetadata = {
@@ -64,12 +65,15 @@ export type ProviderMetadata = {
   promptAssemblyHash: string;
   attemptCount: number;
   operationId: string;
+  correctionAttemptCount: number;
 };
 
 type FashionOperationContext = {
   operationId: string;
   reserveCall: () => Promise<void>;
   releaseCall: () => Promise<void>;
+  signal?: AbortSignal;
+  deadline?: number;
 };
 type ProviderFailureDetails = {
   code: string;
@@ -83,6 +87,7 @@ type ProviderFailureDetails = {
   validationIssues: Array<{ code: string; path: string }>;
   responseStatus: string | null;
   incompleteReason: string | null;
+  correctionAttempt: boolean;
 };
 const operationScope = new AsyncLocalStorage<FashionOperationContext>();
 const failures = new WeakMap<Error, ProviderFailureDetails>();
@@ -115,6 +120,7 @@ export function safeProviderError(
       validationIssues: [],
       responseStatus: null,
       incompleteReason: null,
+      correctionAttempt: false,
     }
   );
 }
@@ -137,11 +143,19 @@ function diagnosticError(
     validationIssues: [],
     responseStatus: null,
     incompleteReason: null,
+    correctionAttempt: false,
     ...details,
     code,
     retryable,
   });
   return error;
+}
+
+export function fashionValidationFailure(code: string, issues: Array<{ code: string; path: string }>) {
+  return diagnosticError(code, "The recommendation did not pass validation. Review the input and retry.", 502, false, {
+    providerCode: "domain_validation",
+    validationIssues: issues.slice(0, 12).map((issue) => ({ code: safeIdentifier(issue.code) ?? "invalid_value", path: safeIdentifier(issue.path) ?? "output" })),
+  });
 }
 
 export function retryAfterMilliseconds(value: string | null, now = Date.now()) {
@@ -491,7 +505,7 @@ export async function requestFashion<T extends z.ZodType>(
       image_url: request.imageDataUrl,
       detail: "auto",
     });
-  const body = JSON.stringify({
+  const requestBody = {
     model,
     instructions,
     input: [{ role: "user", content }],
@@ -507,11 +521,12 @@ export async function requestFashion<T extends z.ZodType>(
         schema: strictJsonSchema(request.schema),
       },
     },
-  });
+  };
   const started = Date.now();
-  const deadline = started + 240_000;
+  const deadline = Math.min(started + 240_000, scope.deadline ?? Infinity);
   const workspaceId = process.env.STYLORA_WORKSPACE_ID || "unconfigured";
   let provisionalOutput = false;
+  let correction: { type: "correction_attempt"; code: string; issues: ProviderFailureDetails["validationIssues"] } | undefined;
   const streamingRequest = request.onPiece
     ? {
         ...request,
@@ -530,6 +545,7 @@ export async function requestFashion<T extends z.ZodType>(
     let details: Partial<ProviderFailureDetails> = {
       attemptCount: attempt,
       operationId: scope.operationId,
+      correctionAttempt: Boolean(correction),
     };
     const remaining = deadline - Date.now();
     if (remaining <= 0) {
@@ -542,17 +558,22 @@ export async function requestFashion<T extends z.ZodType>(
         details,
       );
     }
-    const timeout = AbortSignal.timeout(Math.min(90_000, remaining));
+    const timeout = AbortSignal.any([AbortSignal.timeout(Math.min(90_000, remaining)), ...(scope.signal ? [scope.signal] : [])]);
     try {
+      timeout.throwIfAborted();
       await scope.reserveCall();
       reserved = true;
+      timeout.throwIfAborted();
       const response = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
-        body,
+        body: JSON.stringify({ ...requestBody, input: [{ role: "user", content: [
+          ...content,
+          ...(correction ? [{ type: "input_text", text: `The previous response failed deterministic validation. Return a complete corrected response using the same supplied context and schema. Do not invent evidence or remove required information. Safe validation feedback: ${JSON.stringify(correction)}` }] : []),
+        ] }] }),
         signal: timeout,
       });
       details = {
@@ -590,6 +611,7 @@ export async function requestFashion<T extends z.ZodType>(
       const result = request.onPiece
         ? await readStream(response, streamingRequest)
         : parseFashionResponse(request.schema, await response.json());
+      request.validate?.(result.data);
       return {
         data: result.data,
         metadata: {
@@ -600,6 +622,7 @@ export async function requestFashion<T extends z.ZodType>(
           usage: result.usage,
           attemptCount: attempt,
           operationId: scope.operationId,
+          correctionAttemptCount: correction ? 1 : 0,
         },
       };
     } catch (error) {
@@ -661,7 +684,15 @@ export async function requestFashion<T extends z.ZodType>(
       }
     }
     if (!failure) throw invalidOutput();
-    if (!eligibleRetry || provisionalOutput) throw failure;
+    const validation = safeProviderError(failure);
+    const correctable = validation?.providerCode === "domain_validation" ||
+      (failure.code === "provider_invalid_output" && ["output_schema", "invalid_json", "garment_schema"].includes(validation?.providerCode ?? ""));
+    if (!correction && correctable && !provisionalOutput && !timeout.aborted && attempt < 3) {
+      correction = { type: "correction_attempt", code: failure.code, issues: validation?.validationIssues ?? [] };
+      continue;
+    }
+    if (details.correctionAttempt) throw failure;
+    if (!eligibleRetry || provisionalOutput || scope.signal?.aborted) throw failure;
     if (attempt === 3) {
       throw diagnosticError(
         failure.code,

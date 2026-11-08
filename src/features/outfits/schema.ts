@@ -42,6 +42,15 @@ export const outfitOptionsSchema = z.strictObject({
 export type OutfitOption = z.infer<typeof outfitOptionSchema>;
 export type OutfitOptionType = z.infer<typeof optionTypeSchema>;
 
+export function wardrobeSupportsOutfit(pieces: MatchItem[], inventory: MatchItem[], constraints: {
+  preferences: Record<string, string | string[]>; occasion: string | null; inventoryMode?: InventoryMode;
+}) {
+  const categories = new Set(inventory.filter((item) => isOwnedInventoryItem(item, constraints.inventoryMode) &&
+    !itemConstraintConflict(item, constraints.preferences, constraints.occasion)).map((item) => item.category));
+  return (categories.has("dress") || categories.has("top") && categories.has("bottom")) &&
+    (!pieces.some((piece) => piece.category === "shoes") || categories.has("shoes"));
+}
+
 export function validateOptionComposition(
   options: OutfitOption[],
   pieces: MatchItem[],
@@ -67,24 +76,7 @@ export function validateOptionComposition(
     errors.push("option_types_invalid");
   const inventoryIds = new Map(inventory.map((item) => [item.id, item]));
   const pieceIds = new Map(pieces.map((piece) => [piece.id, piece]));
-  const usableCategories = new Set(
-    inventory
-      .filter(
-        (item) =>
-          isOwnedInventoryItem(item, constraints.inventoryMode) &&
-          !itemConstraintConflict(
-            item,
-            constraints.preferences,
-            constraints.occasion,
-          ),
-      )
-      .map((item) => item.category),
-  );
-  const inventorySupportsOutfit =
-    (usableCategories.has("dress") ||
-      (usableCategories.has("top") && usableCategories.has("bottom"))) &&
-    (!pieces.some((piece) => piece.category === "shoes") ||
-      usableCategories.has("shoes"));
+  const inventorySupportsOutfit = wardrobeSupportsOutfit(pieces, inventory, constraints);
   const compositions = new Set<string>();
   for (const option of options) {
     if (option.status === "unavailable") {

@@ -6,7 +6,7 @@ import {
   categorySchema,
   explanationSchema,
 } from "@/lib/ai/fashion-schema";
-import { requestFashion } from "@/lib/ai/provider";
+import { fashionValidationFailure, requestFashion } from "@/lib/ai/provider";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
 import { z } from "zod";
 import {
@@ -50,7 +50,7 @@ const inventoryRowSchema = z.object({
   archived_at: z.string().nullable(),
 });
 
-export async function listInventory(mode: InventoryMode) {
+export async function listInventory(mode: InventoryMode, signal = AbortSignal.timeout(15000)) {
   const { client, workspaceId } = getWorkspaceDatabase();
   const rows: z.infer<typeof inventoryRowSchema>[] = [];
   const pageSize = 500;
@@ -70,7 +70,7 @@ export async function listInventory(mode: InventoryMode) {
     }
     const { data, error } = await query
       .order("id")
-      .range(offset, offset + pageSize - 1);
+      .range(offset, offset + pageSize - 1).abortSignal(signal);
     if (error)
       throw new ApiError(
         "inventory_read_failed",
@@ -153,17 +153,14 @@ export function validateExplanation(
       "The recommendation referenced unavailable context.",
       502,
     );
-  for (const reason of explanation.whyThis)
-    for (const evidence of reason.evidence) {
+  for (const [reasonIndex, reason] of explanation.whyThis.entries())
+    for (const [evidenceIndex, evidence] of reason.evidence.entries()) {
+      const path = `whyThis.${reasonIndex}.evidence.${evidenceIndex}`;
       if (
         (evidence.source === "preference" || evidence.source === "context") &&
         evidence.id !== null
       )
-        throw new ApiError(
-          "invalid_explanation_evidence",
-          "The recommendation included an unsupported context reference.",
-          502,
-        );
+        throw fashionValidationFailure("invalid_explanation_evidence", [{ code: "context_id_invalid", path }]);
       let source: unknown;
       if (evidence.source === "inspiration")
         source = pieces.find((piece) => piece.id === evidence.id);
@@ -177,11 +174,7 @@ export function validateExplanation(
         value === null ||
         (Array.isArray(value) && !value.length)
       )
-        throw new ApiError(
-          "invalid_explanation_evidence",
-          "The recommendation included unsupported evidence.",
-          502,
-        );
+        throw fashionValidationFailure("invalid_explanation_evidence", [{ code: "evidence_unavailable", path }]);
     }
 }
 

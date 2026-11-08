@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
   parseFashionResponse,
@@ -6,6 +6,8 @@ import {
   retryAfterMilliseconds,
   safeProviderError,
   strictJsonSchema,
+  withFashionOperation,
+  fashionValidationFailure,
 } from "./provider";
 import { descriptionSchema } from "./fashion-schema";
 
@@ -22,6 +24,75 @@ vi.mock("../api", () => ({
     }
   },
 }));
+
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+const completed = (data: unknown) => new Response(JSON.stringify({ status: "completed", output: [
+  { type: "message", content: [{ type: "output_text", text: JSON.stringify(data) }] },
+] }), { headers: { "Content-Type": "application/json" } });
+
+describe("accounted validation correction", () => {
+  function setup(responses: Response[]) {
+    vi.stubEnv("OPENAI_API_KEY", "unit-test-key");
+    vi.stubEnv("OPENAI_MODEL", "unit-test-model");
+    const fetch = vi.fn();
+    for (const response of responses) fetch.mockResolvedValueOnce(response);
+    vi.stubGlobal("fetch", fetch);
+    const context = { operationId: "unit-operation", reserveCall: vi.fn(async () => {}), releaseCall: vi.fn(async () => {}) };
+    return { fetch, context };
+  }
+  it("makes one correction from the same context, with safe validation paths and two reservations", async () => {
+    const { fetch, context } = setup([completed({ count: "private-output-do-not-repeat" }), completed({ count: 2 })]);
+    const result = await withFashionOperation(context, () => requestFashion({ task: "outfit_options", schema: z.strictObject({ count: z.number().positive() }), context: { sourceRevision: 1 } }));
+    expect(result.data).toEqual({ count: 2 });
+    expect(result.metadata).toMatchObject({ attemptCount: 2, correctionAttemptCount: 1 });
+    expect(context.reserveCall).toHaveBeenCalledTimes(2);
+    expect(context.releaseCall).toHaveBeenCalledTimes(2);
+    const first = JSON.parse(fetch.mock.calls[0][1].body);
+    const second = JSON.parse(fetch.mock.calls[1][1].body);
+    expect(second.input[0].content[0]).toEqual(first.input[0].content[0]);
+    expect(second.input[0].content[1].text).toContain("correction_attempt");
+    expect(second.input[0].content[1].text).toContain('"path":"count"');
+    expect(second.input[0].content[1].text).not.toContain("private-output-do-not-repeat");
+  });
+  it("corrects deterministic domain failures once without relaxing the validator", async () => {
+    const { fetch, context } = setup([completed({ count: 1 }), completed({ count: 2 })]);
+    const result = await withFashionOperation(context, () => requestFashion({ task: "outfit_options", schema: z.object({ count: z.number() }), context: {}, validate: (data) => {
+      if (data.count !== 2) throw fashionValidationFailure("invalid_outfit_composition", [{ code: "incomplete_clothing_coverage", path: "options" }]);
+    } }));
+    expect(result.data.count).toBe(2);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it("does not issue a third request when the correction remains invalid", async () => {
+    const { fetch, context } = setup([completed({ count: -1 }), completed({ count: -2 }), completed({ count: 2 })]);
+    const failure = await withFashionOperation(context, () => requestFashion({ task: "outfit_options", schema: z.object({ count: z.number().positive() }), context: {} })).catch((error: unknown) => error);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(safeProviderError(failure)).toMatchObject({ code: "provider_invalid_output", correctionAttempt: true, retryable: false });
+  });
+  it("keeps refusal terminal without a corrective request", async () => {
+    const { fetch, context } = setup([new Response(JSON.stringify({ status: "completed", output: [{ type: "message", content: [{ type: "refusal" }] }] }))]);
+    await expect(withFashionOperation(context, () => requestFashion({ task: "inspiration_confidence", schema: z.object({ count: z.number() }), context: {} }))).rejects.toMatchObject({ code: "provider_refused" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it("stops before accounting or inference when the shared deadline is exhausted", async () => {
+    const { fetch, context } = setup([]);
+    await expect(withFashionOperation({ ...context, deadline: Date.now() - 1 }, () => requestFashion({ task: "outfit_options", schema: z.object({ count: z.number() }), context: {} }))).rejects.toMatchObject({ code: "provider_timeout" });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(context.reserveCall).not.toHaveBeenCalled();
+  });
+  it("never corrects a stream after a complete provisional piece has been published", async () => {
+    const evidence = { source: "visual_inference", state: "observed", confidence: 0.8, evidence: "Visible in the supplied fixture image.", uncertainty: null };
+    const piece = { name: "Fixture shirt", category: "top", subcategory: null, description: "A visible shirt.",
+      coreEvidence: { name: evidence, category: evidence, subcategory: evidence, description: evidence }, attributes: [], confidence: 0.8, uncertainty: [] };
+    const delta = JSON.stringify({ pieces: [piece] });
+    const stream = `data: ${JSON.stringify({ type: "response.output_text.delta", delta })}\n\ndata: ${JSON.stringify({ type: "response.completed", response: { status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: '{"pieces":[]}' }] }] } })}\n\n`;
+    const { fetch, context } = setup([new Response(stream)]);
+    const onPiece = vi.fn();
+    await expect(withFashionOperation(context, () => requestFashion({ task: "inspiration_description", schema: descriptionSchema, context: {}, onPiece }))).rejects.toMatchObject({ code: "provider_invalid_output" });
+    expect(onPiece).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("provider wire validation", () => {
   it("reports validation paths and incomplete reasons without provider values", () => {
