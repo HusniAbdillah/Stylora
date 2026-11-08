@@ -7,6 +7,170 @@ afterEach(() => {
 });
 
 describe("navigation-independent operation requests", () => {
+  it("recovers transient worker status reads with GET only and resets backoff after a valid read", async () => {
+    vi.useFakeTimers();
+    const id = "c11bcb6b-7f55-4adc-b212-08731767d972";
+    const times: number[] = [];
+    const started = Date.now();
+    const responses = [
+      Response.json(
+        { data: { id, status: "queued" } },
+        { status: 202, headers: { "X-Stylora-Executor": "worker" } },
+      ),
+      new TypeError("Connection interrupted"),
+      Response.json({}, { status: 503, headers: { "Retry-After": "2" } }),
+      Response.json({}, { status: 502 }),
+      Response.json({ data: { id, status: "running" } }),
+      Response.json({}, { status: 504 }),
+      Response.json({ data: { id, status: "succeeded" } }),
+    ];
+    const request = vi.fn<typeof fetch>().mockImplementation(async () => {
+      times.push(Date.now() - started);
+      const response = responses.shift();
+      if (response instanceof Error) throw response;
+      if (!response) throw new Error("Unexpected request");
+      return response;
+    });
+    vi.stubGlobal("fetch", request);
+    const pending = startOperationRequest(id, "/api/avatars/" + id);
+    await vi.advanceTimersByTimeAsync(14000);
+    expect(await (await pending).json()).toMatchObject({
+      data: { status: "succeeded" },
+    });
+    expect(times).toEqual([0, 3000, 4000, 6000, 10000, 13000, 14000]);
+    expect(request.mock.calls.map(([, init]) => init?.method)).toEqual([
+      "POST",
+      "GET",
+      "GET",
+      "GET",
+      "GET",
+      "GET",
+      "GET",
+    ]);
+  });
+
+  it.each([400, 404])(
+    "does not retry terminal status HTTP %s",
+    async (status) => {
+      vi.useFakeTimers();
+      const id = "6e33ba68-c50f-40f0-ac78-20f449638588";
+      const request = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          Response.json(
+            { data: { id, status: "queued" } },
+            { headers: { "X-Stylora-Executor": "worker" } },
+          ),
+        )
+        .mockResolvedValueOnce(
+          Response.json({ error: { message: "Unavailable" } }, { status }),
+        );
+      vi.stubGlobal("fetch", request);
+      const pending = startOperationRequest(id, "/api/avatars/" + id);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect((await pending).status).toBe(status);
+      expect(request.mock.calls.map(([, init]) => init?.method)).toEqual([
+        "POST",
+        "GET",
+      ]);
+    },
+  );
+
+  it.each(["transport", "503"])(
+    "bounds consecutive GET failures to eight (%s) without repeating POST",
+    async (failure) => {
+      vi.useFakeTimers();
+      const id = "ec64d4bf-4679-4a3f-bc97-c8a6d895db2b";
+      const request = vi
+        .fn<typeof fetch>()
+        .mockImplementation(async (_url, init) => {
+          if (init?.method === "POST")
+            return Response.json(
+              { data: { id, status: "queued" } },
+              { headers: { "X-Stylora-Executor": "worker" } },
+            );
+          if (failure === "transport") throw new TypeError("Disconnected");
+          return Response.json({}, { status: 503 });
+        });
+      vi.stubGlobal("fetch", request);
+      const pending = startOperationRequest(id, "/api/avatars/" + id).catch(
+        (error) => error,
+      );
+      await vi.advanceTimersByTimeAsync(120000);
+      expect(await pending).toMatchObject({
+        message: "OPERATION_STATUS_UNAVAILABLE",
+      });
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST"),
+      ).toHaveLength(1);
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "GET"),
+      ).toHaveLength(8);
+    },
+  );
+
+  it("respects an HTTP-date Retry-After while keeping the five-minute deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-08T00:00:00Z"));
+    const id = "08b7b52b-d960-44fa-9801-48d1e534f597";
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json(
+          { data: { id, status: "queued" } },
+          { headers: { "X-Stylora-Executor": "worker" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          {},
+          {
+            status: 503,
+            headers: { "Retry-After": "Sun, 08 Nov 2026 00:00:30 GMT" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ data: { id, status: "succeeded" } }),
+      );
+    vi.stubGlobal("fetch", request);
+    const pending = startOperationRequest(id, "/api/avatars/" + id);
+    await vi.advanceTimersByTimeAsync(29999);
+    expect(request).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect((await pending).ok).toBe(true);
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry past the remaining request deadline", async () => {
+    vi.useFakeTimers();
+    const id = "4b28e791-514c-4a32-b940-fc013878d57f";
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementationOnce(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 294000));
+        return Response.json(
+          { data: { id, status: "queued" } },
+          { headers: { "X-Stylora-Executor": "worker" } },
+        );
+      })
+      .mockResolvedValueOnce(
+        Response.json({}, { status: 503, headers: { "Retry-After": "5" } }),
+      );
+    vi.stubGlobal("fetch", request);
+    const pending = startOperationRequest(id, "/api/avatars/" + id).catch(
+      (error) => error,
+    );
+    await vi.advanceTimersByTimeAsync(300000);
+    expect(await pending).toMatchObject({
+      message: "OPERATION_STATUS_UNAVAILABLE",
+    });
+    expect(request.mock.calls.map(([, init]) => init?.method)).toEqual([
+      "POST",
+      "GET",
+    ]);
+  });
+
   it("only polls worker-managed queued jobs, without browser execution retries", async () => {
     vi.useFakeTimers();
     const id = "be88417c-17f6-4ca4-8c24-c032710d287d";

@@ -81,6 +81,45 @@ async function executeRequest(
   if (!operationId || (!response.ok && response.status !== 409))
     return response;
 
+  async function readStatus(statusUrl: string): Promise<Response> {
+    let failures = 0;
+    while (Date.now() < deadline) {
+      let latest: Response | undefined;
+      try {
+        latest = await fetch(statusUrl, {
+          method: "GET",
+          cache: "no-store",
+          signal: AbortSignal.timeout(
+            Math.max(1, Math.min(15_000, deadline - Date.now())),
+          ),
+        });
+        if (![502, 503, 504].includes(latest.status)) {
+          if (latest.ok) await latest.clone().arrayBuffer();
+          return latest;
+        }
+      } catch {
+        latest = undefined;
+      }
+      failures += 1;
+      const remaining = deadline - Date.now();
+      if (failures >= 8 || remaining <= 0) break;
+      let delay = Math.min(1000 * 2 ** (failures - 1), 15_000);
+      const retryAfter = latest?.headers.get("Retry-After");
+      if (retryAfter) {
+        const specified = /^\d+$/.test(retryAfter.trim())
+          ? Number(retryAfter) * 1000
+          : Date.parse(retryAfter) - Date.now();
+        if (Number.isFinite(specified) && specified >= 0) {
+          if (specified >= remaining) break;
+          delay = Math.max(delay, specified);
+        }
+      }
+      if (delay >= remaining) break;
+      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+    }
+    throw new Error("OPERATION_STATUS_UNAVAILABLE");
+  }
+
   while (Date.now() < deadline) {
     if (
       snapshot &&
@@ -93,11 +132,7 @@ async function executeRequest(
       setTimeout(resolve, Math.min(3000, deadline - Date.now())),
     );
     if (Date.now() >= deadline) break;
-    response = await fetch(`/api/workflow-operations/${operationId}`, {
-      method: "GET",
-      cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
-    });
+    response = await readStatus(`/api/workflow-operations/${operationId}`);
     snapshot = await responseOperation(response);
     if (!response.ok || !snapshot) return response;
     const operation = snapshot.operation;
@@ -127,9 +162,8 @@ async function executeRequest(
     }
   }
   if (previewDraftId && !snapshot?.previewDraftId) {
-    return fetch(
+    return readStatus(
       `/api/previews?draftId=${encodeURIComponent(previewDraftId)}`,
-      { method: "GET", cache: "no-store" },
     );
   }
   if (envelope && snapshot) {

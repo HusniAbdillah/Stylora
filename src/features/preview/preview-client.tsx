@@ -216,6 +216,7 @@ export function PreviewClient({
         )
           return;
         draft.current = { draftId: result.draftId, revision: result.revision };
+        setStatusFailed(false);
         setDraftRevision(result.revision);
         setSavedSelection(true);
         pendingRender.current = undefined;
@@ -235,12 +236,7 @@ export function PreviewClient({
           current.preferenceRevision === preferenceRevision.current &&
           draft.current.revision === current.revision
         )
-          setJob((previous) => ({
-            ...previous,
-            status: "failed",
-            errorMessage:
-              "The image could not finish. Your selection is kept. Retry image to continue.",
-          }));
+          setStatusFailed(true);
       } finally {
         pendingLaunches.current.delete(launchKey);
         if (superseded && latestSelection.current === renderSelection)
@@ -293,6 +289,7 @@ export function PreviewClient({
         `/api/previews?draftId=${activeDraftId}${lightweight ? "&poll=1" : ""}`,
         {
           cache: "no-store",
+          signal: AbortSignal.timeout(15_000),
         },
       );
       if (!active) return;
@@ -379,7 +376,11 @@ export function PreviewClient({
       () => {
         check();
       },
-      job.status === "queued" || job.status === "running" ? 2500 : 240000,
+      statusFailed
+        ? 10000
+        : job.status === "queued" || job.status === "running"
+          ? 2500
+          : 240000,
     );
     const focus = () => {
       if (document.visibilityState !== "visible") return;
@@ -414,7 +415,7 @@ export function PreviewClient({
     const pageShow = (event: PageTransitionEvent) => {
       if (event.persisted) restore();
     };
-    check();
+    if (!statusFailed) check();
     window.addEventListener("focus", focus);
     window.addEventListener("pageshow", pageShow);
     window.addEventListener("popstate", restore);
@@ -435,6 +436,7 @@ export function PreviewClient({
   }, [
     activeDraftId,
     job.status,
+    statusFailed,
     savedSelection,
     initial.writesEnabled,
     initial.preferenceRevision,
