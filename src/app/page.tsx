@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import {
   LandingAbout,
   LandingCallToAction,
@@ -6,13 +7,13 @@ import {
   LandingHeader,
   LandingHero,
   LandingSteps,
+  LandingDemo,
 } from "@/features/landing/components";
-import { getLandingSample } from "@/features/landing/sample";
+import { LandingSampleDemo } from "@/features/landing/sample-demo";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  const sample = await getLandingSample();
+export default function HomePage() {
   const links = {
     createHref: "/create",
     sampleHref: "/create?sample=1",
@@ -26,7 +27,14 @@ export default async function HomePage() {
     <>
       <LandingHeader links={links} />
       <main>
-        <LandingHero {...links} sample={sample ?? undefined} />
+        <LandingHero
+          {...links}
+          demo={
+            <Suspense fallback={<LandingDemo loading />}>
+              <LandingSampleDemo />
+            </Suspense>
+          }
+        />
         <LandingSteps />
         <LandingFeatures {...links} />
         <LandingAbout />

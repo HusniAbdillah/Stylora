@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
-import { createWorkspaceSignedRead } from "@/lib/supabase/storage";
+import { createWorkspaceSignedReads } from "@/lib/supabase/storage";
 import { storedLandingSampleSchema } from "./sample-schema";
 import { evaluateCandidate, type MatchItem } from "@/features/matching/gates";
 import { attributesSchema, categorySchema } from "@/lib/ai/fashion-schema";
@@ -13,25 +13,34 @@ export async function getLandingSample() {
   if (!sampleId.success) return null;
   try {
     const { client, workspaceId } = getWorkspaceDatabase();
-    const { data: look, error } = await client
-      .from("looks")
-      .select("id,inspiration_asset_id")
-      .eq("workspace_id", workspaceId)
-      .eq("id", sampleId.data)
-      .eq("source_type", "sample")
-      .maybeSingle();
-    if (error || !look?.inspiration_asset_id) return null;
-    const { data: operation } = await client
-      .from("workflow_operations")
-      .select("id,model,completed_at")
-      .eq("workspace_id", workspaceId)
-      .eq("subject_id", look.id)
-      .eq("subject_type", "look")
-      .eq("status", "succeeded")
-      .eq("kind", "inspiration_description")
-      .limit(1)
-      .maybeSingle();
-    if (!operation) return null;
+    const [lookResult, operationResult] = await Promise.all([
+      client
+        .from("looks")
+        .select("id,inspiration_asset_id")
+        .eq("workspace_id", workspaceId)
+        .eq("id", sampleId.data)
+        .eq("source_type", "sample")
+        .maybeSingle(),
+      client
+        .from("workflow_operations")
+        .select("id,model,completed_at")
+        .eq("workspace_id", workspaceId)
+        .eq("subject_id", sampleId.data)
+        .eq("subject_type", "look")
+        .eq("status", "succeeded")
+        .eq("kind", "inspiration_description")
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const look = lookResult.data;
+    const operation = operationResult.data;
+    if (
+      lookResult.error ||
+      operationResult.error ||
+      !look?.inspiration_asset_id ||
+      !operation
+    )
+      return null;
     const { data: event } = await client
       .from("workflow_operation_events")
       .select("payload")
@@ -41,31 +50,41 @@ export async function getLandingSample() {
       .maybeSingle();
     const parsed = storedLandingSampleSchema.safeParse(event?.payload);
     if (!parsed.success) return null;
-    const image = await createWorkspaceSignedRead(look.inspiration_asset_id);
-    const wardrobe = await Promise.all(
-      parsed.data.wardrobe.map(async (item) => {
-        // Recheck membership before signing an asset referenced by a prepared snapshot.
-        const { data: current } = await client
+    const members = parsed.data.wardrobe.length
+      ? await client
           .from("wardrobe_items")
           .select("id,asset_id")
           .eq("workspace_id", workspaceId)
-          .eq("id", item.id)
+          .in(
+            "id",
+            parsed.data.wardrobe.map((item) => item.id),
+          )
           .eq("source_type", "sample")
           .eq("inventory_status", "owned")
           .is("archived_at", null)
-          .maybeSingle();
-        let imageUrl: string | null = null;
-        if (current?.asset_id) {
-          try {
-            imageUrl = (await createWorkspaceSignedRead(current.asset_id))
-              .signedUrl;
-          } catch {
-            /* The text sample remains readable without an image. */
-          }
-        }
-        return { ...item, available: Boolean(current), imageUrl };
-      }),
+      : { data: [], error: null };
+    if (members.error) return null;
+    const membership = new Map(
+      (members.data ?? []).map((item) => [item.id, item]),
     );
+    const images = await createWorkspaceSignedReads([
+      look.inspiration_asset_id,
+      ...(members.data ?? []).flatMap((item) =>
+        item.asset_id ? [item.asset_id] : [],
+      ),
+    ]);
+    const imageUrl = images.get(look.inspiration_asset_id);
+    if (!imageUrl) return null;
+    const wardrobe = parsed.data.wardrobe.map((item) => {
+      const current = membership.get(item.id);
+      return {
+        ...item,
+        available: Boolean(current),
+        imageUrl: current?.asset_id
+          ? (images.get(current.asset_id) ?? null)
+          : null,
+      };
+    });
     const pieces = parsed.data.description.pieces;
     const matches = pieces.map((piece, index) => {
       const source: MatchItem = {
@@ -110,7 +129,7 @@ export async function getLandingSample() {
     });
     return {
       id: look.id,
-      imageUrl: image.signedUrl,
+      imageUrl,
       pieces,
       matches,
       confidence: parsed.data.confidence,

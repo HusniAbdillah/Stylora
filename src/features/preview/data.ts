@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
-import { createWorkspaceSignedRead } from "@/lib/supabase/storage";
+import { createWorkspaceSignedReads } from "@/lib/supabase/storage";
 import { previewSelectionSchema, slotForPreviewItem } from "./schema";
 import { previewImageStatus } from "./generation";
 import type { PreviewItem, PreviewSelection } from "./preview-studio";
@@ -18,24 +18,22 @@ export async function readPreviewItems(
     .is("archived_at", null)
     .order("created_at", { ascending: false });
   if (error) throw new Error("PREVIEW_WARDROBE_READ_FAILED");
-  return Promise.all(
-    (data ?? []).map(async (row) => ({
-      id: row.id,
-      revision: row.revision,
-      name: row.name,
-      category: z
-        .enum(["top", "bottom", "dress", "outerwear", "shoes", "accessory"])
-        .parse(row.category),
-      subcategory: row.subcategory,
-      inventoryStatus: "owned" as const,
-      imageUrl:
-        row.asset_id && includeImages
-          ? await createWorkspaceSignedRead(row.asset_id)
-              .then((asset) => asset.signedUrl)
-              .catch(() => null)
-          : null,
-    })),
-  );
+  const imageUrls = includeImages
+    ? await createWorkspaceSignedReads(
+        (data ?? []).flatMap((row) => (row.asset_id ? [row.asset_id] : [])),
+      ).catch(() => new Map<string, string>())
+    : new Map<string, string>();
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    revision: row.revision,
+    name: row.name,
+    category: z
+      .enum(["top", "bottom", "dress", "outerwear", "shoes", "accessory"])
+      .parse(row.category),
+    subcategory: row.subcategory,
+    inventoryStatus: "owned" as const,
+    imageUrl: row.asset_id ? (imageUrls.get(row.asset_id) ?? null) : null,
+  }));
 }
 
 export type PreviewSource =
@@ -169,6 +167,28 @@ export async function readPreview(source?: PreviewSource, draftId?: string) {
         }),
       )
       .parse(saved.items);
+    const productIds = snapshotItems.flatMap((snapshot) =>
+      snapshot.source_reference?.kind === "product" && snapshot.id
+        ? [snapshot.id]
+        : [],
+    );
+    const importedProducts = productIds.length
+      ? await client
+          .from("wardrobe_items")
+          .select("id,source_product_id")
+          .eq("workspace_id", workspaceId)
+          .eq("inventory_status", "owned")
+          .is("archived_at", null)
+          .in("source_product_id", [...new Set(productIds)])
+      : { data: [] };
+    const importedByProduct = new Map<string, string>();
+    for (const imported of importedProducts.data ?? []) {
+      if (
+        imported.source_product_id &&
+        !importedByProduct.has(imported.source_product_id)
+      )
+        importedByProduct.set(imported.source_product_id, imported.id);
+    }
     selection = {};
     seedNotice =
       "Review pieces currently in your wardrobe. Open Saved looks for the original composition and image.";
@@ -179,16 +199,8 @@ export async function readPreview(source?: PreviewSource, draftId?: string) {
         snapshot.source_reference?.kind === "product" &&
         snapshot.id
       ) {
-        const { data: imported } = await client
-          .from("wardrobe_items")
-          .select("id")
-          .eq("workspace_id", workspaceId)
-          .eq("inventory_status", "owned")
-          .is("archived_at", null)
-          .eq("source_product_id", snapshot.id)
-          .limit(1)
-          .maybeSingle();
-        item = items.find((candidate) => candidate.id === imported?.id);
+        const importedId = importedByProduct.get(snapshot.id);
+        item = items.find((candidate) => candidate.id === importedId);
       }
       if (!item) {
         proposedNames.push(snapshot.name);

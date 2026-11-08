@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Button, Icon } from "@/components/ui";
 import { LandingDemo, type LandingSample } from "./landing-demo";
 import styles from "./landing.module.css";
@@ -70,8 +71,10 @@ export function LandingHero({
   createHref,
   sampleHref,
   sample,
+  demo,
 }: Pick<LandingLinks, "createHref" | "sampleHref"> & {
   sample?: LandingSample;
+  demo?: ReactNode;
 }) {
   return (
     <section className={styles.hero}>
@@ -99,7 +102,7 @@ export function LandingHero({
         </p>
       </div>
       <div className={styles.heroVisual}>
-        <LandingDemo sample={sample} />
+        {demo ?? <LandingDemo sample={sample} />}
       </div>
       <div className={styles.heroActions}>
         <div className={styles.actions}>
