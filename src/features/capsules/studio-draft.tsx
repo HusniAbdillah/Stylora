@@ -24,6 +24,7 @@ import type { CapsuleDraft, CapsuleItem } from "./capsule-types";
 import {
   canApplyPreparation,
   capsuleAutoReady,
+  capsuleBriefReplacesResults,
   preparationBaseline,
 } from "./draft-preparation";
 
@@ -101,6 +102,9 @@ export function CapsuleDraftStudio({
   const dirty = useRef(false);
   const active = useRef(true);
   const initialSnapshot = useRef(initial);
+  const appliedBrief = useRef(
+    baseBrief ? { draftId: initial.id, brief: baseBrief } : undefined,
+  );
 
   const mirror = useCallback((next: CapsuleDraftState) => {
     const merged = {
@@ -136,11 +140,12 @@ export function CapsuleDraftStudio({
         )
       )
         return;
-      const editingExisting =
-        snapshot.capsuleId && snapshot.capsuleId !== snapshot.id;
-      const destructiveEdit =
-        editingExisting &&
-        JSON.stringify(snapshot.brief) !== JSON.stringify(baseBrief);
+      const destructiveEdit = capsuleBriefReplacesResults(
+        snapshot,
+        appliedBrief.current?.draftId === snapshot.id
+          ? appliedBrief.current.brief
+          : undefined,
+      );
       if (
         !navigate &&
         (snapshot.step !== 3 ||
@@ -193,6 +198,7 @@ export function CapsuleDraftStudio({
         dirty.current || dirtyDrafts.has(snapshot.id),
       );
       if (!matches) return;
+      appliedBrief.current = { draftId: snapshot.id, brief: snapshot.brief };
       mirror({
         ...latest,
         capsuleId: prepared.capsuleId,
@@ -215,7 +221,7 @@ export function CapsuleDraftStudio({
       }
       return prepared;
     },
-    [writesEnabled, ownedItems, mirror, router, baseBrief],
+    [writesEnabled, ownedItems, mirror, router],
   );
 
   const flush = useCallback(() => {
@@ -400,9 +406,12 @@ export function CapsuleDraftStudio({
   function requestBuild() {
     const snapshot = current.current;
     if (
-      snapshot.capsuleId &&
-      snapshot.capsuleId !== snapshot.id &&
-      JSON.stringify(snapshot.brief) !== JSON.stringify(baseBrief)
+      capsuleBriefReplacesResults(
+        snapshot,
+        appliedBrief.current?.draftId === snapshot.id
+          ? appliedBrief.current.brief
+          : undefined,
+      )
     )
       setApplyOpen(true);
     else void build();

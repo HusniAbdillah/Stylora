@@ -60,24 +60,28 @@ export async function getCapsuleDraft(
 
 export async function getCapsuleInventory(): Promise<CapsuleItem[]> {
   const { client, workspaceId } = getWorkspaceDatabase();
-  const { data, error } = await client
-    .from("active_owned_wardrobe")
-    .select("id,name,category,asset_id,revision")
-    .eq("workspace_id", workspaceId)
-    .order("name")
-    .limit(200);
-  if (error) throw new Error("capsule_inventory_read_failed");
-  const rows = z
-    .array(
-      z.object({
-        id: z.uuid(),
-        name: z.string(),
-        category: categorySchema,
-        asset_id: z.uuid().nullable(),
-        revision: z.number().int().positive(),
-      }),
-    )
-    .parse(data);
+  const rowSchema = z.object({
+    id: z.uuid(),
+    name: z.string(),
+    category: categorySchema,
+    asset_id: z.uuid().nullable(),
+    revision: z.number().int().positive(),
+  });
+  const byId = new Map<string, z.infer<typeof rowSchema>>();
+  for (let start = 0; ; start += 500) {
+    const { data, error } = await client
+      .from("active_owned_wardrobe")
+      .select("id,name,category,asset_id,revision")
+      .eq("workspace_id", workspaceId)
+      .order("name")
+      .order("id")
+      .range(start, start + 499);
+    if (error) throw new Error("capsule_inventory_read_failed");
+    const page = z.array(rowSchema).parse(data);
+    for (const row of page) byId.set(row.id, row);
+    if (page.length < 500) break;
+  }
+  const rows = [...byId.values()];
   // One bulk signing call replaces a lookup and a signature per garment.
   const imageUrls = await createWorkspaceSignedReads(
     rows.flatMap((row) => (row.asset_id ? [row.asset_id] : [])),

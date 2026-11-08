@@ -2,6 +2,17 @@ import type { CapsuleDraftState, PreparedCapsule } from "./schema";
 import { capsuleBriefReady } from "./schema";
 import type { CapsuleItem } from "./capsule-types";
 
+export function capsuleBriefReplacesResults(
+  draft: Pick<CapsuleDraftState, "capsuleId" | "brief">,
+  appliedBrief?: CapsuleDraftState["brief"],
+) {
+  return Boolean(
+    draft.capsuleId &&
+    (!appliedBrief ||
+      JSON.stringify(draft.brief) !== JSON.stringify(appliedBrief)),
+  );
+}
+
 export function capsuleAutoReady(
   brief: CapsuleDraftState["brief"],
   inventory: CapsuleItem[],
