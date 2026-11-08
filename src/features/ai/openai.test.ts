@@ -68,6 +68,14 @@ describe("avatar provider direction", () => {
     expect(prompt).toContain("Footwear is selected");
     expect(prompt).not.toContain("Show bare mannequin feet");
   });
+  it("uses the captured newer image model without a legacy fidelity parameter", async () => {
+    const fetchMock = interceptRequest();
+    await generateFashionImage({ items, images, visualDirection: buildAvatarVisualDirection({}, items), renderSettings: getImageRenderSettings({ OPENAI_IMAGE_MODEL: "gpt-image-2.6-flare" }) });
+    const body = fetchMock.mock.calls[0]?.[1]?.body;
+    if (!(body instanceof FormData)) throw new Error("Expected image edit form.");
+    expect(body.get("model")).toBe("gpt-image-2.6-flare");
+    expect(body.has("input_fidelity")).toBe(false);
+  });
 
   it("rejects contradictory slot partitions before making a request", async () => {
     const fetchMock = interceptRequest();

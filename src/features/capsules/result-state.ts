@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { capsuleBriefSchema } from "./schema";
 
@@ -12,6 +13,7 @@ type Context = {
     promptVersion: string;
     schemaVersion: string;
     knowledgeVersion: string;
+    generationConfig?: unknown;
   };
 };
 type Completed = {
@@ -27,6 +29,7 @@ const capturedSchema = z.object({
   preferenceRevision: z.number().int().nonnegative(),
   itemRevisions: z.record(z.uuid(), z.number().int().positive()),
   knowledgeVersion: z.string(),
+  generationConfig: z.unknown().optional(),
 });
 
 export function capsuleResultNeedsGeneration(
@@ -45,6 +48,11 @@ export function capsuleResultNeedsGeneration(
     completed.prompt_version !== current.runtime.promptVersion ||
     completed.schema_version !== current.runtime.schemaVersion ||
     captured.data.knowledgeVersion !== current.runtime.knowledgeVersion ||
+    (current.runtime.generationConfig !== undefined &&
+      !isDeepStrictEqual(
+        captured.data.generationConfig,
+        current.runtime.generationConfig,
+      )) ||
     JSON.stringify(captured.data.brief) !==
       JSON.stringify(capsuleBriefSchema.parse(current.brief)) ||
     captured.data.preferenceRevision !== current.preferenceRevision ||

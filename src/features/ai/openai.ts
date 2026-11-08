@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { getFashionTaskSettings } from "@/lib/ai/task-settings";
 import { buildFashionPrompt, getFashionVersions } from "@/prompts/fashion";
 import { OperationError } from "@/features/operations/errors";
 import {
@@ -28,10 +29,7 @@ export const FASHION_KNOWLEDGE_VERSION =
   getFashionVersions().knowledgeSourceHash;
 export const FASHION_PROMPT_VERSION = `stylora-fashion-v1.openai-2.${FASHION_KNOWLEDGE_VERSION}`;
 export const AVATAR_PROMPT_VERSION = `stylora-fashion-v1.avatar-4.${FASHION_KNOWLEDGE_VERSION}`;
-export const TEXT_MODEL =
-  process.env.OPENAI_TEXT_MODEL?.trim() ||
-  process.env.OPENAI_MODEL?.trim() ||
-  "gpt-5-mini";
+export const TEXT_MODEL = getFashionTaskSettings("capsule_generation").model;
 export const IMAGE_MODEL =
   process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1.5";
 const capsulePrompt = buildFashionPrompt("capsule_generation");
@@ -149,27 +147,32 @@ const usageSchema = z.object({
     .object({ reasoning_tokens: z.number().int().nonnegative().optional() })
     .optional(),
 });
-type CapsuleUsage = z.infer<typeof usageSchema>;
-export type CapsuleProviderMetadata = {
-  model: string;
-  promptVersion: string;
-  schemaVersion: string;
-  knowledgeVersion: string;
-  providerAttempts: number;
-  latencyMs: number;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    total_tokens: number;
-  } | null;
-  requests: {
-    attempt: number;
-    requestId: string | null;
-    latencyMs: number;
-    responseStatus: string;
-    usage: CapsuleUsage | null;
-  }[];
-};
+export const capsuleProviderMetadataSchema = z.object({
+  model: z.string().min(1).max(120),
+  promptVersion: z.string().min(1),
+  schemaVersion: z.string().min(1),
+  knowledgeVersion: z.string().min(1),
+  providerAttempts: z.number().int().min(0).max(3),
+  latencyMs: z.number().nonnegative(),
+  usage: usageSchema.nullable(),
+  requests: z
+    .array(
+      z.object({
+        attempt: z.number().int().min(1).max(3),
+        requestId: z
+          .string()
+          .regex(/^[A-Za-z0-9_-]{1,200}$/)
+          .nullable(),
+        latencyMs: z.number().nonnegative(),
+        responseStatus: z.string().max(80),
+        usage: usageSchema.nullable(),
+      }),
+    )
+    .max(3),
+});
+export type CapsuleProviderMetadata = z.infer<
+  typeof capsuleProviderMetadataSchema
+>;
 function safeRequestId(value: string | null) {
   return value && /^[A-Za-z0-9_-]{1,200}$/.test(value) ? value : null;
 }
@@ -260,6 +263,7 @@ export async function generateFashionJson<T>(input: {
   legacy?: boolean;
   beforeCorrection?: () => Promise<void>;
   beforeRequest?: (attempt: number) => Promise<void>;
+  afterRequest?: () => Promise<void>;
   onProviderMetadata?: (metadata: CapsuleProviderMetadata) => Promise<void>;
 }) {
   const started = Date.now();
@@ -273,6 +277,7 @@ export async function generateFashionJson<T>(input: {
       capsuleGenerationConfig(
         TEXT_MODEL,
         target.success ? target.data.brief.targetOutfits : 3,
+        getFashionTaskSettings("capsule_generation"),
       ),
   );
   const deadline = Date.now() + (input.legacy ? 110000 : config.deadlineMs);
@@ -483,6 +488,19 @@ export async function generateFashionJson<T>(input: {
         throw Object.assign(failure, { providerMetadata: providerMetadata() });
       await input.beforeCorrection?.();
       feedback = { code: failure.code, diagnostics: failure.diagnostics };
+    } finally {
+      if (requestStarted) {
+        try {
+          await input.afterRequest?.();
+        } catch {
+          console.warn(
+            JSON.stringify({
+              event: "provider_slot_release_failed",
+              kind: "capsule_generation",
+            }),
+          );
+        }
+      }
     }
   }
   throw new OpenAIUnavailableError("OPENAI_VALIDATION_FAILED");
@@ -547,12 +565,14 @@ export async function generateFashionImage(input: {
     input.visualDirection,
   );
   const body = new FormData();
-  body.set("model", IMAGE_MODEL);
+  const model = settings.model ?? IMAGE_MODEL;
+  body.set("model", model);
   body.set("size", settings.size);
   body.set("quality", settings.quality);
   body.set("output_format", settings.format);
   body.set("n", "1");
-  body.set("input_fidelity", settings.inputFidelity);
+  if (settings.inputFidelity)
+    body.set("input_fidelity", settings.inputFidelity);
   body.set(
     "prompt",
     buildAvatarImagePrompt({
@@ -583,7 +603,7 @@ export async function generateFashionImage(input: {
     : await request(
         "images/generations",
         JSON.stringify({
-          model: IMAGE_MODEL,
+          model,
           prompt: `${prompt}\nThis saved-outfit task permits illustrative rendering from canonical descriptions. Missing reference images remain uncertain.`,
           size: settings.size,
           quality: settings.quality,
@@ -603,7 +623,7 @@ export async function generateFashionImage(input: {
   return {
     bytes: new Uint8Array(bytes),
     mimeType: "image/png" as const,
-    model: IMAGE_MODEL,
+    model,
     promptVersion: AVATAR_PROMPT_VERSION,
     schemaVersion: FASHION_SCHEMA_VERSION,
     knowledgeVersion: FASHION_KNOWLEDGE_VERSION,

@@ -1,0 +1,28 @@
+[Unit]
+Description=Stylora workflow consumer
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=20
+
+[Service]
+Type=simple
+User=stylora
+Group=stylora
+WorkingDirectory=/opt/stylora
+EnvironmentFile=/etc/stylora/worker.env
+ExecStart=/usr/bin/node --experimental-strip-types scripts/workflow-worker.mjs
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=310
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+MemoryMax=384M
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

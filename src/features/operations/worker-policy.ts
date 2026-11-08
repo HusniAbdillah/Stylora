@@ -23,10 +23,22 @@ type Candidate = {
   lease_until: string | null;
   attempt_count: number;
   result_ref: unknown;
+  next_attempt_at?: string | null;
 };
 
 export function operationIsDue(row: Candidate, now = Date.now()): boolean {
-  if (row.status === "queued") return true;
+  if (row.status === "queued")
+    return !row.next_attempt_at || Date.parse(row.next_attempt_at) <= now;
+  if (row.status === "failed") {
+    const result = row.result_ref;
+    return (
+      row.attempt_count < 3 &&
+      !!result &&
+      typeof result === "object" &&
+      "retryable" in result &&
+      result.retryable === true
+    );
+  }
   // Expired attempts must reach the claim RPC even when exhausted, so it can
   // publish the terminal state rather than leave a running job forever.
   return (

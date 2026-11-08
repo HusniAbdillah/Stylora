@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { setTimeout as delay } from "node:timers/promises";
 import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { parseDatabaseConfig } from "../src/lib/config/runtime-schema.ts";
 import {
   workerOperationKinds,
@@ -56,7 +57,11 @@ for (let attempt = 0; attempt < 3; attempt++) {
     /* A cold development build can exceed the first probe deadline. */
   }
   if (probe?.ok) {
-    if ((await probe.json()).data?.executionMode !== "worker")
+    const state = (await probe.json()).data;
+    if (
+      state?.executionMode !== "worker" ||
+      state.workspaceId !== config.workspaceId
+    )
       throw new Error("Application executor mode does not match this worker.");
     ready = true;
     break;
@@ -76,6 +81,20 @@ const client = createClient(config.url, config.secretKey, {
 const inflight = new Map();
 const deferred = new Map();
 let stopping = false;
+const workerId = randomUUID();
+let lastHeartbeat = 0;
+async function heartbeat() {
+  const { error } = await client
+    .rpc("record_workflow_worker_heartbeat", {
+      p_workspace_id: config.workspaceId,
+      p_worker_id: workerId,
+      p_active_jobs: inflight.size,
+      p_version: "workflow-worker.v2",
+    })
+    .abortSignal(AbortSignal.timeout(10000));
+  if (error) throw new Error("Worker heartbeat unavailable");
+  lastHeartbeat = Date.now();
+}
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () => {
     stopping = true;
@@ -126,6 +145,7 @@ async function dispatch(row) {
 }
 while (!stopping) {
   try {
+    if (Date.now() - lastHeartbeat >= 15000) await heartbeat();
     const subjects = allowedSubjects();
     if (subjects?.length === 0) {
       await delay(1_500);
@@ -140,14 +160,16 @@ while (!stopping) {
           return [];
         let query = client
           .from("workflow_operations")
-          .select("id,kind,status,lease_until,attempt_count,result_ref")
+          .select(
+            "id,kind,status,lease_until,attempt_count,result_ref,next_attempt_at",
+          )
           .eq("workspace_id", config.workspaceId)
           .in(
             "kind",
             workerOperationKinds.filter((kind) => operationLane(kind) === lane),
           )
           .or(
-            `status.eq.queued,and(status.in.(running,partial),lease_until.lte.${new Date().toISOString()})`,
+            `status.eq.queued,and(status.eq.failed,attempt_count.lt.3,result_ref->>retryable.eq.true),and(status.in.(running,partial),lease_until.lte.${new Date().toISOString()})`,
           )
           .order("created_at")
           .limit(50);
@@ -208,4 +230,10 @@ while (!stopping) {
   );
 }
 await Promise.allSettled([...inflight.values()].map((entry) => entry.promise));
+await client
+  .from("workflow_worker_heartbeats")
+  .delete()
+  .eq("workspace_id", config.workspaceId)
+  .eq("worker_id", workerId)
+  .abortSignal(AbortSignal.timeout(10000));
 console.log(JSON.stringify({ event: "worker_stopped" }));

@@ -1,15 +1,18 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import type { FashionTaskSettings } from "@/lib/ai/task-settings";
 import { attributesSchema, categorySchema } from "@/lib/ai/fashion-schema";
 import { capsuleBriefSchema } from "./schema";
 import { CapsuleOutputError, capsuleDiagnostics } from "./generation-schema";
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 export const capsuleGenerationConfigSchema = z.strictObject({
-  version: z.literal("capsule-generation.v2"),
+  version: z.enum(["capsule-generation.v2", "capsule-generation.v3"]),
   model: z.string().min(1).max(120),
   maxOutputTokens: z.number().int().min(6000).max(9000),
-  reasoningEffort: z.literal("low").nullable(),
+  reasoningEffort: z
+    .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
+    .nullable(),
   maxProviderRequests: z.literal(2),
   deadlineMs: z.literal(200000),
 });
@@ -19,13 +22,19 @@ export type CapsuleGenerationConfig = z.infer<
 export function capsuleGenerationConfig(
   model: string,
   targetOutfits: number,
+  settings?: Pick<FashionTaskSettings, "reasoningEffort" | "maxOutputTokens">,
 ): CapsuleGenerationConfig {
   z.number().int().min(3).max(6).parse(targetOutfits);
   return capsuleGenerationConfigSchema.parse({
-    version: "capsule-generation.v2",
+    version: "capsule-generation.v3",
     model,
-    maxOutputTokens: 3000 + targetOutfits * 1000,
-    reasoningEffort: /^gpt-5(?:[.-]|$)/.test(model) ? "low" : null,
+    maxOutputTokens: Math.max(
+      6000,
+      Math.min(settings?.maxOutputTokens ?? 9000, 3000 + targetOutfits * 1000),
+    ),
+    reasoningEffort:
+      settings?.reasoningEffort ??
+      (/^gpt-[56](?:[.-]|$)/.test(model) ? "low" : null),
     maxProviderRequests: 2,
     deadlineMs: 200000,
   });

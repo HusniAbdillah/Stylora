@@ -7,7 +7,12 @@ import {
 import { canRetryOperationCode, OperationError } from "./errors";
 import { workflowProviderLimits } from "./limits";
 import { assertWorkflowExecutorAvailable } from "./health";
-import { checkpointOperationResult, readOperationCheckpoint, type OperationCheckpoint, type CheckpointJson } from "./checkpoints";
+import {
+  checkpointOperationResult,
+  readOperationCheckpoint,
+  type OperationCheckpoint,
+  type CheckpointJson,
+} from "./checkpoints";
 import {
   operationRowSchema,
   startOperationSchema,
@@ -114,7 +119,11 @@ export type OperationHandler<T> = {
   commit(claim: OperationClaim, output: T): Promise<void>;
   checkpoint?: {
     serialize(output: T): OperationCheckpoint;
-    restore(claim: OperationClaim, result: CheckpointJson, metadata: CheckpointJson): Promise<T>;
+    restore(
+      claim: OperationClaim,
+      result: CheckpointJson,
+      metadata: CheckpointJson,
+    ): Promise<T>;
   };
   fail?(claim: OperationClaim, error: OperationFailure): Promise<void>;
 };
@@ -151,9 +160,7 @@ export async function failOperation(
       p_operation_id: claim.operationId,
       p_attempt_count: claim.attemptCount,
       p_input_fingerprint: claim.inputFingerprint,
-      p_status: ["INPUT_SUPERSEDED", "CAPSULE_SUPERSEDED"].includes(code)
-        ? "superseded"
-        : "failed",
+      p_status: "failed",
       p_safe_error_code: code,
       p_result_ref: {
         ...(failure.checkpointed ? { checkpointed: true } : {}),
@@ -171,6 +178,22 @@ export async function failOperation(
   if (error?.code === "40001") return;
   if (error) databaseError(error.code);
   const finished = operationRowSchema.parse(data);
+  if (
+    finished.status === "failed" &&
+    ["INPUT_SUPERSEDED", "CAPSULE_SUPERSEDED"].includes(code)
+  ) {
+    const { error: supersedeError } = await context.client
+      .from("workflow_operations")
+      .update({ status: "superseded", result_ref: null })
+      .eq("workspace_id", context.workspaceId)
+      .eq("id", claim.operationId)
+      .eq("attempt_count", claim.attemptCount)
+      .eq("input_fingerprint", claim.inputFingerprint)
+      .eq("status", "failed")
+      .eq("updated_at", finished.updated_at);
+    if (supersedeError) databaseError(supersedeError.code);
+    return;
+  }
   if (finished.status === "failed" && failure.diagnostics?.length) {
     const diagnostics = z
       .array(
@@ -239,12 +262,22 @@ export async function runOperation<T>(
   };
   let checkpointed = false;
   try {
-    const stored = handler.checkpoint ? await readOperationCheckpoint(claim) : null;
-    const output = stored && handler.checkpoint
-      ? await handler.checkpoint.restore(claim, stored.result, stored.metadata)
-      : await handler.execute(claim);
+    const stored = handler.checkpoint
+      ? await readOperationCheckpoint(claim)
+      : null;
+    const output =
+      stored && handler.checkpoint
+        ? await handler.checkpoint.restore(
+            claim,
+            stored.result,
+            stored.metadata,
+          )
+        : await handler.execute(claim);
     if (handler.checkpoint && !stored)
-      await checkpointOperationResult(claim, handler.checkpoint.serialize(output));
+      await checkpointOperationResult(
+        claim,
+        handler.checkpoint.serialize(output),
+      );
     checkpointed = !!handler.checkpoint;
     await handler.commit(claim, output);
     const committed = await readOperation(operation.id);
@@ -292,8 +325,12 @@ export async function runOperation<T>(
               claim.signal.aborted,
             );
     await (handler.fail ?? failOperation)(claim, {
-      code: checkpointed && safeError.status >= 500 ? "CHECKPOINT_COMMIT_PENDING" : safeError.code,
-      retryable: checkpointed && safeError.status >= 500 ? true : safeError.retryable,
+      code:
+        checkpointed && safeError.status >= 500
+          ? "CHECKPOINT_COMMIT_PENDING"
+          : safeError.code,
+      retryable:
+        checkpointed && safeError.status >= 500 ? true : safeError.retryable,
       checkpointed,
       retryAfterSeconds: safeError.retryAfterSeconds,
       diagnostics: providerFailure.success

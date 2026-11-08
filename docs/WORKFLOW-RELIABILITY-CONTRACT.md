@@ -1,6 +1,6 @@
 # Workflow reliability migration contract
 
-Migration: `20261108042602_workflow_reliability.sql`. This is an additive contract
+Migration: `20261108044718_workflow_reliability.sql`. This is an additive contract
 for the shared workspace executor. Application consumers must adopt its RPCs;
 applying SQL alone does not move Capsule or image calls onto the shared ledger.
 
@@ -177,3 +177,4 @@ Hosted application is delegated to the coordinator after review. PostgreSQL 17,
 hosted policy verification, generated-type comparison, app adoption and real
 worker recovery remain separate rollout checks. Do not reset the hosted project
 or treat local SQL tests as end-to-end provider evidence.
+

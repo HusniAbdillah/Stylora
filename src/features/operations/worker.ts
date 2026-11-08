@@ -13,11 +13,37 @@ import {
 } from "@/lib/supabase/server";
 import { operationStatus, readOperation, runOperation } from "./server";
 import { createOperationKinds } from "./worker-policy";
+import { operationRowSchema } from "./schema";
 
 export async function executeQueuedOperation(id: string) {
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
-  const operation = await readOperation(id);
+  let operation = await readOperation(id);
+  if (
+    operation.status === "failed" &&
+    operation.safe_error_code &&
+    operation.attempt_count < 3 &&
+    operation.result_ref?.retryable === true
+  ) {
+    const { data, error } = await context.client.rpc(
+      "defer_workflow_operation",
+      {
+        p_workspace_id: context.workspaceId,
+        p_operation_id: id,
+        p_attempt_count: operation.attempt_count,
+        p_input_fingerprint: operation.input_fingerprint,
+        p_safe_error_code: operation.safe_error_code,
+      },
+    );
+    if (!error) operation = readDeferred(data);
+    else if (!["23514", "40001", "P0002"].includes(error.code))
+      throw new OperationError(
+        "RECOVERY_UNAVAILABLE",
+        "Task recovery is temporarily unavailable.",
+        503,
+        true,
+      );
+  }
   if (
     ["succeeded", "failed", "superseded", "cancelled"].includes(
       operation.status,
@@ -99,4 +125,8 @@ export async function executeQueuedOperation(id: string) {
       }),
     );
   }
+}
+
+function readDeferred(value: unknown) {
+  return operationRowSchema.parse(value);
 }

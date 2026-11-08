@@ -1,5 +1,7 @@
 import "server-only";
 import { z } from "zod";
+import { getFashionTaskSettings } from "@/lib/ai/task-settings";
+import { capsuleGenerationConfig } from "./generation-context";
 import { ApiError } from "@/lib/api";
 import { getWorkspaceDatabase } from "@/lib/supabase/server";
 import { getCapsuleInventory } from "./drafts";
@@ -180,6 +182,11 @@ export async function getCapsuleResult(id: string) {
     ),
     runtime: {
       model: TEXT_MODEL,
+      generationConfig: capsuleGenerationConfig(
+        TEXT_MODEL,
+        capsule.brief.targetOutfits,
+        getFashionTaskSettings("capsule_generation"),
+      ),
       promptVersion: CAPSULE_PROMPT_VERSION,
       schemaVersion: FASHION_SCHEMA_VERSION,
       knowledgeVersion: FASHION_KNOWLEDGE_VERSION,

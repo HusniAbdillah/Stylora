@@ -24,7 +24,12 @@ export async function apiRoute(run: () => Promise<unknown>) {
     let failure: ApiError;
     if (error instanceof ApiError) failure = error;
     else if (error instanceof OperationError)
-      failure = new ApiError(error.code, error.message, error.status, error.retryable);
+      failure = new ApiError(
+        error.code,
+        error.message,
+        error.status,
+        error.retryable,
+      );
     else if (error instanceof ZodError || error instanceof SyntaxError) {
       failure = new ApiError(
         "invalid_request",
@@ -61,7 +66,16 @@ export async function apiRoute(run: () => Promise<unknown>) {
           retryable: failure.retryable,
         },
       },
-      { status: failure.status, headers: { "Cache-Control": "no-store", ...(error instanceof OperationError && error.retryAfterSeconds !== undefined ? { "Retry-After": String(error.retryAfterSeconds) } : {}) } },
+      {
+        status: failure.status,
+        headers: {
+          "Cache-Control": "no-store",
+          ...(error instanceof OperationError &&
+          error.retryAfterSeconds !== undefined
+            ? { "Retry-After": String(error.retryAfterSeconds) }
+            : {}),
+        },
+      },
     );
   }
 }

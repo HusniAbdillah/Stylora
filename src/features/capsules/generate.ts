@@ -1,5 +1,10 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { getFashionTaskSettings } from "@/lib/ai/task-settings";
+import {
+  reserveWorkflowProviderCall,
+  releaseWorkflowProviderCall,
+} from "@/features/operations/provider-budget";
 import { z } from "zod";
 import { attributesSchema } from "@/lib/ai/fashion-schema";
 import { resolveEffectiveAttributes } from "@/features/matching/gates";
@@ -17,6 +22,7 @@ import {
   CAPSULE_SOURCE_VERSIONS,
   TEXT_MODEL,
   generateFashionJson,
+  capsuleProviderMetadataSchema,
   type CapsuleProviderMetadata,
 } from "@/features/ai/openai";
 import {
@@ -43,6 +49,7 @@ import {
   capsuleProviderSchema,
   CapsuleOutputError,
   capsuleDiagnostics,
+  type CapsuleGeneration,
 } from "./generation-schema";
 import {
   capsuleFingerprint,
@@ -272,6 +279,7 @@ async function capsuleContext(
         generationConfig: capsuleGenerationConfig(
           model,
           capsule.brief.targetOutfits,
+          getFashionTaskSettings("capsule_generation"),
         ),
         sourceVersions: CAPSULE_SOURCE_VERSIONS,
       });
@@ -353,80 +361,6 @@ export async function runCapsuleOperation(operationId: string) {
   await assertWorkflowRpc("commit_capsule_generation");
   const id = operation.subject_id;
   let latestProviderMetadata: CapsuleProviderMetadata | undefined;
-  function ownedAttempt(claim: OperationClaim) {
-    return context.client
-      .from("workflow_operations")
-      .select("provider_call_count")
-      .eq("workspace_id", context.workspaceId)
-      .eq("id", claim.operationId)
-      .eq("attempt_count", claim.attemptCount)
-      .eq("input_fingerprint", claim.inputFingerprint)
-      .eq("status", "running")
-      .is("cancel_requested_at", null)
-      .gt("lease_until", new Date().toISOString())
-      .abortSignal(claim.signal);
-  }
-  async function reserveProviderRequest(claim: OperationClaim) {
-    const current = await ownedAttempt(claim).maybeSingle();
-    if (current.error)
-      throw new OperationError(
-        "PROVIDER_NETWORK_ERROR",
-        "The Capsule request ledger could not be read.",
-        503,
-        true,
-      );
-    if (!current.data)
-      throw new OperationError(
-        "CAPSULE_OPERATION_CHANGED",
-        "This Capsule request changed or was cancelled.",
-        409,
-      );
-    const parsedCount = z
-      .number()
-      .int()
-      .nonnegative()
-      .safeParse(current.data.provider_call_count);
-    if (!parsedCount.success)
-      throw new OperationError(
-        "CAPSULE_PROVIDER_LEDGER_INVALID",
-        "This Capsule request ledger is invalid.",
-        409,
-      );
-    const count = parsedCount.data;
-    if (count >= 3)
-      throw new OperationError(
-        "CAPSULE_PROVIDER_BUDGET_EXHAUSTED",
-        "This Capsule operation reached its request limit.",
-        429,
-      );
-    const reserved = await context.client
-      .from("workflow_operations")
-      .update({ provider_call_count: count + 1 })
-      .eq("workspace_id", context.workspaceId)
-      .eq("id", claim.operationId)
-      .eq("attempt_count", claim.attemptCount)
-      .eq("input_fingerprint", claim.inputFingerprint)
-      .eq("provider_call_count", count)
-      .eq("status", "running")
-      .is("cancel_requested_at", null)
-      .gt("lease_until", new Date().toISOString())
-      .abortSignal(claim.signal)
-      .select("id")
-      .maybeSingle();
-    if (reserved.error)
-      throw new OperationError(
-        "PROVIDER_NETWORK_ERROR",
-        "The Capsule request could not be reserved.",
-        503,
-        true,
-      );
-    if (!reserved.data)
-      throw new OperationError(
-        "CAPSULE_OPERATION_CHANGED",
-        "This Capsule request changed before reservation.",
-        409,
-      );
-  }
   async function persistProviderMetadata(claim: OperationClaim) {
     if (!latestProviderMetadata) return;
     const current = await context.client
@@ -574,6 +508,15 @@ export async function runCapsuleOperation(operationId: string) {
       claim.inputRevision !== captured.capsuleRevision ||
       (captured.generationConfig?.model &&
         captured.generationConfig.model !== capturedMetadata.model) ||
+      (captured.generationConfig &&
+        stableCapsuleValue(captured.generationConfig) !==
+          stableCapsuleValue(
+            capsuleGenerationConfig(
+              capturedMetadata.model,
+              captured.brief.targetOutfits,
+              getFashionTaskSettings("capsule_generation"),
+            ),
+          )) ||
       fresh.fingerprint !== claim.inputFingerprint ||
       stableCapsuleValue(readCapturedCapsule(fresh.input)) !==
         stableCapsuleValue(captured)
@@ -584,7 +527,54 @@ export async function runCapsuleOperation(operationId: string) {
         409,
       );
   }
-  return runOperation(operation.id, {
+  return runOperation<{
+    value: CapsuleGeneration;
+    captured: CapturedCapsule;
+    capturedMetadata: ExecutionMetadata;
+  }>(operation.id, {
+    checkpoint: {
+      serialize: (output) => ({
+        result: z.json().parse(output.value),
+        metadata: z
+          .json()
+          .parse({
+            capturedMetadata: output.capturedMetadata,
+            providerMetadata: latestProviderMetadata,
+          }),
+      }),
+      restore: async (claim, result, savedMetadata) => {
+        const captured = readCapturedCapsule(claim.input);
+        const capturedMetadata = await metadata(claim);
+        await assertCurrent(claim, captured, capturedMetadata);
+        const value = validateCapsuleGeneration(
+          result,
+          captured.brief,
+          captured.items,
+          captured.allowedSignals,
+        );
+        const stored = z
+          .object({
+            capturedMetadata: metadataSchema,
+            providerMetadata: z.unknown(),
+          })
+          .parse(savedMetadata);
+        if (
+          stableCapsuleValue(stored.capturedMetadata) !==
+          stableCapsuleValue(capturedMetadata)
+        )
+          throw new OperationError(
+            "CAPSULE_SUPERSEDED",
+            "The captured Capsule settings changed.",
+            409,
+          );
+        // Metadata was captured by this executor; result and dependencies are
+        // validated again before the transaction commits it.
+        latestProviderMetadata = capsuleProviderMetadataSchema.parse(
+          stored.providerMetadata,
+        );
+        return { value, captured, capturedMetadata };
+      },
+    },
     execute: async (claim) => {
       const captured = readCapturedCapsule(claim.input);
       const capturedMetadata = await metadata(claim);
@@ -597,6 +587,7 @@ export async function runCapsuleOperation(operationId: string) {
           capsuleGenerationConfig(
             capturedMetadata.model,
             captured.brief.targetOutfits,
+            getFashionTaskSettings("capsule_generation"),
           ),
         legacy: !captured.contractVersion,
         schema: z.toJSONSchema(
@@ -609,7 +600,8 @@ export async function runCapsuleOperation(operationId: string) {
             : capsuleGenerationSchema,
         ),
         signal: claim.signal,
-        beforeRequest: () => reserveProviderRequest(claim),
+        beforeRequest: () => reserveWorkflowProviderCall(claim),
+        afterRequest: () => releaseWorkflowProviderCall(claim),
         onProviderMetadata: async (metadata) => {
           latestProviderMetadata = metadata;
         },
