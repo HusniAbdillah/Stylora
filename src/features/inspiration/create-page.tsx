@@ -271,7 +271,7 @@ export function CreatePage({
     )
       void session.start("wardrobe_match");
     if (
-      step !== "upload" &&
+      (step === "matches" || step === "ideas" || step === "details") &&
       matchesReady &&
       !ideasReady &&
       (!options ||

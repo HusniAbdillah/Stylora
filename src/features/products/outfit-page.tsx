@@ -1188,7 +1188,7 @@ export function OutfitPage({
       {usesSampleInventory && (
         <p className="mb-4 rounded-xl border border-stone bg-paper px-4 py-3 text-sm text-secondary">
           Sample inventory · Example wardrobe pieces are shown in this
-          direction. Live wardrobe integration is pending.
+          direction. Example items remain labeled throughout the look.
         </p>
       )}
       {!writesEnabled && (

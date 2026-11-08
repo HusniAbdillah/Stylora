@@ -215,6 +215,7 @@ export async function searchSerpApi(
   query: string,
   apiKey: string,
   contextKey: string,
+  beforeRequest?: () => Promise<void>,
 ): Promise<ProviderResult> {
   const key = `${workspaceId}:${contextKey}:${query.toLowerCase()}`;
   const previous = queryCache.get(key);
@@ -230,6 +231,7 @@ export async function searchSerpApi(
       api_key: apiKey,
     }).toString();
     try {
+      await beforeRequest?.();
       const response = await fetch(url, {
         cache: "no-store",
         signal: AbortSignal.timeout(15_000),

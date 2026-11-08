@@ -411,7 +411,28 @@ export async function searchLookSlot(lookIdInput: string, input: unknown) {
     .limit(1)
     .maybeSingle();
   if (cacheError) throw databaseFailure();
-  if (cached) return searchDto(context, cached, preferences, weights);
+  if (cached) {
+    if (
+      cached.status === "running" &&
+      Date.parse(cached.created_at) < Date.now() - 60000
+    ) {
+      const { data: interrupted, error } = await context.client
+        .from("shopping_searches")
+        .update({ status: "failed", error_code: "SHOPPING_INTERRUPTED" })
+        .eq("workspace_id", context.workspaceId)
+        .eq("look_id", lookId)
+        .eq("option_id", option.id)
+        .eq("id", cached.id)
+        .eq("status", "running")
+        .eq("created_at", cached.created_at)
+        .select("*")
+        .maybeSingle();
+      if (error) throw databaseFailure();
+      if (interrupted)
+        return searchDto(context, interrupted, preferences, weights);
+    }
+    return searchDto(context, cached, preferences, weights);
+  }
   const apiKey = process.env.SERPAPI_API_KEY?.trim();
   const { data: search, error: insertError } = await context.client
     .from("shopping_searches")
@@ -450,7 +471,40 @@ export async function searchLookSlot(lookIdInput: string, input: unknown) {
   if (!apiKey) return searchDto(context, search, preferences, weights);
   try {
     const { results: raw, retrievedAt: providerRetrievedAt } =
-      await searchSerpApi(context.workspaceId, query, apiKey, contextKey);
+      await searchSerpApi(
+        context.workspaceId,
+        query,
+        apiKey,
+        contextKey,
+        async () => {
+          const limit = z.coerce
+            .number()
+            .int()
+            .min(1)
+            .max(10000)
+            .parse(process.env.STYLORA_SEARCH_DAILY_LIMIT ?? 100);
+          const { error } = await context.client
+            .rpc("reserve_shopping_provider_call", {
+              p_workspace_id: context.workspaceId,
+              p_search_id: search.id,
+              p_daily_limit: limit,
+            })
+            .abortSignal(AbortSignal.timeout(10000));
+          if (error)
+            throw new ApiError(
+              error.code === "54000"
+                ? "SHOPPING_BUDGET_EXHAUSTED"
+                : error.code === "40001"
+                  ? "OUTFIT_STALE"
+                  : "SHOPPING_RESERVATION_UNAVAILABLE",
+              error.code === "54000"
+                ? "The daily shopping search limit has been reached. Saved results remain available."
+                : "Shopping search could not be started. Try again shortly.",
+              error.code === "54000" ? 429 : 503,
+              !["54000", "40001"].includes(error.code),
+            );
+        },
+      );
     const offers = [
       ...new Map(
         raw
