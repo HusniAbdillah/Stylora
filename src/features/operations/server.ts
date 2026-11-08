@@ -7,7 +7,7 @@ import {
 import { canRetryOperationCode, OperationError } from "./errors";
 import { workflowProviderLimits } from "./limits";
 import { assertWorkflowExecutorAvailable } from "./health";
-import { checkpointOperationResult, readOperationCheckpoint, type OperationCheckpoint } from "./checkpoints";
+import { checkpointOperationResult, readOperationCheckpoint, type OperationCheckpoint, type CheckpointJson } from "./checkpoints";
 import {
   operationRowSchema,
   startOperationSchema,
@@ -114,7 +114,7 @@ export type OperationHandler<T> = {
   commit(claim: OperationClaim, output: T): Promise<void>;
   checkpoint?: {
     serialize(output: T): OperationCheckpoint;
-    restore(claim: OperationClaim, result: z.core.JSONType, metadata: z.core.JSONType): Promise<T>;
+    restore(claim: OperationClaim, result: CheckpointJson, metadata: CheckpointJson): Promise<T>;
   };
   fail?(claim: OperationClaim, error: OperationFailure): Promise<void>;
 };

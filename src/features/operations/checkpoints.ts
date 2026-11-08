@@ -4,9 +4,10 @@ import { getWorkspaceDatabase, requireWorkspaceWrites } from "@/lib/supabase/ser
 import { OperationError } from "./errors";
 import type { OperationClaim } from "./server";
 
+export type CheckpointJson = z.infer<ReturnType<typeof z.json>>;
 export type OperationCheckpoint = {
-  result: z.core.JSONType;
-  metadata?: z.core.JSONType;
+  result: CheckpointJson;
+  metadata?: CheckpointJson;
 };
 
 export async function readOperationCheckpoint(claim: OperationClaim) {
@@ -17,8 +18,8 @@ export async function readOperationCheckpoint(claim: OperationClaim) {
     .eq("workspace_id", context.workspaceId)
     .eq("operation_id", claim.operationId)
     .eq("input_fingerprint", claim.inputFingerprint)
-    .maybeSingle()
-    .abortSignal(AbortSignal.timeout(10000));
+    .abortSignal(AbortSignal.timeout(10000))
+    .maybeSingle();
   if (error)
     throw new OperationError("CHECKPOINT_UNAVAILABLE", "The saved task result could not be loaded.", 503, true);
   return data ? z.object({ result: z.json(), metadata: z.json() }).parse(data) : null;

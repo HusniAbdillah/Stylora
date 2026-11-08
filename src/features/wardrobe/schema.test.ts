@@ -137,7 +137,7 @@ describe("Wardrobe contracts", () => {
       expect(canonical.attributes).toEqual(item.attributes);
       if (item === manifest.items[0]) {
         expect(() =>
-          toCanonicalWardrobeItem({ ...row, attributes: null }),
+          toCanonicalWardrobeItem({ ...row, attributes: null } as unknown as typeof row),
         ).toThrow();
       }
     }
