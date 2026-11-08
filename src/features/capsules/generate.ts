@@ -482,6 +482,16 @@ export async function runCapsuleOperation(operationId: string) {
         "Capsule provider metadata could not be recorded.",
       );
   }
+  async function recordProviderMetadata(claim: OperationClaim) {
+    try {
+      await persistProviderMetadata(claim);
+    } catch {
+      console.warn("CAPSULE_METADATA_UNAVAILABLE", {
+        operationId: claim.operationId,
+        attemptCount: claim.attemptCount,
+      });
+    }
+  }
   async function metadata(claim: OperationClaim) {
     const result = await context.client
       .from("workflow_operations")
@@ -661,11 +671,11 @@ export async function runCapsuleOperation(operationId: string) {
           "Your capsule changed before generation finished. Your newer choices are kept.",
           409,
         );
-      await persistProviderMetadata(claim);
+      await recordProviderMetadata(claim);
     },
     fail: async (claim, failure) => {
       await failOperation(claim, failure);
-      await persistProviderMetadata(claim);
+      await recordProviderMetadata(claim);
     },
   });
 }
