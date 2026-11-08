@@ -15,12 +15,15 @@ export default async function CapsuleOutfitPage({
     !z.uuid().safeParse(outfitId).success
   )
     notFound();
-  const { result, revision } = await getCapsuleResult(capsuleId);
+  const { result, revision, generationNeeded, contextKey } =
+    await getCapsuleResult(capsuleId);
   if (!result.outfits.some((outfit) => outfit.id === outfitId)) notFound();
   return (
     <CapsuleResultScreen
       result={result}
       revision={revision}
+      generationNeeded={generationNeeded}
+      contextKey={contextKey}
       outfitId={outfitId}
     />
   );

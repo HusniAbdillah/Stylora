@@ -19,6 +19,7 @@ type Props = {
   revision: number;
   outfitId?: string;
   generationNeeded?: boolean;
+  contextKey?: string;
 };
 
 export function CapsuleResultScreen({
@@ -26,21 +27,24 @@ export function CapsuleResultScreen({
   revision,
   outfitId,
   generationNeeded = false,
+  contextKey = String(revision),
 }: Props) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [operationId, setOperationId] = useState<string>();
+  const generationVersion = useRef(0);
   const savingRequest = useRef(false);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(
     result.outfits.length === 0 && generationNeeded,
   );
   const generate = useCallback(async () => {
+    const version = ++generationVersion.current;
     setRunning(true);
     setMessage("");
     try {
       const response = await requestOperation(
-        `capsule:${result.id}:${revision}`,
+        `capsule:${result.id}:${revision}:${contextKey}`,
         `/api/capsules/${result.id}/generate`,
         {},
       );
@@ -48,6 +52,7 @@ export function CapsuleResultScreen({
         data?: { id: string; status: string };
         error?: { message: string };
       };
+      if (version !== generationVersion.current) return;
       if (!response.ok || !payload.data)
         throw new Error(
           payload.error?.message ??
@@ -64,20 +69,28 @@ export function CapsuleResultScreen({
             : "Capsule generation could not finish. Your brief and selected pieces are saved. Retry or edit the capsule.",
         );
     } catch (error) {
+      if (version !== generationVersion.current) return;
       setMessage(
         error instanceof Error
           ? error.message
           : "Capsule generation is unavailable. Your brief is saved.",
       );
     } finally {
-      setRunning(false);
+      if (version === generationVersion.current) setRunning(false);
     }
-  }, [result.id, revision, router]);
+  }, [result.id, revision, contextKey, router]);
 
   useEffect(() => {
+    let active = true;
     if (generationNeeded) {
-      void Promise.resolve().then(generate);
+      void Promise.resolve().then(() => {
+        if (active) return generate();
+      });
     }
+    return () => {
+      active = false;
+      generationVersion.current += 1;
+    };
   }, [result.outfits.length, generationNeeded, generate]);
 
   async function save(outfit: string) {

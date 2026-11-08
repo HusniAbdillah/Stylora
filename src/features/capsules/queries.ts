@@ -6,6 +6,16 @@ import { getCapsuleInventory } from "./drafts";
 import { capsuleBriefSchema } from "./schema";
 import { missingBriefSchema } from "./generation-schema";
 import type { CapsuleAddition, CapsuleResult } from "./capsule-types";
+import {
+  capsuleResultContextKey,
+  capsuleResultNeedsGeneration,
+} from "./result-state";
+import {
+  CAPSULE_PROMPT_VERSION,
+  FASHION_SCHEMA_VERSION,
+  FASHION_KNOWLEDGE_VERSION,
+  TEXT_MODEL,
+} from "@/features/ai/openai";
 
 const explanationSchema = z.object({
   whyThis: z.array(
@@ -62,7 +72,9 @@ export async function getCapsuleResult(id: string) {
       getCapsuleInventory(),
       client
         .from("workflow_operations")
-        .select("id,input")
+        .select(
+          "id,input,input_revision,result_ref,model,prompt_version,schema_version",
+        )
         .eq("workspace_id", workspaceId)
         .eq("subject_type", "capsule")
         .eq("subject_id", id)
@@ -159,27 +171,30 @@ export async function getCapsuleResult(id: string) {
       503,
       true,
     );
-  const dependencies = z
-    .object({
-      itemRevisions: z.record(z.uuid(), z.number().int().positive()),
-      preferenceRevision: z.number().int().min(0),
-    })
-    .safeParse(completed.data?.input);
-  const stale =
-    outfits.length > 0 &&
-    (!dependencies.success ||
-      dependencies.data.preferenceRevision !==
-        (preferences.data?.revision ?? 0) ||
-      capsule.brief.includedItemIds.some(
-        (itemId) =>
-          dependencies.data.itemRevisions[itemId] !==
-          owned.get(itemId)?.revision,
-      ));
+  const current = {
+    brief: capsule.brief,
+    revision: capsule.revision,
+    preferenceRevision: preferences.data?.revision ?? 0,
+    itemRevisions: Object.fromEntries(
+      inventory.map((item) => [item.id, item.revision]),
+    ),
+    runtime: {
+      model: TEXT_MODEL,
+      promptVersion: CAPSULE_PROMPT_VERSION,
+      schemaVersion: FASHION_SCHEMA_VERSION,
+      knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
+    },
+  };
   return {
     result,
     revision: capsule.revision,
     brief: capsule.brief,
-    generationNeeded: !completed.data || stale,
+    generationNeeded: capsuleResultNeedsGeneration(
+      completed.data,
+      current,
+      outfits.map((outfit) => outfit.id),
+    ),
+    contextKey: capsuleResultContextKey(current),
   };
 }
 
