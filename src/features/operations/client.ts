@@ -69,8 +69,9 @@ async function executeRequest(
     method: "POST",
     ...init,
     cache: "no-store",
-    signal: undefined,
+    signal: AbortSignal.timeout(295_000),
   });
+  const workerManaged = response.headers.get("x-stylora-executor") === "worker";
   let snapshot = await responseOperation(response);
   const knownId = z.uuid().safeParse(key);
   let operationId =
@@ -95,6 +96,7 @@ async function executeRequest(
     response = await fetch(`/api/workflow-operations/${operationId}`, {
       method: "GET",
       cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
     });
     snapshot = await responseOperation(response);
     if (!response.ok || !snapshot) return response;
@@ -108,12 +110,12 @@ async function executeRequest(
     const expired =
       typeof operation.leaseUntil === "string" &&
       Date.parse(operation.leaseUntil) <= Date.now();
-    if (operation.status === "queued" || expired) {
+    if (!workerManaged && (operation.status === "queued" || expired)) {
       response = await fetch(url, {
         method: "POST",
         ...init,
         cache: "no-store",
-        signal: undefined,
+        signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
       });
       snapshot = await responseOperation(response);
       if (response.status === 409 && !snapshot) continue;

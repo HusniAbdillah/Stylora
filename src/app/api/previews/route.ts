@@ -1,6 +1,11 @@
 import { ApiError, apiRoute } from "@/lib/api";
 import { OperationError } from "@/features/operations/errors";
 import {
+  executorResponse,
+  usesWorkflowWorker,
+} from "@/features/operations/execution-mode";
+import { previewPollStatus } from "@/features/preview/poll-status";
+import {
   generatePreviewImage,
   previewImageStatus,
 } from "@/features/preview/generation";
@@ -26,13 +31,21 @@ function previewResponse(run: () => Promise<unknown>) {
 }
 
 export async function POST(request: Request) {
-  return previewResponse(async () =>
-    generatePreviewImage(await request.json()),
+  return executorResponse(
+    await previewResponse(async () =>
+      generatePreviewImage(await request.json(), {
+        execute: !usesWorkflowWorker(),
+      }),
+    ),
   );
 }
 
 export async function GET(request: Request) {
-  return previewResponse(async () =>
-    previewImageStatus(new URL(request.url).searchParams.get("draftId") ?? ""),
-  );
+  return previewResponse(async () => {
+    const query = new URL(request.url).searchParams;
+    const draftId = query.get("draftId") ?? "";
+    return query.get("poll") === "1"
+      ? previewPollStatus(draftId)
+      : previewImageStatus(draftId);
+  });
 }

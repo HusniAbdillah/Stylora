@@ -10,6 +10,7 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
+    "worker": "node --experimental-strip-types scripts/workflow-worker.mjs",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",

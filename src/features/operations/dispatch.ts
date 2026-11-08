@@ -7,6 +7,7 @@ const studioKinds = new Set([
   "capsule_generation",
   "preview_image",
   "saved_avatar",
+  "wardrobe_description",
 ]);
 
 export async function dispatchOperation(

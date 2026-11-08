@@ -7,6 +7,34 @@ afterEach(() => {
 });
 
 describe("navigation-independent operation requests", () => {
+  it("only polls worker-managed queued jobs, without browser execution retries", async () => {
+    vi.useFakeTimers();
+    const id = "be88417c-17f6-4ca4-8c24-c032710d287d";
+    const queued = { data: { id, status: "queued", leaseUntil: null } };
+    const fetchRequest = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json(queued, {
+          status: 202,
+          headers: { "X-Stylora-Executor": "worker" },
+        }),
+      )
+      .mockResolvedValueOnce(Response.json(queued))
+      .mockResolvedValueOnce(
+        Response.json({ data: { id, status: "succeeded", leaseUntil: null } }),
+      );
+    vi.stubGlobal("fetch", fetchRequest);
+    const pending = startOperationRequest(id, "/api/avatars/" + id);
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(await (await pending).json()).toMatchObject({
+      data: { status: "succeeded" },
+    });
+    expect(fetchRequest.mock.calls.map(([, init]) => init?.method)).toEqual([
+      "POST",
+      "GET",
+      "GET",
+    ]);
+  });
   it("extracts a queued Preview operation from its job envelope and semantic key", async () => {
     vi.useFakeTimers();
     const id = "7835d538-e16b-46b1-a1ee-8f32e533d2ea";

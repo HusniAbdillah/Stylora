@@ -23,6 +23,7 @@ import {
   startOperation,
 } from "@/features/operations/server";
 import { draftPayloadSchema, revisionSchema } from "./schema";
+import { usesWorkflowWorker } from "@/features/operations/execution-mode";
 import {
   getWardrobeDraft,
   readWardrobeDraftRow,
@@ -147,6 +148,8 @@ export async function executeWardrobeAnalysis(
         return await withFashionOperation(
           {
             operationId,
+            signal: claim.signal,
+            deadline: Date.now() + 240_000,
             reserveCall: async () => {
               const { error } = await context.client.rpc(
                 "reserve_wardrobe_provider_call",
@@ -201,7 +204,12 @@ export async function executeWardrobeAnalysis(
                     p_attempt: claim.attemptCount,
                     p_payload: z
                       .json()
-                      .parse({ piece, index, provisional: true }),
+                      .parse({
+                        piece,
+                        index,
+                        provisional: true,
+                        attemptCount: claim.attemptCount,
+                      }),
                   },
                 );
                 if (error) wardrobeDatabaseError(error);
@@ -276,10 +284,38 @@ export async function getWardrobeAnalysis(draftId: string) {
     .limit(1)
     .maybeSingle();
   if (error) wardrobeDatabaseError(error);
-  if (!data) return { operation: null, leaseExpired: false };
+  if (!data)
+    return {
+      operation: null,
+      leaseExpired: false,
+      executionMode: usesWorkflowWorker() ? "worker" : "inline",
+    };
   const operation = await readOperation(data.id);
+  let provisionalCount = 0;
+  if (operation.status === "partial") {
+    const events = await client
+      .from("workflow_operation_events")
+      .select("payload")
+      .eq("workspace_id", workspaceId)
+      .eq("operation_id", operation.id)
+      .eq("event_type", "piece_completed")
+      .contains("payload", { attemptCount: operation.attempt_count })
+      .order("sequence", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (events.error) wardrobeDatabaseError(events.error);
+    const latestPiece = z
+      .object({
+        index: z.number().int().min(0).max(23),
+        provisional: z.literal(true),
+      })
+      .safeParse(events.data?.payload);
+    if (latestPiece.success) provisionalCount = latestPiece.data.index + 1;
+  }
   return {
     operation: operationStatus(operation),
+    executionMode: usesWorkflowWorker() ? "worker" : "inline",
+    provisionalCount,
     leaseExpired:
       data.lease_until !== null && Date.parse(data.lease_until) <= Date.now(),
   };

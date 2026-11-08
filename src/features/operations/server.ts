@@ -115,6 +115,7 @@ type OperationFailure = {
   code: string;
   retryable: boolean;
   retryAfterSeconds?: number;
+  diagnostics?: { code: string; path: string }[];
 };
 
 export async function failOperation(
@@ -141,7 +142,7 @@ export async function failOperation(
       p_operation_id: claim.operationId,
       p_attempt_count: claim.attemptCount,
       p_input_fingerprint: claim.inputFingerprint,
-      p_status: "failed",
+      p_status: code === "INPUT_SUPERSEDED" ? "superseded" : "failed",
       p_safe_error_code: code,
       p_result_ref: {
         retryable: failure.retryable && canRetryOperationCode(code),
@@ -157,7 +158,30 @@ export async function failOperation(
   );
   if (error?.code === "40001") return;
   if (error) databaseError(error.code);
-  operationRowSchema.parse(data);
+  const finished = operationRowSchema.parse(data);
+  if (finished.status === "failed" && failure.diagnostics?.length) {
+    const diagnostics = z
+      .array(
+        z.strictObject({
+          code: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,79}$/),
+          path: z.string().regex(/^[A-Za-z0-9_.\[\]]{0,160}$/),
+        }),
+      )
+      .max(10)
+      .parse(failure.diagnostics);
+    // The finish RPC deliberately strips optional failure metadata. Attach only
+    // sanitized field paths while retaining its attempt and revision fences.
+    const { error: diagnosticError } = await context.client
+      .from("workflow_operations")
+      .update({ result_ref: { ...finished.result_ref, diagnostics } })
+      .eq("workspace_id", context.workspaceId)
+      .eq("id", claim.operationId)
+      .eq("attempt_count", claim.attemptCount)
+      .eq("input_fingerprint", claim.inputFingerprint)
+      .eq("status", "failed")
+      .eq("updated_at", finished.updated_at);
+    if (diagnosticError) databaseError(diagnosticError.code);
+  }
 }
 
 export async function runOperation<T>(
@@ -187,7 +211,17 @@ export async function runOperation<T>(
     inputFingerprint: operation.input_fingerprint,
     attemptCount: operation.attempt_count,
     input: operation.input,
-    signal: AbortSignal.timeout(240_000),
+    signal: AbortSignal.timeout(
+      Math.max(
+        1,
+        Math.min(
+          240_000,
+          operation.lease_until
+            ? Date.parse(operation.lease_until) - Date.now() - 40_000
+            : 240_000,
+        ),
+      ),
+    ),
   };
   try {
     const output = await handler.execute(claim);
@@ -202,13 +236,18 @@ export async function runOperation<T>(
   } catch (failure) {
     const providerFailure = z
       .object({
-        code: z
-          .string()
-          .regex(
-            /^OPENAI_(CONNECTION_FAILED|UNCONFIGURED|INVALID_OUTPUT|HTTP_\d{3}|IMAGE_[A-Z0-9_]{1,80})$/,
-          ),
+        code: z.string().regex(/^(OPENAI|CAPSULE)_[A-Z0-9_]{1,100}$/),
         retryable: z.boolean(),
         retryAfterSeconds: z.number().int().min(0).max(86400).optional(),
+        diagnostics: z
+          .array(
+            z.strictObject({
+              code: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,79}$/),
+              path: z.string().regex(/^[A-Za-z0-9_.\[\]]{0,160}$/),
+            }),
+          )
+          .max(10)
+          .optional(),
       })
       .safeParse(failure);
     const safeError =
@@ -217,7 +256,7 @@ export async function runOperation<T>(
         : providerFailure.success
           ? new OperationError(
               providerFailure.data.code,
-              "The image provider could not finish. Try again.",
+              "The AI provider could not finish. Check the task status.",
               503,
               providerFailure.data.retryable &&
                 canRetryOperationCode(providerFailure.data.code),
@@ -235,6 +274,9 @@ export async function runOperation<T>(
       code: safeError.code,
       retryable: safeError.retryable,
       retryAfterSeconds: safeError.retryAfterSeconds,
+      diagnostics: providerFailure.success
+        ? providerFailure.data.diagnostics
+        : undefined,
     });
   }
   return readOperation(operation.id);

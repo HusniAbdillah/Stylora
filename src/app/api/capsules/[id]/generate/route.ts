@@ -1,10 +1,18 @@
 import { apiRoute } from "@/lib/api";
 import { generateCapsule } from "@/features/capsules/generate";
+import {
+  executorResponse,
+  usesWorkflowWorker,
+} from "@/features/operations/execution-mode";
 
 export const maxDuration = 300;
-export function POST(
+export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  return apiRoute(async () => generateCapsule((await params).id));
+  return executorResponse(
+    await apiRoute(async () =>
+      generateCapsule((await params).id, { execute: !usesWorkflowWorker() }),
+    ),
+  );
 }

@@ -10,6 +10,8 @@ import { createWorkspaceSignedRead } from "@/lib/supabase/storage";
 import {
   startOperation,
   runOperation,
+  readOperation,
+  OperationError,
   assertWorkflowRpc,
 } from "@/features/operations/server";
 import {
@@ -271,7 +273,10 @@ export async function previewImageStatus(draftId: string) {
   };
 }
 
-export async function generatePreviewImage(input: unknown) {
+export async function generatePreviewImage(
+  input: unknown,
+  options: { execute?: boolean } = {},
+) {
   const parsed = generationInput.parse(input);
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
@@ -336,22 +341,48 @@ export async function generatePreviewImage(input: unknown) {
         current.items,
       ),
       knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
+      reuse: !parsed.renderRequestId,
     }),
     promptVersion: FASHION_PROMPT_VERSION,
     schemaVersion: FASHION_SCHEMA_VERSION,
     model: IMAGE_MODEL,
   });
-  await runOperation(operation.id, {
-    execute: async (claim) =>
-      renderAndStoreAvatar({
+  if (options.execute !== false) await runPreviewOperation(operation.id);
+  return previewImageStatus(parsed.draftId);
+}
+
+export async function runPreviewOperation(operationId: string) {
+  const context = getWorkspaceDatabase();
+  requireWorkspaceWrites(context);
+  const operation = await readOperation(operationId);
+  if (operation.kind !== "preview_image" || operation.subject_type !== "draft")
+    throw new OperationError(
+      "PREVIEW_OPERATION_NOT_FOUND",
+      "This image request is unavailable.",
+      404,
+    );
+  return runOperation(operation.id, {
+    execute: async (claim) => {
+      const current = await readPreviewImageInputs(operation.subject_id);
+      if (
+        current.draft.revision !== claim.inputRevision ||
+        current.renderFingerprint !== claim.input.renderFingerprint
+      )
+        throw new OperationError(
+          "INPUT_SUPERSEDED",
+          "The preview inputs changed.",
+          409,
+        );
+      return renderAndStoreAvatar({
         items: z.array(z.unknown()).parse(claim.input.items),
         preferences: claim.input.preferences,
         renderSettings: imageRenderSettingsSchema.parse(
           claim.input.renderSettings,
         ),
-        reuse: !parsed.renderRequestId,
+        reuse: z.boolean().parse(claim.input.reuse ?? true),
         signal: claim.signal,
-      }),
+      });
+    },
     commit: async (claim, output) => {
       try {
         const { data, error } = await context.client.rpc(
@@ -381,5 +412,4 @@ export async function generatePreviewImage(input: unknown) {
       }
     },
   });
-  return previewImageStatus(parsed.draftId);
 }

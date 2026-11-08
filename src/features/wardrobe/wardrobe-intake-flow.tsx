@@ -80,6 +80,13 @@ export function WardrobeIntakeFlow({
             `/api/wardrobe/operations/${operationId}/run`,
             { method: "POST" },
           );
+          if (
+            response.ok &&
+            response.headers.get("x-stylora-executor") === "worker"
+          ) {
+            if (current.current) setWatchingDraft(current.current.id);
+            return;
+          }
           if (!response.body)
             throw new Error(
               "Photo description could not start. Retry or enter details manually.",
@@ -189,8 +196,12 @@ export function WardrobeIntakeFlow({
         const state = await wardrobeRequest<{
           operation: { id: string; status: string } | null;
           leaseExpired: boolean;
+          executionMode?: "worker" | "inline";
+          provisionalCount?: number;
         }>(`/drafts/${watchingDraft}/analyze`);
         if (!active) return;
+        if (state.executionMode === "worker")
+          setProvisionalCount(state.provisionalCount ?? 0);
         if (state.operation?.status === "succeeded") {
           const saved = await wardrobeRequest<WardrobeDraft>(
             `/drafts/${watchingDraft}`,
@@ -209,16 +220,17 @@ export function WardrobeIntakeFlow({
           setWatchingDraft(undefined);
           setBusy(false);
         } else if (
-          state.operation.status === "queued" ||
-          (state.leaseExpired &&
-            ["running", "partial"].includes(state.operation.status))
+          state.executionMode !== "worker" &&
+          (state.operation.status === "queued" ||
+            (state.leaseExpired &&
+              ["running", "partial"].includes(state.operation.status)))
         ) {
-          setWatchingDraft(undefined);
           await runExistingAnalysis(state.operation.id);
+          if (active) timer = window.setTimeout(() => void check(), 3000);
         } else if (
           state.operation &&
           ["queued", "running", "partial"].includes(state.operation.status) &&
-          !state.leaseExpired
+          (!state.leaseExpired || state.executionMode === "worker")
         ) {
           setStage("analyzing");
           setBusy(true);
