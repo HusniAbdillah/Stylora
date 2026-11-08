@@ -371,7 +371,6 @@ export function WardrobeIntakeFlow({
     )
       return;
     const value = occasion.trim();
-    if (!value && !draft.payload.metadata.occasion) return;
     const version = occasionVersion.current;
     const id = draft.id;
     const timer = window.setTimeout(() => {
@@ -381,8 +380,7 @@ export function WardrobeIntakeFlow({
           if (
             !saved ||
             current.current?.id !== id ||
-            version !== occasionVersion.current ||
-            !value
+            version !== occasionVersion.current
           )
             return;
           setWatchingDraft(undefined);

@@ -159,20 +159,17 @@ export function WardrobeIntake({
         onOccasionChange && (
           <label className={styles.occasionField}>
             <span>
-              Occasion{" "}
-              <span className="text-secondary">(required for analysis)</span>
+              Occasion <span className="text-secondary">(optional)</span>
             </span>
             <input
               value={occasion}
-              required
               maxLength={120}
               disabled={busy}
               placeholder="For example, work or a weekend outing"
               onChange={(event) => onOccasionChange(event.target.value)}
             />
             <small>
-              Descriptions start automatically after your verified photo and
-              occasion are saved.
+              Descriptions start automatically after your photo is verified.
             </small>
           </label>
         )}
@@ -213,7 +210,7 @@ export function WardrobeIntake({
           <p>
             {occasion.trim()
               ? "Your occasion is being saved before descriptions start."
-              : "Add an occasion to start garment descriptions, or enter the details yourself."}
+              : "Garment descriptions will start automatically. You can also enter the details yourself."}
           </p>
           <div className={styles.errorActions}>
             <Button variant="secondary" onClick={chooseFile} disabled={busy}>

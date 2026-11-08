@@ -40,14 +40,14 @@ export async function startWardrobeAnalysis(draftId: string, input: unknown) {
   const occasion = z
     .string()
     .trim()
-    .min(1)
     .max(120)
+    .nullish()
     .safeParse(draft.payload.metadata.occasion);
   if (!occasion.success)
     throw new ApiError(
-      "occasion_required",
-      "Choose an occasion before describing this photo.",
-      409,
+      "occasion_invalid",
+      "Use an occasion of at most 120 characters.",
+      400,
     );
   if (
     draft.status !== "active" ||
@@ -67,10 +67,10 @@ export async function startWardrobeAnalysis(draftId: string, input: unknown) {
   const snapshot = {
     draftRevision: draft.revision,
     assetId: draft.assetId,
-    occasion: occasion.data,
+    occasion: occasion.data || null,
     versions: prompt.versions,
     model,
-    handlerVersion: "wardrobe-description.v2",
+    handlerVersion: "wardrobe-description.v3",
   };
   const op = await startOperation({
     kind: "wardrobe_description",
@@ -102,14 +102,14 @@ export async function executeWardrobeAnalysis(
   const occasion = z
     .string()
     .trim()
-    .min(1)
     .max(120)
+    .nullish()
     .safeParse(operation.input.occasion);
   if (!occasion.success)
     throw new ApiError(
-      "occasion_required",
-      "Choose an occasion before describing this photo.",
-      409,
+      "occasion_invalid",
+      "The captured occasion is invalid. Start a new description.",
+      400,
     );
   if (
     operation.kind !== "wardrobe_description" ||
@@ -191,7 +191,7 @@ export async function executeWardrobeAnalysis(
                 purpose:
                   "Describe garments for an owned wardrobe intake. These are proposed descriptions until the visitor confirms each item.",
                 assetId: draft.asset_id,
-                occasion: occasion.data,
+                occasion: occasion.data || null,
                 sourceRevision: draft.revision,
               },
               imageDataUrl,
@@ -202,14 +202,12 @@ export async function executeWardrobeAnalysis(
                     p_workspace_id: context.workspaceId,
                     p_operation_id: operationId,
                     p_attempt: claim.attemptCount,
-                    p_payload: z
-                      .json()
-                      .parse({
-                        piece,
-                        index,
-                        provisional: true,
-                        attemptCount: claim.attemptCount,
-                      }),
+                    p_payload: z.json().parse({
+                      piece,
+                      index,
+                      provisional: true,
+                      attemptCount: claim.attemptCount,
+                    }),
                   },
                 );
                 if (error) wardrobeDatabaseError(error);
@@ -247,7 +245,7 @@ export async function executeWardrobeAnalysis(
         saved: {},
         metadata: z.json().parse({
           ...output.metadata,
-          occasion: occasion.data,
+          occasion: occasion.data || null,
           extractionTask: "inspiration_description",
         }),
       });
