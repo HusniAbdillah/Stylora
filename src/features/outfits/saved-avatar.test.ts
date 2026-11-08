@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   render: vi.fn(),
   discard: vi.fn(),
   settings: vi.fn(),
+  readCheckpoint: vi.fn(),
+  checkpoint: vi.fn(),
+  restore: vi.fn(),
+  fingerprint: vi.fn(),
   promptVersion: "avatar-prompt.v1",
 }));
 vi.mock("server-only", () => ({}));
@@ -17,6 +21,14 @@ vi.mock("@/lib/supabase/server", async (importOriginal) => ({
 vi.mock("@/features/operations/server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/operations/server")>()),
   assertWorkflowRpc: vi.fn(),
+}));
+vi.mock("@/features/operations/checkpoints", () => ({
+  readOperationCheckpoint: mocks.readCheckpoint,
+  checkpointOperationResult: mocks.checkpoint,
+}));
+vi.mock("@/features/operations/provider-budget", () => ({
+  reserveWorkflowProviderCall: vi.fn(),
+  releaseWorkflowProviderCall: vi.fn(),
 }));
 vi.mock("@/features/ai/openai", () => ({
   IMAGE_MODEL: "gpt-image-1.5",
@@ -31,6 +43,8 @@ vi.mock("@/features/preview/image", () => ({
   renderAndStoreAvatar: mocks.render,
   discardPendingAvatar: mocks.discard,
   getAvatarRenderSettings: mocks.settings,
+  restoreAvatarCheckpoint: mocks.restore,
+  avatarRenderFingerprint: mocks.fingerprint,
 }));
 
 const workspaceId = "cccf56bf-ac67-417e-bef1-f43dc6a87aa1";
@@ -70,6 +84,12 @@ function setup() {
     events: [] as { payload: Record<string, unknown> }[],
     constraintRejections: 0,
     eventFailure: false,
+    commitStatus: "succeeded",
+    commitFailure: false,
+    checkpoint: null as {
+      result: Record<string, unknown>;
+      metadata: Record<string, unknown>;
+    } | null,
   };
   const snapshot = {
     id: savedId,
@@ -163,13 +183,16 @@ function setup() {
             payload: args.p_payload as Record<string, unknown>,
           });
       } else if (name === "complete_saved_avatar") {
-        operation.status = "succeeded";
-        operation.lease_until = null;
-        operation.result_ref = {
-          assetId,
-          renderFingerprint: "c".repeat(64),
-          savedLookId: savedId,
-        };
+        if (state.commitFailure) error = { code: "08006" };
+        else {
+          operation.status = state.commitStatus;
+          operation.lease_until = null;
+          operation.result_ref = {
+            assetId,
+            renderFingerprint: "c".repeat(64),
+            savedLookId: savedId,
+          };
+        }
       } else throw new Error("Unexpected test RPC");
       const result = Promise.resolve({ data: { ...operation }, error });
       return Object.assign(result, { abortSignal: () => result });
@@ -181,6 +204,16 @@ function setup() {
     assetId,
     renderFingerprint: "c".repeat(64),
     createdAsset: false,
+  });
+  mocks.fingerprint.mockReturnValue("c".repeat(64));
+  mocks.restore.mockResolvedValue({
+    assetId,
+    renderFingerprint: "c".repeat(64),
+    createdAsset: false,
+  });
+  mocks.readCheckpoint.mockImplementation(async () => state.checkpoint);
+  mocks.checkpoint.mockImplementation(async (_claim, output) => {
+    state.checkpoint = output;
   });
   return { state, writes, fences };
 }
@@ -265,4 +298,60 @@ describe("saved-avatar render capture", () => {
     expect(state.operation.result_ref).toMatchObject({ retryable: false });
     expect(mocks.render).not.toHaveBeenCalled();
   });
+
+  it("recovers a checkpoint after a lost commit without another render or deleting the image", async () => {
+    const { state } = setup();
+    state.commitFailure = true;
+    mocks.render.mockResolvedValueOnce({
+      assetId,
+      renderFingerprint: "c".repeat(64),
+      createdAsset: true,
+    });
+    expect((await runSavedAvatar(operationId)).status).toBe("failed");
+    expect(state.operation.safe_error_code).toBe("CHECKPOINT_COMMIT_PENDING");
+    expect(state.checkpoint).toEqual({
+      result: { assetId, renderFingerprint: "c".repeat(64) },
+      metadata: {},
+    });
+    expect(mocks.discard).not.toHaveBeenCalled();
+    retry(state);
+    state.commitFailure = false;
+    mocks.settings.mockReturnValue({ ...settings, quality: "high" });
+    expect((await runSavedAvatar(operationId)).status).toBe("succeeded");
+    expect(mocks.render).toHaveBeenCalledOnce();
+    expect(mocks.fingerprint).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.any(Object),
+      settings,
+    );
+    expect(mocks.restore).toHaveBeenCalledWith(
+      state.checkpoint?.result,
+      "c".repeat(64),
+      expect.any(AbortSignal),
+      {},
+    );
+    expect(mocks.discard).not.toHaveBeenCalled();
+  });
+
+  it("rejects changed policy before restoring a stored checkpoint", async () => {
+    const { state } = setup();
+    state.commitFailure = true;
+    await runSavedAvatar(operationId);
+    retry(state);
+    mocks.promptVersion = "avatar-prompt.v2";
+    expect((await runSavedAvatar(operationId)).status).toBe("failed");
+    expect(state.operation.safe_error_code).toBe("AVATAR_RUNTIME_CHANGED");
+    expect(mocks.render).toHaveBeenCalledOnce();
+    expect(mocks.restore).not.toHaveBeenCalled();
+  });
+
+  it.each(["superseded", "cancelled"])(
+    "discards only pending output after confirmed %s completion",
+    async (status) => {
+      const { state } = setup();
+      state.commitStatus = status;
+      expect((await runSavedAvatar(operationId)).status).toBe(status);
+      expect(mocks.discard).toHaveBeenCalledWith(assetId);
+    },
+  );
 });
