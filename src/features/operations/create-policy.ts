@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Json } from "@/types/database";
+import type { FashionTaskSettings } from "@/lib/ai/task-settings";
 
-export const CREATE_RUNTIME_VERSION = "owner2-create.v7";
+export const CREATE_RUNTIME_VERSION = "owner2-create.v8";
 export const createKindSchema = z.enum([
   "inspiration_description",
   "inspiration_confidence",
@@ -60,6 +61,7 @@ export function createInputSnapshot(input: {
   optionType?: string;
   intentId?: string;
   draftId?: string;
+  providerSettings?: FashionTaskSettings;
 }): Record<string, Json> {
   const snapshot: Record<string, Json> = {
     lookId: input.look.id,
@@ -92,6 +94,8 @@ export function createInputSnapshot(input: {
   }
   if (input.optionType) snapshot.optionType = input.optionType;
   if (input.draftId) snapshot.draftId = input.draftId;
+  if (input.providerSettings)
+    snapshot.providerSettings = z.json().parse(input.providerSettings);
   if (input.intentId) snapshot.intentId = input.intentId;
   return snapshot;
 }

@@ -5,6 +5,11 @@ import { ApiError } from "../api";
 import { buildFashionPrompt, type FashionTask } from "../../prompts/fashion";
 import type { Garment } from "./fashion-schema";
 import {
+  getFashionTaskSettings,
+  fashionTaskSettingsSchema,
+  type FashionTaskSettings,
+} from "./task-settings";
+import {
   PieceStreamError,
   PieceStreamParser,
   safeValidationIssues,
@@ -43,7 +48,7 @@ const responseTextSchema = z.object({
 type ProviderUsage = z.infer<typeof responseTextSchema>["usage"];
 
 export type FashionRequest<T extends z.ZodType> = {
-  task: FashionTask;
+  task: Exclude<FashionTask, "preview_image">;
   schema: T;
   context: unknown;
   imageDataUrl?: string;
@@ -66,6 +71,8 @@ export type ProviderMetadata = {
   attemptCount: number;
   operationId: string;
   correctionAttemptCount: number;
+  providerSettings: FashionTaskSettings;
+  slotReleaseFailed: boolean;
 };
 
 type FashionOperationContext = {
@@ -74,6 +81,7 @@ type FashionOperationContext = {
   releaseCall: () => Promise<void>;
   signal?: AbortSignal;
   deadline?: number;
+  providerSettings?: FashionTaskSettings;
 };
 type ProviderFailureDetails = {
   code: string;
@@ -162,12 +170,10 @@ export function fashionValidationFailure(
     false,
     {
       providerCode: "domain_validation",
-      validationIssues: issues
-        .slice(0, 12)
-        .map((issue) => ({
-          code: safeIdentifier(issue.code) ?? "invalid_value",
-          path: safeIdentifier(issue.path) ?? "output",
-        })),
+      validationIssues: issues.slice(0, 12).map((issue) => ({
+        code: safeIdentifier(issue.code) ?? "invalid_value",
+        path: safeIdentifier(issue.path) ?? "output",
+      })),
     },
   );
 }
@@ -320,6 +326,21 @@ export function parseFashionResponse<T extends z.ZodType>(
       providerCode: "response_schema",
       validationIssues: safeValidationIssues(parsed.error.issues),
     });
+  if (
+    parsed.data.status === "incomplete" &&
+    parsed.data.incomplete_details?.reason === "max_output_tokens"
+  )
+    throw diagnosticError(
+      "provider_output_limit",
+      "The analysis reached its output limit. Adjust the task settings or narrow the input before restarting.",
+      502,
+      false,
+      {
+        providerCode: "response_incomplete",
+        responseStatus: "incomplete",
+        incompleteReason: "max_output_tokens",
+      },
+    );
   if (parsed.data.status !== "completed")
     throw invalidOutput({
       providerCode: "response_incomplete",
@@ -467,8 +488,11 @@ export async function requestFashion<T extends z.ZodType>(
   }
   const key =
     process.env.OPENAI_API_KEY?.trim() || process.env.MODEL_API_KEY?.trim();
-  const model = process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
-  if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,119}$/.test(model)) {
+  const settings = scope.providerSettings
+    ? fashionTaskSettingsSchema.parse(scope.providerSettings)
+    : getFashionTaskSettings(request.task);
+  const model = settings.model;
+  if (!key) {
     throw diagnosticError(
       "provider_unavailable",
       "Fashion analysis is not configured yet. Try again after setup.",
@@ -523,10 +547,10 @@ export async function requestFashion<T extends z.ZodType>(
     model,
     instructions,
     input: [{ role: "user", content }],
-    reasoning: { effort: "low" },
+    reasoning: { effort: settings.reasoningEffort },
     store: false,
     stream: Boolean(request.onPiece),
-    max_output_tokens: 24000,
+    max_output_tokens: settings.maxOutputTokens,
     text: {
       format: {
         type: "json_schema",
@@ -562,6 +586,9 @@ export async function requestFashion<T extends z.ZodType>(
     let reserved = false;
     let eligibleRetry = false;
     let failure: ApiError | undefined;
+    let validatedResult:
+      { data: z.output<T>; metadata: ProviderMetadata } | undefined;
+    let slotReleaseFailed = false;
     let details: Partial<ProviderFailureDetails> = {
       attemptCount: attempt,
       operationId: scope.operationId,
@@ -650,7 +677,7 @@ export async function requestFashion<T extends z.ZodType>(
         ? await readStream(response, streamingRequest)
         : parseFashionResponse(request.schema, await response.json());
       request.validate?.(result.data);
-      return {
+      validatedResult = {
         data: result.data,
         metadata: {
           ...versions,
@@ -661,6 +688,8 @@ export async function requestFashion<T extends z.ZodType>(
           attemptCount: attempt,
           operationId: scope.operationId,
           correctionAttemptCount: correction ? 1 : 0,
+          providerSettings: settings,
+          slotReleaseFailed: false,
         },
       };
     } catch (error) {
@@ -716,12 +745,23 @@ export async function requestFashion<T extends z.ZodType>(
       });
     } finally {
       try {
-        if (reserved) await scope.releaseCall();
+        if (reserved) {
+          try {
+            await scope.releaseCall();
+          } catch {
+            slotReleaseFailed = true;
+          }
+        }
       } finally {
         releaseSlot();
       }
     }
+    if (validatedResult) {
+      validatedResult.metadata.slotReleaseFailed = slotReleaseFailed;
+      return validatedResult;
+    }
     if (!failure) throw invalidOutput();
+    if (slotReleaseFailed) throw failure;
     const validation = safeProviderError(failure);
     const correctable =
       validation?.providerCode === "domain_validation" ||

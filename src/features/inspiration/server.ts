@@ -29,6 +29,7 @@ import type { Database } from "@/types/database";
 import { getPersonalizationSnapshot } from "@/features/preferences/server";
 import { listInventory } from "@/features/matching/backend";
 import { buildFashionPrompt } from "@/prompts/fashion";
+import { getFashionTaskSettings } from "@/lib/ai/task-settings";
 import {
   createKindSchema, createInputSnapshot, createOperationFingerprint, createOperationPolicy,
 } from "@/features/operations/create-policy";
@@ -439,6 +440,7 @@ export async function getLook(lookId: string) {
       lookId: z.literal(look.id), inventoryMode: z.enum(["sample", "live", "combined"]),
       optionType: z.enum(["closest", "from_wardrobe", "fresh_alternative"]).optional(),
       intentId: z.uuid().optional(),
+      draftId: z.uuid().optional(),
     }).safeParse(operation.input);
     const kind = createKindSchema.safeParse(operation.kind);
     let currentFingerprint: string | null = null;
@@ -451,10 +453,11 @@ export async function getLook(lookId: string) {
       if ((!needsPieces || (pieces.length > 0 && inventory)) && (!captured.data.optionType || option)) {
         const input = createInputSnapshot({ kind: kind.data, look, pieces,
           inventoryMode: captured.data.inventoryMode, personalization, inventory,
-          optionType: captured.data.optionType, intentId: captured.data.intentId });
+          optionType: captured.data.optionType, intentId: captured.data.intentId,
+          draftId: captured.data.draftId, providerSettings: getFashionTaskSettings(kind.data) });
         currentFingerprint = createOperationFingerprint({ kind: kind.data, input,
           versions: buildFashionPrompt(kind.data).versions,
-          model: process.env.OPENAI_MODEL || "gpt-6-luna",
+          model: getFashionTaskSettings(kind.data).model,
           subjectId: option?.id ?? look.id, revision: option?.revision ?? look.revision });
       }
     }

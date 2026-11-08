@@ -27,6 +27,10 @@ import {
 } from "@/lib/ai/provider";
 import { usesWorkflowWorker } from "./execution-mode";
 import { buildFashionPrompt } from "@/prompts/fashion";
+import {
+  fashionTaskSettingsSchema,
+  getFashionTaskSettings,
+} from "@/lib/ai/task-settings";
 import type { Database, Json } from "@/types/database";
 import {
   CREATE_RUNTIME_VERSION,
@@ -55,6 +59,7 @@ const snapshotSchema = z.object({
   runtimeVersion: z.string().optional(),
   intentId: z.uuid().optional(),
   draftId: z.uuid().optional(),
+  providerSettings: fashionTaskSettingsSchema,
 });
 const asJson = (value: unknown): Json => z.json().parse(value);
 
@@ -177,6 +182,7 @@ async function operationInput(
     inventory,
     optionType,
     draftId: await requireActiveCreateDraft(look.id, requestedDraftId),
+    providerSettings: getFashionTaskSettings(kind),
   });
   if (
     ["outfit_options", "option_regeneration"].includes(kind) &&
@@ -299,7 +305,7 @@ async function projectOperation(op: Operation) {
           kind: kind.data,
           input,
           versions: buildFashionPrompt(kind.data).versions,
-          model: process.env.OPENAI_MODEL || "gpt-6-luna",
+          model: getFashionTaskSettings(kind.data).model,
           subjectId,
           revision,
         });
@@ -366,7 +372,7 @@ export async function startLookOperation(
     revision = data.revision;
   }
   const prompt = buildFashionPrompt(parsed.kind);
-  const model = process.env.OPENAI_MODEL || "gpt-6-luna";
+  const model = getFashionTaskSettings(parsed.kind).model;
   const fingerprint = createOperationFingerprint({
     kind: parsed.kind,
     input,
@@ -469,6 +475,7 @@ export async function executeOperation(id: string) {
   return withFashionOperation(
     {
       operationId: op.id,
+      providerSettings: snapshot.providerSettings,
       signal,
       deadline,
       reserveCall: async () => {
@@ -528,6 +535,16 @@ export async function executeOperation(id: string) {
             409,
           );
         const kind = kindSchema.parse(op.kind);
+        if (
+          JSON.stringify(snapshot.providerSettings) !==
+            JSON.stringify(getFashionTaskSettings(kind)) ||
+          op.model !== snapshot.providerSettings.model
+        )
+          throw new ApiError(
+            "input_superseded",
+            "The analysis settings changed. Start a new operation for the current configuration.",
+            409,
+          );
         const capturedPreferences =
           kind === "inspiration_description"
             ? {}

@@ -147,6 +147,62 @@ describe("accounted validation correction", () => {
     ).rejects.toMatchObject({ code: "provider_refused" });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+  it("uses captured controls and preserves a valid response when releasing quota fails", async () => {
+    const { fetch, context } = setup([completed({ count: 2 })]);
+    context.releaseCall.mockRejectedValueOnce(
+      new Error("synthetic release failure"),
+    );
+    vi.stubEnv("OPENAI_TEXT_MODEL", "new-live-model");
+    const providerSettings = {
+      version: "fashion-request.v1" as const,
+      model: "captured-model",
+      reasoningEffort: "none" as const,
+      maxOutputTokens: 16000,
+    };
+    const result = await withFashionOperation(
+      { ...context, providerSettings },
+      () =>
+        requestFashion({
+          task: "outfit_options",
+          schema: z.object({ count: z.number() }),
+          context: {},
+        }),
+    );
+    expect(result).toMatchObject({
+      data: { count: 2 },
+      metadata: { providerSettings, slotReleaseFailed: true },
+    });
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({
+      model: "captured-model",
+      max_output_tokens: 16000,
+      reasoning: { effort: "none" },
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it("reports output exhaustion without automatically paying for the same capped request again", async () => {
+    const { fetch, context } = setup([
+      new Response(
+        JSON.stringify({
+          status: "incomplete",
+          incomplete_details: { reason: "max_output_tokens" },
+          output: [],
+        }),
+      ),
+    ]);
+    await expect(
+      withFashionOperation(context, () =>
+        requestFashion({
+          task: "outfit_options",
+          schema: z.object({ count: z.number() }),
+          context: {},
+        }),
+      ),
+    ).rejects.toMatchObject({
+      code: "provider_output_limit",
+      retryable: false,
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it("stops before accounting or inference when the shared deadline is exhausted", async () => {
     const { fetch, context } = setup([]);
     await expect(

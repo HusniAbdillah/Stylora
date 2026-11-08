@@ -119,5 +119,34 @@ describe("Create operation recovery policy", () => {
     expect(fingerprint(input)).not.toBe(
       fingerprint({ ...input, occasion: "Travel" }),
     );
+    const configured = {
+      ...input,
+      draftId: assetId,
+      providerSettings: {
+        version: "fashion-request.v1",
+        model: "test-model",
+        reasoningEffort: "low",
+        maxOutputTokens: 24000,
+      },
+    };
+    expect(fingerprint(configured)).not.toBe(fingerprint(input));
+    expect(fingerprint(configured)).not.toBe(
+      fingerprint({
+        ...configured,
+        providerSettings: {
+          ...configured.providerSettings,
+          reasoningEffort: "none",
+        },
+      }),
+    );
+    expect(fingerprint(configured)).not.toBe(
+      fingerprint({
+        ...configured,
+        providerSettings: {
+          ...configured.providerSettings,
+          maxOutputTokens: 16000,
+        },
+      }),
+    );
   });
 });

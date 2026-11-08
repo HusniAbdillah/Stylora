@@ -49,6 +49,12 @@ const lookId = "6762a315-1490-409b-909b-f424450b06af";
 const assetId = "ad77a8cf-c749-48b1-b463-d21dd65ab503";
 const draftId = "0913da75-d639-4a78-849b-a0d37553c837";
 const operationId = "27521082-6561-47ac-a732-ae19901b7849";
+const providerSettings = {
+  version: "fashion-request.v1",
+  model: "unit-test-model",
+  reasoningEffort: "low",
+  maxOutputTokens: 24000,
+};
 const base = {
   id: operationId,
   kind: "inspiration_description",
@@ -64,13 +70,14 @@ const base = {
     draftId,
     inventoryMode: "combined",
     runtimeVersion: CREATE_RUNTIME_VERSION,
+    providerSettings,
   },
   attempt_count: 1,
   provider_call_count: 0,
   result_ref: null as unknown,
   lease_until: null,
   safe_error_code: null,
-  model: "fixture",
+  model: providerSettings.model,
   prompt_version: "fixture",
   schema_version: "fixture",
 };
@@ -80,6 +87,8 @@ let assetStatus = "ready";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("OPENAI_TEXT_MODEL", providerSettings.model);
+  vi.stubEnv("OPENAI_DESCRIPTION_MODEL", "");
   row = { ...base };
   draftStatus = "active";
   assetStatus = "ready";
@@ -239,6 +248,12 @@ describe("Create allocation and execution gates", () => {
     expect(
       mocks.rpc.mock.calls.some(([name]) => name === "finish_create_operation"),
     ).toBe(false);
+  });
+  it("supersedes queued work if its captured provider controls changed", async () => {
+    vi.stubEnv("OPENAI_DESCRIPTION_REASONING_EFFORT", "none");
+    await executeOperation(operationId);
+    expect(row.status).toBe("superseded");
+    expect(mocks.requestFashion).not.toHaveBeenCalled();
   });
   it("returns a queued retry for worker mode without executing in the request", async () => {
     await startLookOperation(lookId, {
