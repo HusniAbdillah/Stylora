@@ -75,9 +75,27 @@ function ReviewDemo({
         onClose={() => setOpen(false)}
         onPublish={() => setUrl("https://stylora.example/shared/sample")}
         onTurnOff={() => {
-          setOpen(false);
           setRevokeOpen(true);
         }}
+        confirmation={
+          revokeOpen
+            ? {
+                content: (
+                  <ShareRevocationDialog
+                    open
+                    lookTitle={look.title}
+                    onClose={() => setRevokeOpen(false)}
+                    onRevoke={() => {
+                      setUrl(null);
+                      setRevoked(true);
+                      setRevokeOpen(false);
+                    }}
+                  />
+                ),
+                onCancel: () => setRevokeOpen(false),
+              }
+            : undefined
+        }
       >
         {managing && (
           <section className="mt-5 border-t border-stone pt-4">
@@ -94,16 +112,6 @@ function ReviewDemo({
           </section>
         )}
       </ShareReviewDialog>
-      <ShareRevocationDialog
-        open={revokeOpen}
-        lookTitle={look.title}
-        onClose={() => setRevokeOpen(false)}
-        onRevoke={() => {
-          setUrl(null);
-          setRevoked(true);
-          setRevokeOpen(false);
-        }}
-      />
       {revoked && (
         <p role="status" className="mt-4 text-sm">
           Sample link turned off.

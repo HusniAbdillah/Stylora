@@ -41,6 +41,48 @@ export const outfitOptionsSchema = z.strictObject({
 });
 export type OutfitOption = z.infer<typeof outfitOptionSchema>;
 export type OutfitOptionType = z.infer<typeof optionTypeSchema>;
+export const ABSENT_PREFERENCES_GUIDANCE =
+  "These ideas use the reference's colors and silhouette. Add your preferences for more personal color and fit guidance.";
+
+export function hasSuppliedPreferences(
+  preferences: Record<string, string | string[]>,
+) {
+  return Object.values(preferences).some((value) =>
+    Array.isArray(value)
+      ? value.some((entry) => entry.trim().length > 0)
+      : value.trim().length > 0,
+  );
+}
+
+export function wardrobeSupportsOutfit(
+  pieces: MatchItem[],
+  inventory: MatchItem[],
+  constraints: {
+    preferences: Record<string, string | string[]>;
+    occasion: string | null;
+    inventoryMode?: InventoryMode;
+  },
+) {
+  const categories = new Set(
+    inventory
+      .filter(
+        (item) =>
+          isOwnedInventoryItem(item, constraints.inventoryMode) &&
+          !itemConstraintConflict(
+            item,
+            constraints.preferences,
+            constraints.occasion,
+          ),
+      )
+      .map((item) => item.category),
+  );
+  return (
+    (categories.has("dress") ||
+      (categories.has("top") && categories.has("bottom"))) &&
+    (!pieces.some((piece) => piece.category === "shoes") ||
+      categories.has("shoes"))
+  );
+}
 
 export function validateOptionComposition(
   options: OutfitOption[],
@@ -67,26 +109,21 @@ export function validateOptionComposition(
     errors.push("option_types_invalid");
   const inventoryIds = new Map(inventory.map((item) => [item.id, item]));
   const pieceIds = new Map(pieces.map((piece) => [piece.id, piece]));
-  const usableCategories = new Set(
-    inventory
-      .filter(
-        (item) =>
-          isOwnedInventoryItem(item, constraints.inventoryMode) &&
-          !itemConstraintConflict(
-            item,
-            constraints.preferences,
-            constraints.occasion,
-          ),
-      )
-      .map((item) => item.category),
+  const inventorySupportsOutfit = wardrobeSupportsOutfit(
+    pieces,
+    inventory,
+    constraints,
   );
-  const inventorySupportsOutfit =
-    (usableCategories.has("dress") ||
-      (usableCategories.has("top") && usableCategories.has("bottom"))) &&
-    (!pieces.some((piece) => piece.category === "shoes") ||
-      usableCategories.has("shoes"));
   const compositions = new Set<string>();
+  const suppliedPreferences = hasSuppliedPreferences(constraints.preferences);
   for (const option of options) {
+    if (
+      suppliedPreferences &&
+      option.explanation.uncertainty.some((note) =>
+        note.includes(ABSENT_PREFERENCES_GUIDANCE),
+      )
+    )
+      errors.push("supplied_preferences_marked_absent");
     if (option.status === "unavailable") {
       if (option.optionType !== "from_wardrobe" || option.items.length)
         errors.push("unavailable_option_invalid");

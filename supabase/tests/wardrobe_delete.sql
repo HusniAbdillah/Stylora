@@ -81,6 +81,22 @@ BEGIN
     IF SQLERRM <> 'STYLORA_OWNED_ONLY_OPTION' THEN RAISE; END IF;
   END;
   BEGIN
+    UPDATE public.outfit_options SET is_current = false WHERE workspace_id = ws AND id = option_id;
+    UPDATE public.outfit_option_items SET item_kind = 'missing', wardrobe_item_id = NULL,
+      missing_brief = jsonb_build_object('description', 'Invalid ready missing slot') WHERE workspace_id = ws AND id = slot;
+    RAISE EXCEPTION 'A ready historical from-wardrobe option accepted a missing slot';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM <> 'STYLORA_OWNED_ONLY_OPTION' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE public.outfit_options SET status = 'unavailable' WHERE workspace_id = ws AND id = option_id;
+    UPDATE public.outfit_option_items SET item_kind = 'missing', wardrobe_item_id = NULL,
+      missing_brief = jsonb_build_object('description', 'Invalid current missing slot') WHERE workspace_id = ws AND id = slot;
+    RAISE EXCEPTION 'A current unavailable from-wardrobe option accepted a missing slot';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM <> 'STYLORA_OWNED_ONLY_OPTION' THEN RAISE; END IF;
+  END;
+  BEGIN
     PERFORM public.wardrobe_item_command(foreign_ws, item, 1, 'delete');
     RAISE EXCEPTION 'Foreign workspace deletion accepted';
   EXCEPTION WHEN no_data_found THEN NULL;

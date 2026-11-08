@@ -10,6 +10,8 @@ import { createWorkspaceSignedRead } from "@/lib/supabase/storage";
 import {
   startOperation,
   runOperation,
+  readOperation,
+  OperationError,
   assertWorkflowRpc,
 } from "@/features/operations/server";
 import {
@@ -22,6 +24,7 @@ import {
   normalizeAvatarItems,
   avatarRenderFingerprint,
   renderAndStoreAvatar,
+  restoreAvatarCheckpoint,
   discardPendingAvatar,
   getAvatarRenderSettings,
 } from "./image";
@@ -30,6 +33,10 @@ import { buildAvatarVisualDirection } from "./visual-direction";
 import { previewSelectionSchema, slotForPreviewItem } from "./schema";
 import type { PreviewJob } from "./preview-studio";
 import { isCurrentPreviewContext, previewJobStatus } from "./job-status";
+import {
+  reserveWorkflowProviderCall,
+  releaseWorkflowProviderCall,
+} from "@/features/operations/provider-budget";
 
 const generationInput = z.strictObject({
   draftId: z.uuid(),
@@ -202,7 +209,14 @@ export async function previewImageStatus(draftId: string) {
   let job: PreviewJob = { status: "idle" };
   let operationId = operation?.id ?? null;
   if (operation) {
-    if (operation.status === "superseded") operationId = null;
+    if (
+      operation.status === "superseded" ||
+      (operation.status === "failed" &&
+        z
+          .object({ retryable: z.literal(false) })
+          .safeParse(operation.result_ref).success)
+    )
+      operationId = null;
     job = {
       status: previewJobStatus(operation.status),
       superseded: operation.status === "superseded",
@@ -271,7 +285,10 @@ export async function previewImageStatus(draftId: string) {
   };
 }
 
-export async function generatePreviewImage(input: unknown) {
+export async function generatePreviewImage(
+  input: unknown,
+  options: { execute?: boolean } = {},
+) {
   const parsed = generationInput.parse(input);
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
@@ -336,24 +353,80 @@ export async function generatePreviewImage(input: unknown) {
         current.items,
       ),
       knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
+      reuse: !parsed.renderRequestId,
     }),
     promptVersion: FASHION_PROMPT_VERSION,
     schemaVersion: FASHION_SCHEMA_VERSION,
     model: IMAGE_MODEL,
   });
-  await runOperation(operation.id, {
-    execute: async (claim) =>
-      renderAndStoreAvatar({
-        items: z.array(z.unknown()).parse(claim.input.items),
-        preferences: claim.input.preferences,
-        renderSettings: imageRenderSettingsSchema.parse(
-          claim.input.renderSettings,
-        ),
-        reuse: !parsed.renderRequestId,
-        signal: claim.signal,
-      }),
-    commit: async (claim, output) => {
-      try {
+  if (options.execute !== false) await runPreviewOperation(operation.id);
+  return previewImageStatus(parsed.draftId);
+}
+
+export async function runPreviewOperation(operationId: string) {
+  const context = getWorkspaceDatabase();
+  requireWorkspaceWrites(context);
+  const operation = await readOperation(operationId);
+  if (operation.kind !== "preview_image" || operation.subject_type !== "draft")
+    throw new OperationError(
+      "PREVIEW_OPERATION_NOT_FOUND",
+      "This image request is unavailable.",
+      404,
+    );
+  return runOperation<Awaited<ReturnType<typeof renderAndStoreAvatar>>>(
+    operation.id,
+    {
+      checkpoint: {
+        serialize: (output) => ({
+          result: {
+            assetId: output.assetId,
+            renderFingerprint: output.renderFingerprint,
+          },
+          metadata: {},
+        }),
+        restore: async (claim, result, metadata) => {
+          const current = await readPreviewImageInputs(operation.subject_id);
+          if (
+            current.draft.revision !== claim.inputRevision ||
+            current.renderFingerprint !== claim.input.renderFingerprint
+          )
+            throw new OperationError(
+              "INPUT_SUPERSEDED",
+              "The preview inputs changed.",
+              409,
+            );
+          return restoreAvatarCheckpoint(
+            result,
+            current.renderFingerprint,
+            claim.signal,
+            metadata,
+          );
+        },
+      },
+      execute: async (claim) => {
+        const current = await readPreviewImageInputs(operation.subject_id);
+        if (
+          current.draft.revision !== claim.inputRevision ||
+          current.renderFingerprint !== claim.input.renderFingerprint
+        )
+          throw new OperationError(
+            "INPUT_SUPERSEDED",
+            "The preview inputs changed.",
+            409,
+          );
+        return renderAndStoreAvatar({
+          items: z.array(z.unknown()).parse(claim.input.items),
+          preferences: claim.input.preferences,
+          renderSettings: imageRenderSettingsSchema.parse(
+            claim.input.renderSettings,
+          ),
+          reuse: z.boolean().parse(claim.input.reuse ?? true),
+          signal: claim.signal,
+          beforeGenerate: () => reserveWorkflowProviderCall(claim),
+          afterGenerate: () => releaseWorkflowProviderCall(claim),
+        });
+      },
+      commit: async (claim, output) => {
         const { data, error } = await context.client.rpc(
           "complete_preview_operation",
           {
@@ -365,21 +438,35 @@ export async function generatePreviewImage(input: unknown) {
             p_render_fingerprint: output.renderFingerprint,
           },
         );
+        if (error?.code === "40001")
+          throw new OperationError(
+            "INPUT_SUPERSEDED",
+            "The preview inputs changed. Reopen the current preview.",
+            409,
+          );
+        if (error?.code === "23514")
+          throw new OperationError(
+            "PREVIEW_COMMIT_REJECTED",
+            "This image cannot be attached. Request a new image.",
+            409,
+          );
+        if (error?.code === "P0002")
+          throw new OperationError(
+            "PREVIEW_COMMIT_NOT_FOUND",
+            "This preview is unavailable. Reopen your saved selection.",
+            404,
+          );
         if (error)
-          throw new ApiError(
-            "preview_commit_failed",
+          throw new OperationError(
+            "PREVIEW_COMMIT_FAILED",
             "The image could not be attached. Retry image.",
             503,
             true,
           );
         const committed = z.object({ status: z.string() }).parse(data);
-        if (committed.status !== "succeeded" && output.createdAsset)
+        if (["superseded", "cancelled"].includes(committed.status))
           await discardPendingAvatar(output.assetId);
-      } catch (error) {
-        if (output.createdAsset) await discardPendingAvatar(output.assetId);
-        throw error;
-      }
+      },
     },
-  });
-  return previewImageStatus(parsed.draftId);
+  );
 }

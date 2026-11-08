@@ -14,7 +14,7 @@ export function SavedLooksLoading({ detail = false }: { detail?: boolean }) {
       <div aria-hidden="true">
         {detail ? (
           <div className="grid items-start gap-6 md:grid-cols-[minmax(280px,420px)_minmax(0,1fr)] md:gap-8">
-            <Skeleton className="aspect-[3/4] rounded-2xl md:aspect-[2/3]" />
+            <Skeleton className="aspect-[2/3] rounded-2xl" />
             <div className="space-y-4">
               <Skeleton className="w-1/3" />
               <Skeleton className="h-12 w-3/4" />

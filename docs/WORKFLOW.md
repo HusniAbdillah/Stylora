@@ -18,7 +18,7 @@ not authorize cloud changes, deployments or paid usage by itself.
 | Repository           | Created: scaffold, CI and PR template exist. Keep the README setup steps accurate                                     | Owner 1        |
 | Database target      | One new hosted Supabase project in the Singapore region is the only runtime database                                  | Owner 1        |
 | Data isolation       | One `STYLORA_WORKSPACE_ID` per developer plus `demo` and `preview` workspaces in the same project                     | Owner 1        |
-| Background execution | Option A in section 5 for the build, Option B only if Owner 4 is ahead at the 04:00 checkpoint                        | Owners 2 and 4 |
+| Background execution | Vercel Queues with a Supabase outbox and repair schedule; optional inline or supervised worker mode; see section 5 and AI-WORKER.md | Owners 2 and 4 |
 | Streaming strategy   | Try provider streaming for 20 minutes; if strict JSON streaming fails, switch to manifest plus per-piece calls        | Owner 2        |
 | Merge windows        | Fixed windows in section 3, squash merge, main always deployable                                                      | Owner 1        |
 | Provider budget      | Cap per developer: 150 OpenAI text calls, 20 image calls, 100 SerpAPI searches; cache everything by input fingerprint | Team           |
@@ -157,10 +157,9 @@ thin route files.
 ## 5. Background work that fits seven hours
 
 PRD R04 to R06 need work to start early, run in parallel and survive
-navigation. A database row is not an executor (TDD section 8). Two honest
-options:
+navigation. A database row is not an executor (TDD section 8).
 
-**Option A, recommended for the build.** Persist an operation row (kind,
+**Inline compatibility mode.** Persist an operation row (kind,
 subject, input fingerprint, revision, status, result reference) before calling
 a provider. The client starts the operation as soon as inputs are complete,
 from a module-level store that is not tied to a page component, so client-side
@@ -172,14 +171,43 @@ next visit restarts it. This survives page changes and tab switches inside the
 app; it does not survive a server function crash. Record that limitation in
 PROGRESS-NEW.md; do not describe it as a durable queue.
 
-**Option B, target if time allows.** Supabase Queues with a dedicated worker
-or an Edge Function consumer, as specified in TDD section 8.2. Start only if
-Option A is merged and green at the 04:00 checkpoint.
+**Queue deployment.** Set `STYLORA_EXECUTION_MODE=queue` using the reviewed
+`.env.production.example`. Operation allocation and its dispatch outbox entry
+commit atomically, including saved-avatar jobs. Vercel Queues invokes private
+text and image consumers after a bounded publication attempt. A due-only
+Supabase Cron repair schedule recovers lost publication and expired delivery;
+idle ticks issue no HTTP request. Browser polling only reads status. This path
+needs no VPS or permanently running Node worker. Apply the outbox migration and
+activate the private trigger, platform credentials, dedicated dispatch secret
+and repair schedule before enabling it.
+
+**Optional worker mode.** Set `STYLORA_EXECUTION_MODE=worker` in the app and a
+separately supervised `pnpm worker` process, using the same dedicated worker
+secret and workspace. The scanner invokes the authenticated internal executor
+for queued and expired-lease operations. Both processes must remain available,
+and recent heartbeats gate new allocations. This is an alternative execution
+mode, not a required host for the queue deployment.
+
+All executors use database claims, captured settings, checkpoints and fenced
+publication. The database enforces three shared text-provider slots and one
+image-provider slot per workspace across consumers; Vercel's three-text and
+one-image consumer limits supplement that bound. Eligible retries retain their
+persisted due time and paid-request caps. A checkpointed result can be replayed
+without another model call; an unknown provider response before checkpointing
+cannot guarantee exactly-once billing.
+
+Vercel Hobby needs Fluid Compute for the 300-second route budget. Free
+infrastructure quotas are finite and do not include free AI inference. The
+Production example starts at 50 text, 5 image and 30 search requests per UTC day;
+runtime defaults remain 150, 20 and 100. See `docs/AI-WORKER.md` and
+`docs/SERVERLESS-DEPLOYMENT.md` for setup, secret boundaries and deployed checks.
+Setting an environment variable or passing local tests does not establish that
+a queue consumer and repair schedule are active.
 
 Parallel calls: description and Review with confidence are two separate
 requests started together; missing-slot searches run with a pool of three;
-avatar images run one at a time per workspace. Collect results with a settle-all pattern, not a fail-fast one,
-so one failure never hides the others.
+avatar images run one at a time per workspace. Collect results with a
+settle-all pattern, not a fail-fast one, so one failure never hides the others.
 
 ## 6. Seven-hour timeline
 

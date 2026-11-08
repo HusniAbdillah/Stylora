@@ -551,6 +551,56 @@ export type Database = {
           },
         ]
       }
+      operation_result_checkpoints: {
+        Row: {
+          created_at: string
+          created_attempt: number
+          input_fingerprint: string
+          kind: string
+          metadata: Json
+          model: string
+          operation_id: string
+          prompt_version: string
+          result: Json
+          schema_version: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_attempt: number
+          input_fingerprint: string
+          kind: string
+          metadata?: Json
+          model: string
+          operation_id: string
+          prompt_version: string
+          result: Json
+          schema_version: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_attempt?: number
+          input_fingerprint?: string
+          kind?: string
+          metadata?: Json
+          model?: string
+          operation_id?: string
+          prompt_version?: string
+          result?: Json
+          schema_version?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operation_result_checkpoints_workspace_id_operation_id_fkey"
+            columns: ["workspace_id", "operation_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_operations"
+            referencedColumns: ["workspace_id", "id"]
+          },
+        ]
+      }
       outfit_option_items: {
         Row: {
           candidate_position: number
@@ -1072,6 +1122,7 @@ export type Database = {
           option_item_id: string
           option_revision: number
           provider: string
+          provider_call_count: number
           query: string
           score_version: string
           score_weights: Json
@@ -1091,6 +1142,7 @@ export type Database = {
           option_item_id: string
           option_revision: number
           provider: string
+          provider_call_count?: number
           query: string
           score_version?: string
           score_weights?: Json
@@ -1110,6 +1162,7 @@ export type Database = {
           option_item_id?: string
           option_revision?: number
           provider?: string
+          provider_call_count?: number
           query?: string
           score_version?: string
           score_weights?: Json
@@ -1369,6 +1422,65 @@ export type Database = {
           },
         ]
       }
+      workflow_dispatch_outbox: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          dispatch_generation: number
+          due_at: string
+          id: string
+          is_current: boolean
+          last_error_code: string | null
+          lease_token: string | null
+          lease_until: string | null
+          operation_id: string
+          published_at: string | null
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          dispatch_generation: number
+          due_at: string
+          id?: string
+          is_current?: boolean
+          last_error_code?: string | null
+          lease_token?: string | null
+          lease_until?: string | null
+          operation_id: string
+          published_at?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          dispatch_generation?: number
+          due_at?: string
+          id?: string
+          is_current?: boolean
+          last_error_code?: string | null
+          lease_token?: string | null
+          lease_until?: string | null
+          operation_id?: string
+          published_at?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_dispatch_outbox_workspace_id_operation_id_fkey"
+            columns: ["workspace_id", "operation_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_operations"
+            referencedColumns: ["workspace_id", "id"]
+          },
+        ]
+      }
       workflow_drafts: {
         Row: {
           asset_id: string | null
@@ -1500,6 +1612,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -1525,6 +1638,7 @@ export type Database = {
           kind: string
           lease_until?: string | null
           model?: string | null
+          next_attempt_at?: string | null
           prompt_version?: string | null
           provider_call_count?: number
           provider_inflight?: number
@@ -1550,6 +1664,7 @@ export type Database = {
           kind?: string
           lease_until?: string | null
           model?: string | null
+          next_attempt_at?: string | null
           prompt_version?: string | null
           provider_call_count?: number
           provider_inflight?: number
@@ -1566,6 +1681,73 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "workflow_operations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_provider_daily_budgets: {
+        Row: {
+          budget_date: string
+          image_calls: number
+          search_calls: number
+          text_calls: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          budget_date: string
+          image_calls?: number
+          search_calls?: number
+          text_calls?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          budget_date?: string
+          image_calls?: number
+          search_calls?: number
+          text_calls?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_provider_daily_budgets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_worker_heartbeats: {
+        Row: {
+          active_jobs: number
+          last_seen_at: string
+          version: string
+          worker_id: string
+          workspace_id: string
+        }
+        Insert: {
+          active_jobs: number
+          last_seen_at?: string
+          version: string
+          worker_id: string
+          workspace_id: string
+        }
+        Update: {
+          active_jobs?: number
+          last_seen_at?: string
+          version?: string
+          worker_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_worker_heartbeats_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1843,6 +2025,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -1863,11 +2046,71 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      checkpoint_workflow_result: {
+        Args: {
+          p_attempt: number
+          p_input_fingerprint: string
+          p_metadata?: Json
+          p_operation_id: string
+          p_result: Json
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          created_attempt: number
+          input_fingerprint: string
+          kind: string
+          metadata: Json
+          model: string
+          operation_id: string
+          prompt_version: string
+          result: Json
+          schema_version: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "operation_result_checkpoints"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      claim_workflow_dispatches: {
+        Args: {
+          p_lease_seconds?: number
+          p_limit?: number
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          created_at: string
+          dispatch_generation: number
+          due_at: string
+          id: string
+          is_current: boolean
+          last_error_code: string | null
+          lease_token: string | null
+          lease_until: string | null
+          operation_id: string
+          published_at: string | null
+          state: string
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "workflow_dispatch_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       claim_workflow_operation: {
         Args: {
+          p_image_daily_limit?: number
           p_input_revision: number
           p_lease_seconds?: number
           p_operation_id: string
+          p_text_daily_limit?: number
           p_workspace_id: string
         }
         Returns: {
@@ -1882,6 +2125,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -1925,6 +2169,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -1966,6 +2211,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -2007,6 +2253,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -2045,6 +2292,49 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
+          prompt_version: string | null
+          provider_call_count: number
+          provider_inflight: number
+          provider_request_id: string | null
+          result_ref: Json | null
+          safe_error_code: string | null
+          schema_version: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_operations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      defer_workflow_operation: {
+        Args: {
+          p_attempt_count: number
+          p_input_fingerprint: string
+          p_operation_id: string
+          p_retry_after_seconds?: number
+          p_safe_error_code: string
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cancel_requested_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input: Json
+          input_fingerprint: string
+          input_revision: number
+          kind: string
+          lease_until: string | null
+          model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -2106,6 +2396,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -2136,6 +2427,37 @@ export type Database = {
         }
         Returns: undefined
       }
+      finish_workflow_dispatch: {
+        Args: {
+          p_error_code?: string
+          p_lease_token: string
+          p_outbox_id: string
+          p_success: boolean
+          p_workspace_id: string
+        }
+        Returns: {
+          attempt_count: number
+          created_at: string
+          dispatch_generation: number
+          due_at: string
+          id: string
+          is_current: boolean
+          last_error_code: string | null
+          lease_token: string | null
+          lease_until: string | null
+          operation_id: string
+          published_at: string | null
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_dispatch_outbox"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       finish_workflow_operation: {
         Args: {
           p_attempt_count: number
@@ -2158,6 +2480,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -2187,6 +2510,31 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      reconcile_workflow_dispatches: {
+        Args: { p_limit?: number; p_workspace_id: string }
+        Returns: number
+      }
+      record_workflow_worker_heartbeat: {
+        Args: {
+          p_active_jobs: number
+          p_version: string
+          p_worker_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          active_jobs: number
+          last_seen_at: string
+          version: string
+          worker_id: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_worker_heartbeats"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       regenerate_saved_look_media: {
         Args: {
@@ -2221,6 +2569,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      release_workflow_provider_call: {
+        Args: {
+          p_attempt: number
+          p_input_fingerprint: string
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       reserve_create_provider_call: {
         Args: {
           p_attempt: number
@@ -2229,10 +2586,29 @@ export type Database = {
         }
         Returns: undefined
       }
+      reserve_shopping_provider_call: {
+        Args: {
+          p_daily_limit?: number
+          p_search_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       reserve_wardrobe_provider_call: {
         Args: {
           p_attempt: number
           p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      reserve_workflow_provider_call: {
+        Args: {
+          p_attempt: number
+          p_image_daily_limit?: number
+          p_input_fingerprint: string
+          p_operation_id: string
+          p_text_daily_limit?: number
           p_workspace_id: string
         }
         Returns: undefined
@@ -2275,6 +2651,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -2433,6 +2810,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -2475,6 +2853,7 @@ export type Database = {
           kind: string
           lease_until: string | null
           model: string | null
+          next_attempt_at: string | null
           prompt_version: string | null
           provider_call_count: number
           provider_inflight: number
@@ -2494,6 +2873,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      stylora_create_draft_active: {
+        Args: { p_draft_id?: string; p_look_id: string; p_workspace_id: string }
+        Returns: boolean
+      }
+      stylora_enqueue_workflow_dispatch: {
+        Args: {
+          p_force?: boolean
+          p_operation_id: string
+          p_workspace_id: string
+        }
+        Returns: string
       }
       stylora_record_operation_event: {
         Args: {
@@ -2526,6 +2917,10 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: number
+      }
+      stylora_workflow_retryable_code: {
+        Args: { p_code: string }
+        Returns: boolean
       }
       wardrobe_draft_command: {
         Args: {
@@ -2709,3 +3104,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

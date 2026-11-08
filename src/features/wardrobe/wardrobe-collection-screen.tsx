@@ -12,13 +12,11 @@ import {
   WARDROBE_RETURN_SCROLL_KEY,
   WARDROBE_RETURN_URL_KEY,
 } from "./wardrobe-navigation";
+import { wardrobeChanged, wardrobeRequest } from "./client";
 import {
-  displayWardrobeItem,
-  wardrobeChanged,
-  wardrobeRequest,
-  type WardrobeDisplayItem,
-} from "./client";
-type WardrobeRecord = ReturnType<typeof displayWardrobeItem>;
+  matchesWardrobeCollectionQuery,
+  type WardrobeCollectionItem,
+} from "./collection";
 import {
   wardrobeCategories,
   type WardrobeCategory,
@@ -79,7 +77,7 @@ function updateView(patch: Partial<WardrobeView>) {
   window.dispatchEvent(new Event(viewEvent));
 }
 
-function categoryCounts(records: readonly WardrobeRecord[]) {
+function categoryCounts(records: readonly WardrobeCollectionItem[]) {
   const counts = Object.fromEntries(
     wardrobeCategories
       .filter((category) => category.id !== "all")
@@ -89,17 +87,6 @@ function categoryCounts(records: readonly WardrobeRecord[]) {
   return counts;
 }
 
-function matchesQuery(item: WardrobeRecord, query: string) {
-  const text = [
-    item.name,
-    item.subcategory ?? "",
-    ...item.fields.flatMap((field) => [field.label, field.value]),
-  ]
-    .join(" ")
-    .toLocaleLowerCase();
-  return text.includes(query.trim().toLocaleLowerCase());
-}
-
 export function WardrobeCollectionScreen({
   initialSearch = "",
   initialItems = [],
@@ -107,7 +94,7 @@ export function WardrobeCollectionScreen({
   writesEnabled = false,
 }: {
   initialSearch?: string;
-  initialItems?: WardrobeDisplayItem[];
+  initialItems?: WardrobeCollectionItem[];
   initialError?: string;
   writesEnabled?: boolean;
 }) {
@@ -118,19 +105,17 @@ export function WardrobeCollectionScreen({
     () => initialSearch,
   );
   const view = parseView(search);
-  const [records, setRecords] = useState(() =>
-    initialItems.map(displayWardrobeItem),
-  );
+  const [records, setRecords] = useState(initialItems);
   const [error, setError] = useState(initialError);
   const [ready, setReady] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   async function refresh() {
     setRefreshing(true);
     try {
-      const result = await wardrobeRequest<{ items: WardrobeDisplayItem[] }>(
-        "",
+      const result = await wardrobeRequest<{ items: WardrobeCollectionItem[] }>(
+        "/collection",
       );
-      setRecords(result.items.map(displayWardrobeItem));
+      setRecords(result.items);
       setError(undefined);
     } catch (failure) {
       setError(
@@ -186,7 +171,7 @@ export function WardrobeCollectionScreen({
   const shown = statusItems.filter(
     (item) =>
       (view.category === "all" || item.category === view.category) &&
-      matchesQuery(item, view.q),
+      matchesWardrobeCollectionQuery(item, view.q),
   );
   const counts = categoryCounts(statusItems);
   const openItem = (id: string) => {

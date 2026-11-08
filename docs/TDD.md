@@ -29,7 +29,7 @@ descriptions and recommendation explanations are distinct typed objects.
 | App        | Next.js App Router, React, strict TypeScript, deployed on Vercel                                                           |
 | Validation | Zod for every request, action, query parameter and provider output                                                         |
 | Data       | Hosted Supabase PostgreSQL and private Storage through the Supabase JS client, server only                                 |
-| AI         | OpenAI API: `gpt-5-mini` for text and vision, `gpt-image-1.5` for images; server-only HTTP transport                       |
+| AI         | OpenAI API: `gpt-6-luna` with low reasoning for text and vision, `gpt-image-2.6-flare` for images; validated task overrides and server-only HTTP transport                       |
 | Shopping   | SerpAPI Google Shopping                                                                                                    |
 | UI         | Tailwind CSS with tokens from the Figma `Stylora / Light` collection, Radix primitives, Motion, Inter and Instrument Serif |
 | Checks     | ESLint, TypeScript, Vitest, Prettier; GitHub Actions on every pull request                                                 |
@@ -134,7 +134,7 @@ explicit adapter.
 ### Shopping, saving and sharing
 
 | Method and path                                                  | Input                                                  | Behavior                                                             |
-| ---------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------- |
+| ----------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------- |
 | POST `/api/looks/[lookId]/products/search`                       | `optionId`, `optionItemId`, optional query and weights | One slot per request; the orchestrator runs slots in parallel        |
 | GET `/api/looks/[lookId]/products`                               | `optionId`                                             | Cached results per slot, factors, score version                      |
 | PUT `/api/looks/[lookId]/selection`                              | `optionId`, `expectedRevision`, slot choices           | Atomic per-slot selection; selection never creates ownership         |
@@ -259,29 +259,63 @@ and fingerprint makes starts idempotent.
 
 ### 8.2 Execution decision
 
-The build uses Option A from WORKFLOW.md section 5: the operation row is
-created first, the client starts the request from a module-level store, the
-route handler awaits the provider within its time budget and commits the
-validated result; leases restart abandoned work on the next visit. This
-survives in-app navigation, not a server crash. Option B, Supabase Queues with
-a dedicated consumer ([Supabase Queues](https://supabase.com/docs/guides/queues)),
-is the durable target if time allows. Never return success while relying on an
-un-awaited promise, and never treat a queued row as running work.
+`STYLORA_EXECUTION_MODE=inline` retains the request executor for compatibility.
+`queue` is the serverless deployment path. Allocation commits the operation and
+a transactional dispatch outbox entry, then returns HTTP 202. A bounded
+post-response dispatch attempt publishes operation references to private Vercel
+Queues consumers. Supabase Cron reconciles persisted outbox state each minute
+and invokes the protected repair endpoint only when a current dispatch is due;
+idle ticks remain SQL-only. A lost callback or queue publication does not erase
+the committed dispatch intent. No always-on worker host is required.
+
+`worker` remains an optional executor for local or supervised environments. A
+separate Node process scans queued and expired-lease operations and invokes the
+authenticated internal executor. Worker readiness requires a recent heartbeat.
+Queue readiness requires both deployment credentials and the dedicated dispatch
+repair secret. The browser only reads progress in both background modes;
+closing it does not stop the deployed executor.
+
+All modes use the existing database claim, input and source-revision checks,
+provider quotas, checkpoints and fenced commit. The database enforces three
+shared text-provider slots and one image-provider slot per workspace across
+Create, wardrobe, Capsule and avatar consumers. Platform consumer concurrency
+is an additional limit, not the shared authority. Cache reuse and validated
+checkpoint replay do not reserve another paid provider call.
+
+The route budget is 300 seconds, the database lease is 280 seconds and provider
+work has a shorter 240-second deadline. Vercel Hobby requires Fluid Compute for
+the 300-second Function limit; queue visibility renewal cannot extend it.
+Retryable failures follow persisted eligibility, due times and bounded provider
+attempts. Budget exhaustion waits until the next UTC day. Invalid input,
+refusals and stale dependencies are not silently replayed. Queue delivery is
+at least once; interrupted provider billing cannot be guaranteed exactly once.
+
+Apply the reviewed outbox migration and activate the private trigger, dedicated
+secret and due-only repair schedule before enabling queue mode. Configuration
+alone is not deployed completion evidence. See `docs/AI-WORKER.md` and
+`docs/SERVERLESS-DEPLOYMENT.md` for setup, finite free-tier quotas, recovery and
+the unrun deployment checks. Never treat a queued row as an executor.
 
 ### 8.3 Readiness and task graph
 
 | Operation                 | Complete input required                   | Earliest start               | Parallel with               |
 | ------------------------- | ----------------------------------------- | ---------------------------- | --------------------------- |
-| `inspiration_description` | Verified upload, stable occasion          | Upload verified              | Confidence review           |
-| `inspiration_confidence`  | Same image, occasion, preference snapshot | Upload verified              | Description                 |
+| `inspiration_description` | Verified upload, stable optional occasion | Upload verified              | Confidence review           |
+| `inspiration_confidence`  | Same image, optional occasion, preferences | Upload verified              | Description                 |
 | `wardrobe_match`          | Accepted piece revision, owned inventory  | Stable review, no dirty edit | Confidence may still run    |
-| `outfit_options`          | Matches, pieces, inventory, preferences   | Match committed              | —                           |
+| `outfit_options`          | Matches, pieces, inventory, preferences   | Matches ready, Match open              | —                           |
 | `option_regeneration`     | One option type and current context       | Suggest another              | Other options stay usable   |
 | `marketplace_search`      | Missing-slot brief, region, query         | Options committed            | Each slot, pool of three    |
 | `wardrobe_description`    | Verified draft image                      | Upload verified              | —                           |
 | `capsule_generation`      | Complete brief and selected owned items   | Wizard inputs stable         | —                           |
 | `preview_image`           | Valid selection and preference snapshot   | Selection stable             | One image job per workspace |
 | `saved_avatar`            | Committed snapshot                        | Save transaction             | Save is already complete    |
+
+Matching may prefetch during Review once a complete revision has no dirty edit.
+Allocate new outfit generation only while on Wardrobe match, Outfit ideas or
+Outfit details, with current matches and no pending upload, context save or
+piece edit. Returning to Review pauses new outfit allocations. Existing jobs
+continue, and saved drafts and results remain available during navigation.
 
 No task starts on an empty form, each keystroke, hover or unverified upload.
 Clicking the forward action navigates and ensures one operation exists; it never

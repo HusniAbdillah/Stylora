@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { marketplaceMetadata, type MarketplaceMetadata } from "./catalog";
+import { toWardrobeCollectionItem } from "./collection";
 import { ApiError } from "@/lib/api";
 import {
   getWorkspaceDatabase,
@@ -540,9 +541,14 @@ export async function saveWardrobeEditor(id: string, input: unknown) {
   ).draft;
 }
 
+export async function listWardrobeCollection(input: unknown = {}) {
+  const result = await listWardrobeItems(input);
+  return { ...result, items: result.items.map(toWardrobeCollectionItem) };
+}
+
 export async function wardrobePageState() {
   try {
-    return { ...(await listWardrobeItems()), error: undefined };
+    return { ...(await listWardrobeCollection()), error: undefined };
   } catch {
     return {
       items: [],

@@ -11,8 +11,8 @@ BEGIN
   op := public.start_workflow_operation(w,'saved_avatar','saved_look',s,1,repeat('d',64));
   INSERT INTO public.saved_look_media(id,workspace_id,saved_look_id,operation_id,preference_snapshot_hash)
   VALUES(m,w,s,op.id,repeat('a',64));
-  UPDATE public.workflow_operations SET status='failed',completed_at=now(),attempt_count=1 WHERE workspace_id=w AND id=op.id;
-  UPDATE public.saved_look_media SET status='failed' WHERE workspace_id=w AND id=m;
+  op := public.claim_workflow_operation(w,op.id,1);
+  op := public.finish_workflow_operation(w,op.id,op.attempt_count,op.input_fingerprint,'failed','{"retryable":true}','PROVIDER_TIMEOUT');
   retried := public.retry_saved_look_media(w,s);
   IF retried.id<>m OR retried.operation_id<>op.id OR retried.status<>'queued' THEN RAISE EXCEPTION 'Retry identity failed'; END IF;
   retried := public.retry_saved_look_media(w,s);

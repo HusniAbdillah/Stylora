@@ -20,6 +20,7 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/storage", () => ({
   createWorkspaceSignedUpload: vi.fn(),
   verifyWorkspaceStorageAsset: vi.fn(),
+  readVerifiedWorkspaceStorageAsset: vi.fn(),
 }));
 vi.mock("./visual-direction", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./visual-direction")>();
@@ -32,9 +33,11 @@ vi.mock("./visual-direction", async (importOriginal) => {
 import {
   avatarRenderFingerprint,
   getAvatarRenderSettings,
+  restoreAvatarCheckpoint,
   type AvatarItem,
 } from "./image";
 import { buildAvatarVisualDirection } from "./visual-direction";
+import { readVerifiedWorkspaceStorageAsset } from "@/lib/supabase/storage";
 
 afterEach(() => vi.clearAllMocks());
 const shirt: AvatarItem = {
@@ -186,5 +189,107 @@ describe("avatar render fingerprints", () => {
     expect(avatarRenderFingerprint(outfit, preferences, medium)).not.toBe(
       avatarRenderFingerprint(outfit, preferences, high),
     );
+  });
+});
+
+describe("avatar image checkpoints", () => {
+  const result = {
+    assetId: "ae781e34-b315-44a5-abfe-0c6c074a49c8",
+    renderFingerprint: "a".repeat(64),
+  };
+  const signal = new AbortController().signal;
+  const verified = {
+    ...result,
+    bucket: "previews" as const,
+    storagePath: "workspace/preview.png",
+    mimeType: "image/png" as const,
+    byteSize: 4,
+    width: 1024,
+    height: 1536,
+    bytes: new Uint8Array([137, 80, 78, 71]),
+  };
+
+  it("restores only verified private image bytes without creating another asset", async () => {
+    vi.mocked(readVerifiedWorkspaceStorageAsset).mockResolvedValueOnce(
+      verified,
+    );
+    await expect(
+      restoreAvatarCheckpoint(result, result.renderFingerprint, signal, {}),
+    ).resolves.toEqual({ ...result, createdAsset: false });
+    expect(readVerifiedWorkspaceStorageAsset).toHaveBeenCalledWith(
+      result.assetId,
+      { signal },
+    );
+  });
+
+  it.each([
+    [{ ...result, createdAsset: true }, {}, "AVATAR_CHECKPOINT_UNUSABLE"],
+    [result, { signedUrl: "forbidden" }, "AVATAR_CHECKPOINT_UNUSABLE"],
+    [{ ...result, renderFingerprint: "b".repeat(64) }, {}, "INPUT_SUPERSEDED"],
+  ])(
+    "rejects incompatible or stale checkpoints before reading storage",
+    async (saved, metadata, code) => {
+      await expect(
+        restoreAvatarCheckpoint(
+          saved,
+          result.renderFingerprint,
+          signal,
+          metadata,
+        ),
+      ).rejects.toMatchObject({ code, status: 409, retryable: false });
+      expect(readVerifiedWorkspaceStorageAsset).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { bucket: "wardrobe" as const },
+    { mimeType: "image/jpeg" as const },
+  ])(
+    "rejects a verified asset outside generated private PNG output",
+    async (override) => {
+      vi.mocked(readVerifiedWorkspaceStorageAsset).mockResolvedValueOnce({
+        ...verified,
+        ...override,
+      });
+      await expect(
+        restoreAvatarCheckpoint(result, result.renderFingerprint, signal),
+      ).rejects.toMatchObject({
+        code: "AVATAR_CHECKPOINT_UNUSABLE",
+        status: 409,
+      });
+    },
+  );
+
+  it("keeps transport failures retryable while treating missing or foreign assets as unusable", async () => {
+    vi.mocked(readVerifiedWorkspaceStorageAsset).mockRejectedValueOnce({
+      upstreamStatus: 503,
+    });
+    await expect(
+      restoreAvatarCheckpoint(result, result.renderFingerprint, signal),
+    ).rejects.toMatchObject({ code: "PROVIDER_SERVER_ERROR", retryable: true });
+    vi.mocked(readVerifiedWorkspaceStorageAsset).mockRejectedValueOnce({
+      code: "INVALID_STORAGE_ASSET",
+    });
+    await expect(
+      restoreAvatarCheckpoint(result, result.renderFingerprint, signal),
+    ).rejects.toMatchObject({
+      code: "AVATAR_CHECKPOINT_UNUSABLE",
+      status: 409,
+      retryable: false,
+    });
+  });
+
+  it("preserves an expired read deadline without marking its stored image unusable", async () => {
+    const controller = new AbortController();
+    const timeout = new DOMException("Read timed out", "TimeoutError");
+    controller.abort(timeout);
+    vi.mocked(readVerifiedWorkspaceStorageAsset).mockRejectedValueOnce(timeout);
+    await expect(
+      restoreAvatarCheckpoint(
+        result,
+        result.renderFingerprint,
+        controller.signal,
+      ),
+    ).rejects.toBe(timeout);
   });
 });

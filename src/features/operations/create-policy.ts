@@ -1,8 +1,13 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Json } from "@/types/database";
+import {
+  fashionTaskSettingsSchema,
+  type FashionTaskSettings,
+} from "@/lib/ai/task-settings";
+import { fingerprintOperationInput } from "./fingerprint";
+import { isRetryableCreateFailureCode } from "./create-failure";
 
-export const CREATE_RUNTIME_VERSION = "owner2-create.v6";
+export const CREATE_RUNTIME_VERSION = "owner2-create.v10";
 export const createKindSchema = z.enum([
   "inspiration_description",
   "inspiration_confidence",
@@ -11,6 +16,66 @@ export const createKindSchema = z.enum([
   "option_regeneration",
 ]);
 export type CreateKind = z.infer<typeof createKindSchema>;
+
+export function createResultMatchesRuntime(
+  metadata: unknown,
+  settings: FashionTaskSettings,
+  versions: {
+    promptAssemblyHash: string;
+    promptVersion: string;
+    schemaVersion: string;
+  },
+) {
+  const parsed = z
+    .object({
+      providerSettings: fashionTaskSettingsSchema,
+      model: z.string(),
+      promptAssemblyHash: z.string(),
+      promptVersion: z.string(),
+      schemaVersion: z.string(),
+      handlerVersion: z.literal(CREATE_RUNTIME_VERSION),
+    })
+    .safeParse(metadata);
+  return (
+    parsed.success &&
+    parsed.data.model === settings.model &&
+    fingerprintOperationInput(parsed.data) ===
+      fingerprintOperationInput({
+        providerSettings: settings,
+        model: settings.model,
+        promptAssemblyHash: versions.promptAssemblyHash,
+        promptVersion: versions.promptVersion,
+        schemaVersion: versions.schemaVersion,
+        handlerVersion: CREATE_RUNTIME_VERSION,
+      })
+  );
+}
+
+export function matchesCoverCurrentInput(
+  rows: { piece_id: string; input_metadata: unknown }[],
+  pieceIds: string[],
+  expected: {
+    inventoryMode: "sample" | "live" | "combined";
+    inventoryFingerprint: string;
+    preferenceFingerprint: string;
+  },
+) {
+  const metadata = z.object({
+    inventoryMode: z.literal(expected.inventoryMode),
+    inventoryFingerprint: z.literal(expected.inventoryFingerprint),
+    preferenceFingerprint: z.literal(expected.preferenceFingerprint),
+  });
+  return (
+    rows.length === pieceIds.length &&
+    rows.length > 0 &&
+    new Set(rows.map((row) => row.piece_id)).size === pieceIds.length &&
+    rows.every(
+      (row) =>
+        pieceIds.includes(row.piece_id) &&
+        metadata.safeParse(row.input_metadata).success,
+    )
+  );
+}
 
 export function createInputSnapshot(input: {
   kind: CreateKind;
@@ -33,6 +98,8 @@ export function createInputSnapshot(input: {
   };
   optionType?: string;
   intentId?: string;
+  draftId?: string;
+  providerSettings?: FashionTaskSettings;
 }): Record<string, Json> {
   const snapshot: Record<string, Json> = {
     lookId: input.look.id,
@@ -64,6 +131,9 @@ export function createInputSnapshot(input: {
     snapshot.pieces = z.json().parse(input.pieces);
   }
   if (input.optionType) snapshot.optionType = input.optionType;
+  if (input.draftId) snapshot.draftId = input.draftId;
+  if (input.providerSettings)
+    snapshot.providerSettings = z.json().parse(input.providerSettings);
   if (input.intentId) snapshot.intentId = input.intentId;
   return snapshot;
 }
@@ -76,19 +146,15 @@ export function createOperationFingerprint(input: {
   subjectId: string;
   revision: number;
 }) {
-  return createHash("sha256")
-    .update(
-      JSON.stringify({
-        kind: input.kind,
-        input: input.input,
-        versions: input.versions,
-        handlerVersion: CREATE_RUNTIME_VERSION,
-        model: input.model,
-        subjectId: input.subjectId,
-        revision: input.revision,
-      }),
-    )
-    .digest("hex");
+  return fingerprintOperationInput({
+    kind: input.kind,
+    input: input.input,
+    versions: input.versions,
+    handlerVersion: CREATE_RUNTIME_VERSION,
+    model: input.model,
+    subjectId: input.subjectId,
+    revision: input.revision,
+  });
 }
 
 type OperationPolicyInput = {
@@ -98,11 +164,13 @@ type OperationPolicyInput = {
   attempt_count: number;
   provider_call_count: number;
   result_ref: unknown;
+  safe_error_code?: string | null;
 };
 
 export function createOperationPolicy(
   op: OperationPolicyInput,
   currentFingerprint: string | null,
+  now = Date.now(),
 ) {
   const captured = z
     .object({
@@ -110,8 +178,15 @@ export function createOperationPolicy(
       runtimeVersion: z.string().optional(),
     })
     .safeParse(op.input);
-  const retryable = z
-    .object({ retryable: z.literal(true) })
+  const retryable =
+    z.object({ retryable: z.literal(true) }).safeParse(op.result_ref).success &&
+    isRetryableCreateFailureCode(op.safe_error_code);
+  const deferred = z
+    .object({ retryAfter: z.iso.datetime() })
+    .safeParse(op.result_ref);
+  const retryAfter = deferred.success ? deferred.data.retryAfter : null;
+  const checkpointed = z
+    .object({ checkpointed: z.literal(true) })
     .safeParse(op.result_ref).success;
   const terminal = ["succeeded", "failed", "cancelled", "superseded"].includes(
     op.status,
@@ -130,11 +205,13 @@ export function createOperationPolicy(
             ? "input_changed"
             : op.attempt_count >= 3
               ? "attempt_limit"
-              : op.provider_call_count >= 3
+              : op.provider_call_count >= 3 && !checkpointed
                 ? "provider_call_limit"
                 : !retryable
                   ? "non_retryable"
-                  : null;
+                  : retryAfter && Date.parse(retryAfter) > now
+                    ? "retry_backoff"
+                    : null;
   return {
     assetId: captured.success ? (captured.data.assetId ?? null) : null,
     runtimeVersion,
@@ -142,6 +219,7 @@ export function createOperationPolicy(
     currentInputFingerprint: currentFingerprint,
     canRetry: retryBlockedReason === null,
     retryBlockedReason,
+    retryAfter,
     canRestart:
       terminal &&
       currentFingerprint !== null &&

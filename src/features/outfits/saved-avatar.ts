@@ -5,21 +5,43 @@ import {
   IMAGE_MODEL,
   AVATAR_PROMPT_VERSION as FASHION_PROMPT_VERSION,
   FASHION_SCHEMA_VERSION,
+  FASHION_KNOWLEDGE_VERSION,
 } from "@/features/ai/openai";
 import {
   assertWorkflowRpc,
   readOperation,
   runOperation,
   OperationError,
+  failOperation,
+  type OperationClaim,
 } from "@/features/operations/server";
 import {
   renderAndStoreAvatar,
   discardPendingAvatar,
   getAvatarRenderSettings,
   normalizeAvatarItems,
+  restoreAvatarCheckpoint,
+  avatarRenderFingerprint,
 } from "@/features/preview/image";
 import { imageRenderSettingsSchema } from "@/features/ai/image-settings";
-import { buildAvatarVisualDirection } from "@/features/preview/visual-direction";
+import {
+  avatarVisualDirectionSchema,
+  buildAvatarVisualDirection,
+} from "@/features/preview/visual-direction";
+import {
+  reserveWorkflowProviderCall,
+  releaseWorkflowProviderCall,
+} from "@/features/operations/provider-budget";
+
+const renderContextSchema = z.strictObject({
+  version: z.literal("saved-avatar-render.v1"),
+  model: z.string().min(1),
+  promptVersion: z.string().min(1),
+  schemaVersion: z.string().min(1),
+  knowledgeVersion: z.string().min(1),
+  renderSettings: imageRenderSettingsSchema,
+  visualDirection: avatarVisualDirectionSchema,
+});
 
 const avatarInputSchema = z
   .object({
@@ -63,52 +85,197 @@ export async function runSavedAvatar(operationId: string) {
   const items = normalizeAvatarItems(
     z.array(z.record(z.string(), z.unknown())).min(1).parse(snapshot.items),
   );
+  const preferences = snapshot.preference_snapshot;
   await assertWorkflowRpc("complete_saved_avatar");
-  return runOperation(operation.id, {
-    execute: async (claim) => {
-      const reuse = shouldReuseSavedAvatar(claim.input);
-      const renderSettings = imageRenderSettingsSchema.parse(
-        claim.input.renderSettings ?? getAvatarRenderSettings(),
-      );
-      const visualDirection = buildAvatarVisualDirection(
-        snapshot.preference_snapshot,
-        items,
-      );
-      const { data, error } = await context.client
-        .from("workflow_operations")
-        .update({
-          model: IMAGE_MODEL,
-          prompt_version: FASHION_PROMPT_VERSION,
-          schema_version: FASHION_SCHEMA_VERSION,
-          input: z.record(z.string(), z.json()).parse({
-            ...claim.input,
-            visualDirection,
-            renderSettings,
-          }),
-        })
+  let renderContext: z.infer<typeof renderContextSchema> | undefined;
+  async function resolveRenderContext(
+    claim: OperationClaim,
+    allowCapture: boolean,
+  ) {
+    const visualDirection = buildAvatarVisualDirection(preferences, items);
+    const current = await readOperation(claim.operationId);
+    let captured: unknown = current.result_ref?.renderContext;
+    if (!captured) {
+      const history = await context.client
+        .from("workflow_operation_events")
+        .select("payload")
         .eq("workspace_id", context.workspaceId)
-        .eq("id", claim.operationId)
-        .eq("attempt_count", claim.attemptCount)
-        .eq("status", "running")
-        .select("id")
+        .eq("operation_id", claim.operationId)
+        .eq("source_revision", claim.inputRevision)
+        .eq("event_type", "started")
+        .contains("payload", { inputFingerprint: claim.inputFingerprint })
+        .order("sequence", { ascending: true })
+        .limit(1)
         .maybeSingle();
-      if (error || !data)
+      if (history.error)
         throw new OperationError(
-          "AVATAR_OPERATION_CHANGED",
-          "The image request changed. Reopen the saved look.",
-          409,
+          "AVATAR_CONTEXT_UNAVAILABLE",
+          "The captured image settings are unavailable.",
         );
-      return renderAndStoreAvatar({
-        items,
-        preferences: snapshot.preference_snapshot,
-        allowIllustrativeItems: true,
-        reuse,
-        signal: claim.signal,
-        renderSettings,
-      });
-    },
-    async commit(claim, output) {
-      try {
+      captured = z
+        .object({ savedAvatarRenderContext: z.unknown().optional() })
+        .parse(history.data?.payload ?? {}).savedAvatarRenderContext;
+    }
+    if (!captured && (!allowCapture || claim.attemptCount > 1))
+      throw new OperationError(
+        "AVATAR_CONTEXT_UNAVAILABLE",
+        "Create a new image request to capture its settings.",
+        409,
+      );
+    const parsedContext = renderContextSchema.safeParse(
+      captured ?? {
+        version: "saved-avatar-render.v1",
+        model: IMAGE_MODEL,
+        promptVersion: FASHION_PROMPT_VERSION,
+        schemaVersion: FASHION_SCHEMA_VERSION,
+        knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
+        renderSettings: claim.input.renderSettings ?? getAvatarRenderSettings(),
+        visualDirection,
+      },
+    );
+    if (!parsedContext.success)
+      throw new OperationError(
+        "AVATAR_RUNTIME_CHANGED",
+        "The saved image settings use an older runtime. Request a new image.",
+        409,
+      );
+    renderContext = parsedContext.data;
+    if (
+      renderContext.model !== IMAGE_MODEL ||
+      renderContext.promptVersion !== FASHION_PROMPT_VERSION ||
+      renderContext.schemaVersion !== FASHION_SCHEMA_VERSION ||
+      renderContext.knowledgeVersion !== FASHION_KNOWLEDGE_VERSION ||
+      JSON.stringify(renderContext.visualDirection) !==
+        JSON.stringify(visualDirection)
+    )
+      throw new OperationError(
+        "AVATAR_RUNTIME_CHANGED",
+        "The image runtime changed. Request a new image.",
+        409,
+      );
+    return { current, renderContext };
+  }
+  return runOperation<Awaited<ReturnType<typeof renderAndStoreAvatar>>>(
+    operation.id,
+    {
+      checkpoint: {
+        serialize: (output) => ({
+          result: {
+            assetId: output.assetId,
+            renderFingerprint: output.renderFingerprint,
+          },
+          metadata: {},
+        }),
+        restore: async (claim, result, metadata) => {
+          const captured = await resolveRenderContext(claim, false);
+          const expected = avatarRenderFingerprint(
+            items,
+            preferences,
+            captured.renderContext.renderSettings,
+          );
+          return restoreAvatarCheckpoint(
+            result,
+            expected,
+            claim.signal,
+            metadata,
+          );
+        },
+      },
+      execute: async (claim) => {
+        const reuse = shouldReuseSavedAvatar(claim.input);
+        const { current, renderContext } = await resolveRenderContext(
+          claim,
+          true,
+        );
+        const { data, error } = await context.client
+          .from("workflow_operations")
+          .update({
+            model: IMAGE_MODEL,
+            prompt_version: FASHION_PROMPT_VERSION,
+            schema_version: FASHION_SCHEMA_VERSION,
+            result_ref: z
+              .record(z.string(), z.json())
+              .parse({ ...current.result_ref, renderContext }),
+          })
+          .eq("workspace_id", context.workspaceId)
+          .eq("id", claim.operationId)
+          .eq("attempt_count", claim.attemptCount)
+          .eq("input_fingerprint", claim.inputFingerprint)
+          .eq("status", "running")
+          .gt("lease_until", new Date().toISOString())
+          .is("cancel_requested_at", null)
+          .select("id")
+          .maybeSingle();
+        if (error || !data)
+          throw new OperationError(
+            "AVATAR_OPERATION_CHANGED",
+            "The image request changed. Reopen the saved look.",
+            409,
+          );
+        const recorded = await context.client
+          .rpc("stylora_record_operation_event", {
+            p_workspace_id: context.workspaceId,
+            p_operation_id: claim.operationId,
+            p_event_type: "started",
+            p_payload: z.json().parse({
+              inputFingerprint: claim.inputFingerprint,
+              savedAvatarRenderContext: renderContext,
+            }),
+          })
+          .abortSignal(AbortSignal.timeout(15000));
+        if (recorded.error)
+          throw new OperationError(
+            "AVATAR_CONTEXT_PERSIST_FAILED",
+            "The image settings could not be captured. Request a new image.",
+            503,
+          );
+        claim.signal.throwIfAborted();
+        return renderAndStoreAvatar({
+          items,
+          preferences,
+          allowIllustrativeItems: true,
+          reuse,
+          signal: claim.signal,
+          renderSettings: renderContext.renderSettings,
+          beforeGenerate: () => reserveWorkflowProviderCall(claim),
+          afterGenerate: () => releaseWorkflowProviderCall(claim),
+        });
+      },
+      async fail(claim, failure) {
+        await failOperation(claim, failure);
+        if (!renderContext) return;
+        const finished = await readOperation(claim.operationId);
+        if (
+          finished.status !== "failed" ||
+          finished.attempt_count !== claim.attemptCount ||
+          finished.input_fingerprint !== claim.inputFingerprint
+        )
+          return;
+        const saved = await context.client
+          .from("workflow_operations")
+          .update({
+            result_ref: z
+              .record(z.string(), z.json())
+              .parse({ ...finished.result_ref, renderContext }),
+          })
+          .eq("workspace_id", context.workspaceId)
+          .eq("id", claim.operationId)
+          .eq("attempt_count", claim.attemptCount)
+          .eq("input_fingerprint", claim.inputFingerprint)
+          .eq("status", "failed")
+          .eq("updated_at", finished.updated_at)
+          .is("lease_until", null)
+          .is("cancel_requested_at", null)
+          .select("id")
+          .maybeSingle();
+        if (saved.error || !saved.data)
+          throw new OperationError(
+            "AVATAR_CONTEXT_PERSIST_FAILED",
+            "The image settings could not be preserved. Request a new image.",
+            503,
+          );
+      },
+      async commit(claim, output) {
         const { data, error } = await context.client
           .rpc("complete_saved_avatar", {
             p_workspace_id: context.workspaceId,
@@ -119,6 +286,24 @@ export async function runSavedAvatar(operationId: string) {
             p_render_fingerprint: output.renderFingerprint,
           })
           .abortSignal(AbortSignal.timeout(15000));
+        if (error?.code === "40001")
+          throw new OperationError(
+            "INPUT_SUPERSEDED",
+            "The image request changed. Reopen the saved look.",
+            409,
+          );
+        if (error?.code === "23514")
+          throw new OperationError(
+            "AVATAR_COMMIT_REJECTED",
+            "This image cannot be attached. Request a new image.",
+            409,
+          );
+        if (error?.code === "P0002")
+          throw new OperationError(
+            "AVATAR_COMMIT_NOT_FOUND",
+            "This saved image request is unavailable. Reopen the saved look.",
+            404,
+          );
         if (error)
           throw new OperationError(
             "AVATAR_COMMIT_FAILED",
@@ -127,12 +312,9 @@ export async function runSavedAvatar(operationId: string) {
             true,
           );
         const committed = z.object({ status: z.string() }).parse(data);
-        if (committed.status !== "succeeded" && output.createdAsset)
+        if (["superseded", "cancelled"].includes(committed.status))
           await discardPendingAvatar(output.assetId);
-      } catch (failure) {
-        if (output.createdAsset) await discardPendingAvatar(output.assetId);
-        throw failure;
-      }
+      },
     },
-  });
+  );
 }

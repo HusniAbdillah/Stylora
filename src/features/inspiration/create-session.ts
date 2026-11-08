@@ -543,8 +543,11 @@ export class CreateSession {
     const next = this.draftQueue
       .catch(() => undefined)
       .then(async () => {
+        if (generation !== this.generation)
+          throw new Error(
+            "The active inspiration changed. Reopen the original draft to apply this edit.",
+          );
         const draft = await this.ensureDraft();
-        this.update({ draftStatus: "saving" });
         if (
           generation !== this.generation ||
           (expectedId && draft.id !== expectedId)
@@ -552,6 +555,7 @@ export class CreateSession {
           throw new Error(
             "The active inspiration changed. Reopen the original draft to apply this edit.",
           );
+        this.update({ draftStatus: "saving" });
         try {
           const saved = await createRequest(
             `/api/workflow-drafts/${draft.id}`,
@@ -577,6 +581,12 @@ export class CreateSession {
           if (generation === this.generation)
             this.update({ draftStatus: "failed" });
           throw error;
+        } finally {
+          if (
+            generation !== this.generation &&
+            this.state.draftStatus === "saving"
+          )
+            this.update({ draftStatus: "saved" });
         }
       });
     this.draftQueue = next;
@@ -601,6 +611,21 @@ export class CreateSession {
       file.size === 0
     )
       throw new Error("Choose a JPEG, PNG or WebP image up to 10 MiB.");
+    const requestedGeneration = this.generation;
+    try {
+      let context: Promise<void>;
+      let draft: Promise<unknown>;
+      do {
+        context = this.contextQueue;
+        await context;
+        draft = this.draftQueue;
+        await draft;
+      } while (context !== this.contextQueue || draft !== this.draftQueue);
+    } catch (error) {
+      this.report(error);
+      throw error;
+    }
+    if (requestedGeneration !== this.generation) return;
     const generation = ++this.generation;
     const feedbackId = `inspiration-upload:${this.scope}:${generation}`;
     publishFeedback({
@@ -711,7 +736,7 @@ export class CreateSession {
         await this.applyOccasion(occasion);
       })
       .finally(() => {
-        if (generation === this.generation && intent === this.contextIntent)
+        if (intent === this.contextIntent)
           this.update({ contextSaving: false });
       });
     this.contextQueue = request;
@@ -750,10 +775,12 @@ export class CreateSession {
     if (existing) return existing;
     if (!force && this.prepared.has(key)) return Promise.resolve();
     this.prepared.add(key);
+    this.update({ error: null });
     const generation = this.generation;
     const request = (async () => {
       try {
         const draft = await this.ensureDraft();
+        if (generation !== this.generation) return;
         if (!draft.lookId)
           throw new Error("Verify an inspiration image first.");
         const operation = await createRequest(
@@ -773,11 +800,16 @@ export class CreateSession {
           this.state.look?.id === draft.lookId
         )
           this.mergeOperation(operation);
-        if (active(operation)) {
+        if (
+          active(operation) &&
+          generation === this.generation &&
+          this.state.look?.id === draft.lookId
+        ) {
           this.execute(operation.id, { generation, lookId: draft.lookId });
           if (generation === this.generation) this.observe(operation.id);
         }
       } catch (error) {
+        this.prepared.delete(key);
         if (generation === this.generation) this.report(error);
       } finally {
         this.starting.delete(key);
@@ -891,7 +923,10 @@ export class CreateSession {
                 const value = z
                   .object({ review: confidenceSchema })
                   .safeParse(event.payload);
-                if (value.success)
+                if (
+                  value.success &&
+                  this.currentOperation("inspiration_confidence")?.id === id
+                )
                   this.update({ provisionalConfidence: value.data.review });
               }
             }
@@ -910,10 +945,14 @@ export class CreateSession {
             if (!active(operation)) {
               if (
                 operation.kind === "inspiration_description" &&
+                this.currentOperation("inspiration_description")?.id === id &&
                 operation.status !== "failed"
               )
                 this.update({ provisional: [] });
-              if (operation.kind === "inspiration_confidence")
+              if (
+                operation.kind === "inspiration_confidence" &&
+                this.currentOperation("inspiration_confidence")?.id === id
+              )
                 this.update({ provisionalConfidence: null });
               await this.reloadLook();
               break;
@@ -1189,6 +1228,9 @@ export class CreateSession {
       (op) =>
         op.kind === kind &&
         op.runtimeVersion === op.currentRuntimeVersion &&
+        (!op.currentInputFingerprint ||
+          !op.inputFingerprint ||
+          op.currentInputFingerprint === op.inputFingerprint) &&
         op.inputRevision === this.state.look?.revision &&
         (!op.assetId ||
           op.assetId === this.state.look?.inspirationImage?.assetId) &&

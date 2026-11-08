@@ -4,6 +4,7 @@ import { capsuleBriefReady, type CapsuleDraftState } from "./schema";
 import {
   canApplyPreparation,
   capsuleAutoReady,
+  capsuleBriefReplacesResults,
   preparationBaseline,
 } from "./draft-preparation";
 import type { CapsuleItem } from "./capsule-types";
@@ -26,6 +27,27 @@ const captured: CapsuleDraftState = {
 const receipt = { capsuleId: id, capsuleRevision: 1, draftRevision: 5 };
 
 describe("capsule preparation receipts", () => {
+  it("confirms edits to the original prepared draft even when capsule and draft IDs match", () => {
+    const prepared = { ...captured, capsuleId: captured.id };
+    expect(capsuleBriefReplacesResults(prepared, captured.brief)).toBe(false);
+    expect(
+      capsuleBriefReplacesResults(
+        {
+          ...prepared,
+          brief: { ...prepared.brief, notes: "Replace these combinations" },
+        },
+        captured.brief,
+      ),
+    ).toBe(true);
+  });
+
+  it("allows first preparation and unchanged receipts while confirming an unknown recovered baseline", () => {
+    expect(capsuleBriefReplacesResults(captured)).toBe(false);
+    const prepared = { ...captured, capsuleId: receipt.capsuleId };
+    expect(capsuleBriefReplacesResults(prepared)).toBe(true);
+    expect(capsuleBriefReplacesResults(prepared, captured.brief)).toBe(false);
+  });
+
   it("keeps newer local edits while using the acknowledged server CAS baseline", () => {
     const latest = {
       ...captured,

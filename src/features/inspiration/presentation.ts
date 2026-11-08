@@ -19,6 +19,66 @@ export const label = (value: string) =>
     .replaceAll(".", " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replaceAll("_", " ");
+const inputSignalLabels = new Map<string, string>([
+  ["inspiration", "Inspiration"],
+  ["wardrobe", "Wardrobe"],
+  ["occasion", "Occasion"],
+  ["skinSwatchId", "Skin tone"],
+  ["skinSwatchHex", "Skin tone"],
+  ["undertone", "Undertone"],
+  ["contrast", "Contrast"],
+  ["bodyIllustrationGroup", "Body reference"],
+  ["bodyIllustrationId", "Body reference"],
+  ["fit", "Fit preference"],
+  ["styles", "Clothing style"],
+  ["proportions", "Proportion preference"],
+  ["colorFamilies", "Color preference"],
+  ["occasions", "Preferred occasions"],
+  ["climate", "Climate"],
+  ["coverage", "Coverage preference"],
+  ["lengths", "Length preference"],
+  ["layering", "Layering preference"],
+  ["fabricDislikes", "Fabrics to avoid"],
+  ["footwearComfort", "Footwear comfort"],
+  ["careTolerance", "Care preference"],
+]);
+
+export function presentInputSignals(
+  signals: readonly string[],
+  preferences?: PreferencesDraft,
+): string[] {
+  const supplied = preferences
+    ? new Set(
+        Object.entries(preferences)
+          .filter(([, value]) =>
+            (Array.isArray(value) ? value : [value]).some(
+              (entry) =>
+                typeof entry === "string" &&
+                entry.trim() &&
+                !["unsure", "unknown", "skip", "no preference"].includes(
+                  entry.trim().toLowerCase(),
+                ),
+            ),
+          )
+          .map(([key]) => key),
+      )
+    : null;
+  return [
+    ...new Set(
+      signals.flatMap((key) => {
+        const text = inputSignalLabels.get(key);
+        if (
+          !text ||
+          (supplied &&
+            !["inspiration", "wardrobe", "occasion"].includes(key) &&
+            !supplied.has(key))
+        )
+          return [];
+        return [text];
+      }),
+    ),
+  ];
+}
 const strings = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === "string")
@@ -111,9 +171,21 @@ export function presentConfidence(
   operation: CreateOperation | undefined,
 ): ConfidenceReview {
   const review = look?.confidenceReview;
-  if (review && !review.stale)
+  if (review)
     return {
-      status: "ready",
+      status: review.stale
+        ? operation?.status === "failed"
+          ? "failed"
+          : operation?.status === "running" || operation?.status === "partial"
+            ? "running"
+            : operation?.status === "queued"
+              ? "queued"
+              : "unavailable"
+        : "ready",
+      stale: review.stale,
+      errorMessage: review.stale
+        ? "Previous review. Refresh for the latest results."
+        : undefined,
       insights: review.insights,
       occasions: review.occasions,
       reasons: review.explanation.whyThis.map((why) => why.reason),
@@ -139,9 +211,7 @@ export function presentConfidence(
           : operation?.status === "queued"
             ? "queued"
             : "unavailable",
-    errorMessage: review?.stale
-      ? "Your inputs changed. Refresh this analysis for the current version."
-      : "Confidence review is not available for this version yet.",
+    errorMessage: "Confidence review is not available for this version yet.",
   };
 }
 
@@ -173,9 +243,14 @@ export function presentPreferences(
 export function presentMatches(
   look: CreateLook,
   mode?: "live" | "sample" | "combined",
+  includeStale = false,
 ): WardrobeMatch[] {
   return look.matches
-    .filter((match) => !match.stale && (!mode || match.inventoryMode === mode))
+    .filter(
+      (match) =>
+        (includeStale || !match.stale) &&
+        (!mode || match.inventoryMode === mode),
+    )
     .map((match) => ({
       id: match.id,
       outcome: match.outcome,
@@ -251,10 +326,13 @@ export function presentIdeas(
   look: CreateLook,
   operations: CreateOperation[],
   mode?: "live" | "sample" | "combined",
+  includeStale = false,
 ): OutfitIdea[] {
   return look.outfitOptions
     .filter(
-      (option) => !option.stale && (!mode || option.inventoryMode === mode),
+      (option) =>
+        (includeStale || !option.stale) &&
+        (!mode || option.inventoryMode === mode),
     )
     .map((option) => {
       const regeneration = operations.find(
@@ -282,7 +360,7 @@ export function presentIdeas(
         title: option.title,
         concept: option.concept,
         reasons: option.explanation.whyThis.map((reason) => reason.reason),
-        inputsUsed: option.explanation.inputsUsed.map(label),
+        inputsUsed: presentInputSignals(option.explanation.inputsUsed),
         differences: option.explanation.differences,
         uncertainty: option.explanation.uncertainty,
         pieces: option.items.map((item) => ({

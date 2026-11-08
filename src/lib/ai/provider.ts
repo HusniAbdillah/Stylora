@@ -5,6 +5,11 @@ import { ApiError } from "../api";
 import { buildFashionPrompt, type FashionTask } from "../../prompts/fashion";
 import type { Garment } from "./fashion-schema";
 import {
+  getFashionTaskSettings,
+  fashionTaskSettingsSchema,
+  type FashionTaskSettings,
+} from "./task-settings";
+import {
   PieceStreamError,
   PieceStreamParser,
   safeValidationIssues,
@@ -41,13 +46,41 @@ const responseTextSchema = z.object({
 });
 
 type ProviderUsage = z.infer<typeof responseTextSchema>["usage"];
+type ProviderReceipt = {
+  attempt: number;
+  requestId: string | null;
+  httpStatus: number | null;
+  latencyMs: number;
+  usage: ProviderUsage | null;
+  responseStatus: string | null;
+  providerCode: string | null;
+  correctionAttempt: boolean;
+};
+const receiptSchema = z.object({
+  id: z.string().optional(),
+  status: z.string().optional(),
+  usage: responseTextSchema.shape.usage,
+});
+
+function totalUsage(receipts: ProviderReceipt[]): ProviderUsage | null {
+  if (!receipts.length || receipts.some((entry) => !entry.usage)) return null;
+  return receipts.reduce(
+    (sum, entry) => ({
+      input_tokens: sum.input_tokens + entry.usage!.input_tokens,
+      output_tokens: sum.output_tokens + entry.usage!.output_tokens,
+      total_tokens: sum.total_tokens + entry.usage!.total_tokens,
+    }),
+    { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+  );
+}
 
 export type FashionRequest<T extends z.ZodType> = {
-  task: FashionTask;
+  task: Exclude<FashionTask, "preview_image">;
   schema: T;
   context: unknown;
   imageDataUrl?: string;
   onPiece?: (piece: Garment, index: number) => Promise<void> | void;
+  validate?: (data: z.output<T>) => void;
 };
 
 export type ProviderMetadata = {
@@ -64,12 +97,20 @@ export type ProviderMetadata = {
   promptAssemblyHash: string;
   attemptCount: number;
   operationId: string;
+  correctionAttemptCount: number;
+  providerSettings: FashionTaskSettings;
+  slotReleaseFailed: boolean;
+  requests: ProviderReceipt[];
+  task: FashionRequest<z.ZodType>["task"];
 };
 
 type FashionOperationContext = {
   operationId: string;
   reserveCall: () => Promise<void>;
   releaseCall: () => Promise<void>;
+  signal?: AbortSignal;
+  deadline?: number;
+  providerSettings?: FashionTaskSettings;
 };
 type ProviderFailureDetails = {
   code: string;
@@ -83,6 +124,9 @@ type ProviderFailureDetails = {
   validationIssues: Array<{ code: string; path: string }>;
   responseStatus: string | null;
   incompleteReason: string | null;
+  correctionAttempt: boolean;
+  providerSettings: FashionTaskSettings | null;
+  requests: ProviderReceipt[];
 };
 const operationScope = new AsyncLocalStorage<FashionOperationContext>();
 const failures = new WeakMap<Error, ProviderFailureDetails>();
@@ -115,6 +159,9 @@ export function safeProviderError(
       validationIssues: [],
       responseStatus: null,
       incompleteReason: null,
+      correctionAttempt: false,
+      providerSettings: null,
+      requests: [],
     }
   );
 }
@@ -137,11 +184,33 @@ function diagnosticError(
     validationIssues: [],
     responseStatus: null,
     incompleteReason: null,
+    correctionAttempt: false,
+    providerSettings: null,
+    requests: [],
     ...details,
     code,
     retryable,
   });
   return error;
+}
+
+export function fashionValidationFailure(
+  code: string,
+  issues: Array<{ code: string; path: string }>,
+) {
+  return diagnosticError(
+    code,
+    "The recommendation did not pass validation. Review the input and retry.",
+    502,
+    false,
+    {
+      providerCode: "domain_validation",
+      validationIssues: issues.slice(0, 12).map((issue) => ({
+        code: safeIdentifier(issue.code) ?? "invalid_value",
+        path: safeIdentifier(issue.path) ?? "output",
+      })),
+    },
+  );
 }
 
 export function retryAfterMilliseconds(value: string | null, now = Date.now()) {
@@ -292,6 +361,21 @@ export function parseFashionResponse<T extends z.ZodType>(
       providerCode: "response_schema",
       validationIssues: safeValidationIssues(parsed.error.issues),
     });
+  if (
+    parsed.data.status === "incomplete" &&
+    parsed.data.incomplete_details?.reason === "max_output_tokens"
+  )
+    throw diagnosticError(
+      "provider_output_limit",
+      "The analysis reached its output limit. Adjust the task settings or narrow the input before restarting.",
+      502,
+      false,
+      {
+        providerCode: "response_incomplete",
+        responseStatus: "incomplete",
+        incompleteReason: "max_output_tokens",
+      },
+    );
   if (parsed.data.status !== "completed")
     throw invalidOutput({
       providerCode: "response_incomplete",
@@ -336,6 +420,7 @@ export function parseFashionResponse<T extends z.ZodType>(
 async function readStream<T extends z.ZodType>(
   response: Response,
   request: FashionRequest<T>,
+  onResponse: (value: unknown) => void,
 ) {
   if (!response.body) throw invalidOutput();
   const reader = response.body.getReader();
@@ -369,6 +454,7 @@ async function readStream<T extends z.ZodType>(
       }
     } else if (event.type === "response.completed") {
       completion = event.response;
+      onResponse(completion);
     } else if (
       event.type === "response.refusal.delta" ||
       event.type === "response.refusal.done"
@@ -381,6 +467,7 @@ async function readStream<T extends z.ZodType>(
     } else if (
       ["response.failed", "response.incomplete"].includes(event.type)
     ) {
+      onResponse(event.response);
       parseFashionResponse(request.schema, event.response);
       throw invalidOutput({ providerCode: "stream_failed" });
     } else if (event.type === "error") {
@@ -439,8 +526,11 @@ export async function requestFashion<T extends z.ZodType>(
   }
   const key =
     process.env.OPENAI_API_KEY?.trim() || process.env.MODEL_API_KEY?.trim();
-  const model = process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
-  if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,119}$/.test(model)) {
+  const settings = scope.providerSettings
+    ? fashionTaskSettingsSchema.parse(scope.providerSettings)
+    : getFashionTaskSettings(request.task);
+  const model = settings.model;
+  if (!key) {
     throw diagnosticError(
       "provider_unavailable",
       "Fashion analysis is not configured yet. Try again after setup.",
@@ -491,14 +581,14 @@ export async function requestFashion<T extends z.ZodType>(
       image_url: request.imageDataUrl,
       detail: "auto",
     });
-  const body = JSON.stringify({
+  const requestBody = {
     model,
     instructions,
     input: [{ role: "user", content }],
-    reasoning: { effort: "low" },
+    reasoning: { effort: settings.reasoningEffort },
     store: false,
     stream: Boolean(request.onPiece),
-    max_output_tokens: 24000,
+    max_output_tokens: settings.maxOutputTokens,
     text: {
       format: {
         type: "json_schema",
@@ -507,11 +597,19 @@ export async function requestFashion<T extends z.ZodType>(
         schema: strictJsonSchema(request.schema),
       },
     },
-  });
+  };
   const started = Date.now();
-  const deadline = started + 240_000;
+  const deadline = Math.min(started + 240_000, scope.deadline ?? Infinity);
   const workspaceId = process.env.STYLORA_WORKSPACE_ID || "unconfigured";
   let provisionalOutput = false;
+  const receipts: ProviderReceipt[] = [];
+  let correction:
+    | {
+        type: "correction_attempt";
+        code: string;
+        issues: ProviderFailureDetails["validationIssues"];
+      }
+    | undefined;
   const streamingRequest = request.onPiece
     ? {
         ...request,
@@ -527,9 +625,24 @@ export async function requestFashion<T extends z.ZodType>(
     let reserved = false;
     let eligibleRetry = false;
     let failure: ApiError | undefined;
+    let validatedResult:
+      { data: z.output<T>; metadata: ProviderMetadata } | undefined;
+    let slotReleaseFailed = false;
+    let requestSent = false;
+    let responseUsage: ProviderUsage | null = null;
+    let responseStatus: string | null = null;
+    const attemptStarted = Date.now();
+    const recordEnvelope = (value: unknown) => {
+      const parsed = receiptSchema.safeParse(value);
+      if (parsed.success) {
+        responseUsage = parsed.data.usage ?? null;
+        responseStatus = safeIdentifier(parsed.data.status);
+      }
+    };
     let details: Partial<ProviderFailureDetails> = {
       attemptCount: attempt,
       operationId: scope.operationId,
+      correctionAttempt: Boolean(correction),
     };
     const remaining = deadline - Date.now();
     if (remaining <= 0) {
@@ -542,17 +655,41 @@ export async function requestFashion<T extends z.ZodType>(
         details,
       );
     }
-    const timeout = AbortSignal.timeout(Math.min(90_000, remaining));
+    const timeout = AbortSignal.any([
+      AbortSignal.timeout(Math.min(90_000, remaining)),
+      ...(scope.signal ? [scope.signal] : []),
+    ]);
     try {
+      timeout.throwIfAborted();
       await scope.reserveCall();
       reserved = true;
+      timeout.throwIfAborted();
+      requestSent = true;
       const response = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
-        body,
+        body: JSON.stringify({
+          ...requestBody,
+          input: [
+            {
+              role: "user",
+              content: [
+                ...content,
+                ...(correction
+                  ? [
+                      {
+                        type: "input_text",
+                        text: `The previous response failed deterministic validation. Return a complete corrected response using the same supplied context and schema. Do not invent evidence or remove required information. Safe validation feedback: ${JSON.stringify(correction)}`,
+                      },
+                    ]
+                  : []),
+              ],
+            },
+          ],
+        }),
         signal: timeout,
       });
       details = {
@@ -587,19 +724,30 @@ export async function requestFashion<T extends z.ZodType>(
           details,
         );
       }
-      const result = request.onPiece
-        ? await readStream(response, streamingRequest)
-        : parseFashionResponse(request.schema, await response.json());
-      return {
+      let result: ReturnType<typeof parseFashionResponse<T>>;
+      if (request.onPiece)
+        result = await readStream(response, streamingRequest, recordEnvelope);
+      else {
+        const envelope: unknown = await response.json();
+        recordEnvelope(envelope);
+        result = parseFashionResponse(request.schema, envelope);
+      }
+      request.validate?.(result.data);
+      validatedResult = {
         data: result.data,
         metadata: {
           ...versions,
+          task: request.task,
           model,
           requestId: details.requestId ?? result.responseId,
           latencyMs: Date.now() - started,
           usage: result.usage,
           attemptCount: attempt,
           operationId: scope.operationId,
+          correctionAttemptCount: correction ? 1 : 0,
+          providerSettings: settings,
+          slotReleaseFailed: false,
+          requests: [],
         },
       };
     } catch (error) {
@@ -654,14 +802,69 @@ export async function requestFashion<T extends z.ZodType>(
         retryable: failure.retryable,
       });
     } finally {
+      if (requestSent)
+        receipts.push({
+          attempt,
+          requestId: details.requestId ?? null,
+          httpStatus: details.httpStatus ?? null,
+          latencyMs: Date.now() - attemptStarted,
+          usage: responseUsage,
+          responseStatus,
+          providerCode: failure
+            ? (safeProviderError(failure)?.providerCode ?? null)
+            : null,
+          correctionAttempt: Boolean(correction),
+        });
       try {
-        if (reserved) await scope.releaseCall();
+        if (reserved) {
+          try {
+            await scope.releaseCall();
+          } catch {
+            slotReleaseFailed = true;
+          }
+        }
       } finally {
         releaseSlot();
       }
     }
+    if (validatedResult) {
+      validatedResult.metadata.slotReleaseFailed = slotReleaseFailed;
+      validatedResult.metadata.requests = [...receipts];
+      validatedResult.metadata.usage = totalUsage(receipts);
+      validatedResult.metadata.latencyMs = Date.now() - started;
+      return validatedResult;
+    }
     if (!failure) throw invalidOutput();
-    if (!eligibleRetry || provisionalOutput) throw failure;
+    failures.set(failure, {
+      ...safeProviderError(failure)!,
+      providerSettings: settings,
+      requests: [...receipts],
+    });
+    if (slotReleaseFailed) throw failure;
+    const validation = safeProviderError(failure);
+    const correctable =
+      validation?.providerCode === "domain_validation" ||
+      (failure.code === "provider_invalid_output" &&
+        ["output_schema", "invalid_json", "garment_schema"].includes(
+          validation?.providerCode ?? "",
+        ));
+    if (
+      !correction &&
+      correctable &&
+      !provisionalOutput &&
+      !timeout.aborted &&
+      attempt < 3
+    ) {
+      correction = {
+        type: "correction_attempt",
+        code: failure.code,
+        issues: validation?.validationIssues ?? [],
+      };
+      continue;
+    }
+    if (details.correctionAttempt) throw failure;
+    if (!eligibleRetry || provisionalOutput || scope.signal?.aborted)
+      throw failure;
     if (attempt === 3) {
       throw diagnosticError(
         failure.code,

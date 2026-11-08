@@ -5,6 +5,16 @@ import {
   requireWorkspaceWrites,
 } from "@/lib/supabase/server";
 import { canRetryOperationCode, OperationError } from "./errors";
+import { workflowProviderLimits } from "./limits";
+import { assertWorkflowExecutorAvailable } from "./health";
+import { scheduleWorkflowDispatch } from "./queue-wake";
+import { waitForDailyProviderBudget } from "./provider-budget";
+import {
+  checkpointOperationResult,
+  readOperationCheckpoint,
+  type OperationCheckpoint,
+  type CheckpointJson,
+} from "./checkpoints";
 import {
   operationRowSchema,
   startOperationSchema,
@@ -80,6 +90,7 @@ export async function startOperation(
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
   const request = parsed.data;
+  await assertWorkflowExecutorAvailable();
   const { data, error } = await context.client.rpc("start_workflow_operation", {
     p_workspace_id: context.workspaceId,
     p_kind: request.kind,
@@ -93,6 +104,7 @@ export async function startOperation(
     p_model: request.model,
   });
   if (error) databaseError(error.code);
+  scheduleWorkflowDispatch();
   return operationRowSchema.parse(data);
 }
 
@@ -108,6 +120,14 @@ export type OperationClaim = {
 export type OperationHandler<T> = {
   execute(claim: OperationClaim): Promise<T>;
   commit(claim: OperationClaim, output: T): Promise<void>;
+  checkpoint?: {
+    serialize(output: T): OperationCheckpoint;
+    restore(
+      claim: OperationClaim,
+      result: CheckpointJson,
+      metadata: CheckpointJson,
+    ): Promise<T>;
+  };
   fail?(claim: OperationClaim, error: OperationFailure): Promise<void>;
 };
 
@@ -115,6 +135,8 @@ type OperationFailure = {
   code: string;
   retryable: boolean;
   retryAfterSeconds?: number;
+  diagnostics?: { code: string; path: string }[];
+  checkpointed?: boolean;
 };
 
 export async function failOperation(
@@ -144,6 +166,7 @@ export async function failOperation(
       p_status: "failed",
       p_safe_error_code: code,
       p_result_ref: {
+        ...(failure.checkpointed ? { checkpointed: true } : {}),
         retryable: failure.retryable && canRetryOperationCode(code),
         ...(retrySeconds === undefined
           ? {}
@@ -157,7 +180,46 @@ export async function failOperation(
   );
   if (error?.code === "40001") return;
   if (error) databaseError(error.code);
-  operationRowSchema.parse(data);
+  const finished = operationRowSchema.parse(data);
+  if (
+    finished.status === "failed" &&
+    ["INPUT_SUPERSEDED", "CAPSULE_SUPERSEDED"].includes(code)
+  ) {
+    const { error: supersedeError } = await context.client
+      .from("workflow_operations")
+      .update({ status: "superseded", result_ref: null })
+      .eq("workspace_id", context.workspaceId)
+      .eq("id", claim.operationId)
+      .eq("attempt_count", claim.attemptCount)
+      .eq("input_fingerprint", claim.inputFingerprint)
+      .eq("status", "failed")
+      .eq("updated_at", finished.updated_at);
+    if (supersedeError) databaseError(supersedeError.code);
+    return;
+  }
+  if (finished.status === "failed" && failure.diagnostics?.length) {
+    const diagnostics = z
+      .array(
+        z.strictObject({
+          code: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,79}$/),
+          path: z.string().regex(/^[A-Za-z0-9_.\[\]]{0,160}$/),
+        }),
+      )
+      .max(10)
+      .parse(failure.diagnostics);
+    // The finish RPC deliberately strips optional failure metadata. Attach only
+    // sanitized field paths while retaining its attempt and revision fences.
+    const { error: diagnosticError } = await context.client
+      .from("workflow_operations")
+      .update({ result_ref: { ...finished.result_ref, diagnostics } })
+      .eq("workspace_id", context.workspaceId)
+      .eq("id", claim.operationId)
+      .eq("attempt_count", claim.attemptCount)
+      .eq("input_fingerprint", claim.inputFingerprint)
+      .eq("status", "failed")
+      .eq("updated_at", finished.updated_at);
+    if (diagnosticError) databaseError(diagnosticError.code);
+  }
 }
 
 export async function runOperation<T>(
@@ -176,8 +238,14 @@ export async function runOperation<T>(
     p_operation_id: existing.id,
     p_input_revision: existing.input_revision,
     p_lease_seconds: 280,
+    p_text_daily_limit: workflowProviderLimits().textDailyLimit,
+    p_image_daily_limit: workflowProviderLimits().imageDailyLimit,
   });
-  if (error?.code === "55P03") return readOperation(existing.id);
+  if (error?.code === "55P03") {
+    if (error.message === "PROVIDER_DAILY_BUDGET_EXHAUSTED")
+      await waitForDailyProviderBudget(existing);
+    return readOperation(existing.id);
+  }
   if (error) databaseError(error.code);
   const operation = operationRowSchema.parse(data);
   if (operation.status !== "running") return operation;
@@ -187,10 +255,37 @@ export async function runOperation<T>(
     inputFingerprint: operation.input_fingerprint,
     attemptCount: operation.attempt_count,
     input: operation.input,
-    signal: AbortSignal.timeout(240_000),
+    signal: AbortSignal.timeout(
+      Math.max(
+        1,
+        Math.min(
+          240_000,
+          operation.lease_until
+            ? Date.parse(operation.lease_until) - Date.now() - 40_000
+            : 240_000,
+        ),
+      ),
+    ),
   };
+  let checkpointed = false;
   try {
-    const output = await handler.execute(claim);
+    const stored = handler.checkpoint
+      ? await readOperationCheckpoint(claim)
+      : null;
+    const output =
+      stored && handler.checkpoint
+        ? await handler.checkpoint.restore(
+            claim,
+            stored.result,
+            stored.metadata,
+          )
+        : await handler.execute(claim);
+    if (handler.checkpoint && !stored)
+      await checkpointOperationResult(
+        claim,
+        handler.checkpoint.serialize(output),
+      );
+    checkpointed = !!handler.checkpoint;
     await handler.commit(claim, output);
     const committed = await readOperation(operation.id);
     if (!["succeeded", "cancelled", "superseded"].includes(committed.status)) {
@@ -202,13 +297,18 @@ export async function runOperation<T>(
   } catch (failure) {
     const providerFailure = z
       .object({
-        code: z
-          .string()
-          .regex(
-            /^OPENAI_(CONNECTION_FAILED|UNCONFIGURED|INVALID_OUTPUT|HTTP_\d{3}|IMAGE_[A-Z0-9_]{1,80})$/,
-          ),
+        code: z.string().regex(/^(OPENAI|CAPSULE)_[A-Z0-9_]{1,100}$/),
         retryable: z.boolean(),
         retryAfterSeconds: z.number().int().min(0).max(86400).optional(),
+        diagnostics: z
+          .array(
+            z.strictObject({
+              code: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,79}$/),
+              path: z.string().regex(/^[A-Za-z0-9_.\[\]]{0,160}$/),
+            }),
+          )
+          .max(10)
+          .optional(),
       })
       .safeParse(failure);
     const safeError =
@@ -217,7 +317,7 @@ export async function runOperation<T>(
         : providerFailure.success
           ? new OperationError(
               providerFailure.data.code,
-              "The image provider could not finish. Try again.",
+              "The AI provider could not finish. Check the task status.",
               503,
               providerFailure.data.retryable &&
                 canRetryOperationCode(providerFailure.data.code),
@@ -232,9 +332,17 @@ export async function runOperation<T>(
               claim.signal.aborted,
             );
     await (handler.fail ?? failOperation)(claim, {
-      code: safeError.code,
-      retryable: safeError.retryable,
+      code:
+        checkpointed && safeError.status >= 500
+          ? "CHECKPOINT_COMMIT_PENDING"
+          : safeError.code,
+      retryable:
+        checkpointed && safeError.status >= 500 ? true : safeError.retryable,
+      checkpointed,
       retryAfterSeconds: safeError.retryAfterSeconds,
+      diagnostics: providerFailure.success
+        ? providerFailure.data.diagnostics
+        : undefined,
     });
   }
   return readOperation(operation.id);

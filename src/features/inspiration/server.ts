@@ -29,8 +29,9 @@ import type { Database } from "@/types/database";
 import { getPersonalizationSnapshot } from "@/features/preferences/server";
 import { listInventory } from "@/features/matching/backend";
 import { buildFashionPrompt } from "@/prompts/fashion";
+import { getFashionTaskSettings } from "@/lib/ai/task-settings";
 import {
-  createKindSchema, createInputSnapshot, createOperationFingerprint, createOperationPolicy,
+  createKindSchema, createInputSnapshot, createOperationFingerprint, createOperationPolicy, createResultMatchesRuntime,
 } from "@/features/operations/create-policy";
 
 type PieceRow = Database["public"]["Tables"]["inspiration_pieces"]["Row"];
@@ -209,7 +210,7 @@ export function toCanonicalPiece(row: PieceRow, assetId: string | null) {
   };
 }
 
-export async function getLookContext(lookId: string) {
+export async function getLookContext(lookId: string, signal = AbortSignal.timeout(15000)) {
   uuid.parse(lookId);
   const { client, workspaceId } = getWorkspaceDatabase();
   const { data: look, error } = await client
@@ -217,7 +218,7 @@ export async function getLookContext(lookId: string) {
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("id", lookId)
-    .maybeSingle();
+    .abortSignal(signal).maybeSingle();
   if (error)
     throw new ApiError(
       "look_read_failed",
@@ -232,7 +233,7 @@ export async function getLookContext(lookId: string) {
     .eq("workspace_id", workspaceId)
     .eq("look_id", lookId)
     .is("removed_at", null)
-    .order("position");
+    .order("position").abortSignal(signal);
   if (piecesError)
     throw new ApiError(
       "pieces_read_failed",
@@ -419,13 +420,20 @@ export async function getLook(lookId: string) {
       ),
     ),
   );
-  function inputsStale(metadata: unknown, includesInventory: boolean) {
+  function inputsStale(metadata: unknown, includesInventory: boolean,
+    kind: "inspiration_confidence" | "wardrobe_match" | "outfit_options" | "option_regeneration") {
     const parsedMetadata = inputMetadataSchema.safeParse(metadata);
     if (
       !parsedMetadata.success ||
       parsedMetadata.data.preferenceFingerprint !== personalization.fingerprint
     )
       return true;
+    try {
+      if (!createResultMatchesRuntime(metadata, getFashionTaskSettings(kind), buildFashionPrompt(kind).versions))
+        return true;
+    } catch {
+      return true;
+    }
     if (!includesInventory) return false;
     const mode = parsedMetadata.data.inventoryMode;
     return (
@@ -439,23 +447,29 @@ export async function getLook(lookId: string) {
       lookId: z.literal(look.id), inventoryMode: z.enum(["sample", "live", "combined"]),
       optionType: z.enum(["closest", "from_wardrobe", "fresh_alternative"]).optional(),
       intentId: z.uuid().optional(),
+      draftId: z.uuid().optional(),
     }).safeParse(operation.input);
     const kind = createKindSchema.safeParse(operation.kind);
     let currentFingerprint: string | null = null;
-    if (captured.success && kind.success && look.source_type !== "sample" && inspirationImage?.status === "ready" && look.occasion?.trim()) {
+    if (captured.success && kind.success && look.source_type !== "sample" && inspirationImage?.status === "ready") {
       const needsPieces = ["wardrobe_match", "outfit_options", "option_regeneration"].includes(kind.data);
       const inventory = currentInventory.get(captured.data.inventoryMode);
       const option = captured.data.optionType
         ? options.data?.find((entry) => entry.option_type === captured.data.optionType)
         : undefined;
       if ((!needsPieces || (pieces.length > 0 && inventory)) && (!captured.data.optionType || option)) {
-        const input = createInputSnapshot({ kind: kind.data, look, pieces,
-          inventoryMode: captured.data.inventoryMode, personalization, inventory,
-          optionType: captured.data.optionType, intentId: captured.data.intentId });
-        currentFingerprint = createOperationFingerprint({ kind: kind.data, input,
-          versions: buildFashionPrompt(kind.data).versions,
-          model: process.env.OPENAI_MODEL || "gpt-6-luna",
-          subjectId: option?.id ?? look.id, revision: option?.revision ?? look.revision });
+        try {
+          const input = createInputSnapshot({ kind: kind.data, look, pieces,
+            inventoryMode: captured.data.inventoryMode, personalization, inventory,
+            optionType: captured.data.optionType, intentId: captured.data.intentId,
+            draftId: captured.data.draftId, providerSettings: getFashionTaskSettings(kind.data) });
+          currentFingerprint = createOperationFingerprint({ kind: kind.data, input,
+            versions: buildFashionPrompt(kind.data).versions,
+            model: getFashionTaskSettings(kind.data).model,
+            subjectId: option?.id ?? look.id, revision: option?.revision ?? look.revision });
+        } catch {
+          currentFingerprint = null;
+        }
       }
     }
     return {
@@ -463,7 +477,7 @@ export async function getLook(lookId: string) {
       inputRevision: operation.input_revision, inputFingerprint: operation.input_fingerprint,
       attemptCount: operation.attempt_count, promptVersion: operation.prompt_version,
       schemaVersion: operation.schema_version, model: operation.model,
-      resultRef: operation.result_ref, errorCode: operation.safe_error_code,
+      resultRef: operation.result_ref, errorCode: operation.safe_error_code?.toLowerCase() ?? null,
       createdAt: operation.created_at, completedAt: operation.completed_at,
       subjectId: operation.subject_id, leaseUntil: operation.lease_until,
       inventoryMode: captured.success ? captured.data.inventoryMode : null,
@@ -506,7 +520,7 @@ export async function getLook(lookId: string) {
           sourceType: review.source_type,
           stale:
             review.source_revision !== look.revision ||
-            inputsStale(review.input_metadata, false),
+            inputsStale(review.input_metadata, false, "inspiration_confidence"),
         }
       : null,
     matches: (matches.data ?? []).map((match) => ({
@@ -534,7 +548,7 @@ export async function getLook(lookId: string) {
       sourceType: match.source_type,
       stale:
         match.source_revision !== look.revision ||
-        inputsStale(match.input_metadata, true),
+        inputsStale(match.input_metadata, true, "wardrobe_match"),
     })),
     outfitOptions: (options.data ?? []).map((option) => ({
       id: option.id,
@@ -552,7 +566,7 @@ export async function getLook(lookId: string) {
       sourceType: option.source_type,
       stale:
         option.source_revision !== look.revision ||
-        inputsStale(option.provider_metadata, true),
+        inputsStale(option.provider_metadata, true, z.object({ task: z.literal("option_regeneration") }).safeParse(option.provider_metadata).success ? "option_regeneration" : "outfit_options"),
       items: (slots.data ?? [])
         .filter((slot) => slot.option_id === option.id)
         .map((slot) => ({

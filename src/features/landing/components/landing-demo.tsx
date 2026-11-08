@@ -22,7 +22,13 @@ const labels = {
   missing: "Missing",
 } as const;
 
-export function LandingDemo({ sample }: { sample?: LandingSample }) {
+export function LandingDemo({
+  sample,
+  loading = false,
+}: {
+  sample?: LandingSample;
+  loading?: boolean;
+}) {
   const [stage, setStage] = useState(0);
   const [paused, setPaused] = useState(false);
   const [visible, setVisible] = useState(true);
@@ -65,6 +71,7 @@ export function LandingDemo({ sample }: { sample?: LandingSample }) {
       ref={containerRef}
       className={styles.demo}
       aria-label="Stylora process preview"
+      aria-busy={loading}
       data-stage={frame}
       data-paused={paused || !visible || !pageVisible || reducedMotion}
     >
@@ -78,7 +85,11 @@ export function LandingDemo({ sample }: { sample?: LandingSample }) {
         alt="Sample outfit inspiration"
         className={styles.demoPhoto}
       />
-      {!sample && <span className={styles.demoLabel}>Sample unavailable</span>}
+      {!sample && (
+        <span className={styles.demoLabel}>
+          {loading ? "Loading sample" : "Sample unavailable"}
+        </span>
+      )}
       {sample && (
         <>
           <div className={styles.scan} aria-hidden="true" />

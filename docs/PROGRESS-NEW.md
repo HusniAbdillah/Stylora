@@ -1,5 +1,235 @@
 # Stylora shared progress reporting
 
+## Owner 4 AI reliability and local worker evaluation, 8 November 2026
+
+### Earlier local-worker checkpoint
+
+- Task O4.1, O4.3, O4.6 and O4.7, with the user-authorized Create and wardrobe
+  audit. Branch `o4/ai-reliability-audit` from main `ba4252d`. One Lane B pull
+  request covers shared execution, private asset reads, runtime configuration
+  and the related feature fixes. No dependency, migration or generated type
+  change. Main remained at `ba4252d` when fetched before delivery.
+- Added a separately running worker over existing persisted operations. Mode is
+  explicit and defaults to inline. Worker mode acknowledges jobs and polls
+  status without browser execution retries. Claims, leases, attempt budgets,
+  captured inputs and commit fences remain database-backed. One worker per
+  workspace; Capsule's global text quota is still process bounded.
+- Create now uses compact constrained output, current-match readiness, optional
+  occasion, bounded request deadlines and one accounted validation correction.
+  Late allocation, draft switching, stale confidence events and partial-result
+  recovery have regression coverage. Capsule captures policy and context,
+  retains safe diagnostic paths, and counts requests before HTTP dispatch.
+- Reproduced a saved-avatar failure on the hosted development schema: its
+  executor attempted to change immutable operation input. Preserved that
+  database guard and moved render capture to fenced metadata plus a durable
+  event that survives retries. A new request then rendered and attached its
+  image successfully. The old failed request was kept as evidence until cleanup.
+- Preview uses validated batch signing and lightweight active polling. Landing
+  streams its demo. Wardrobe sends a separate collection DTO, preserving full
+  canonical detail and API reads. Supabase transport is bounded; loopback dev
+  hydration is supported explicitly. Future Vercel deployments target Tokyo
+  beside the current database; production latency was not remeasured.
+- Live environment: local Next.js on port 3114, separate Node worker, hosted
+  `dev-owner-4`, writes enabled, external run journal and subject allowlist.
+  Run ID `650ec498-e947-4b50-996b-5519878191fa`. Sample fixture source was the
+  repository's wardrobe dataset and design reference images. No personal photo
+  or production workspace was used. Pre-existing items and preferences were
+  preserved. All run-owned fixtures, operations, drafts, saved looks, generated
+  assets and uploaded objects were removed after evaluation.
+- Actual local commands included `node <external>/evaluate.mjs prepare`,
+  `create`, `regenerate`, `wardrobe`, `capsule`, `capsule-ledger`, `preview`,
+  `save`, `save-capsule`, `regenerate-saved-capsule`, `boundaries`, `recovery`,
+  `resume-recovery`, `summary` and the three cleanup phases. `<external>` was
+  the chat artifact directory's `reliability-evaluation` folder, outside git.
+  That controller supplied process-only credentials and started the app plus
+  `node --experimental-strip-types scripts/workflow-worker.mjs`. It reset the
+  allowlist to empty before each worker restart.
+- Real `gpt-6-luna` calls completed description, confidence, matches, all three
+  outfit directions, regeneration, wardrobe intake and two Capsules. Total text
+  calls were eight or nine (the first Capsule predates the new ledger and had
+  a two-request cap), within twelve. Two medium-quality `gpt-image-1.5` calls
+  produced verified PNG assets. Preview save reused the same asset without a
+  render. No marketplace search was spent because these options had no missing
+  slots. See [AI-RELIABILITY-AUDIT.md](AI-RELIABILITY-AUDIT.md) for timings.
+- Fresh-worker recovery retired an obsolete captured Create runtime and an
+  exhausted expired Capsule lease without model calls. Unauthorized executor
+  access returned 401; an existing foreign-workspace operation returned 404.
+  Full table policy tests were not rerun because no database policy changed.
+- `pnpm exec vitest run`: 417 passed, two existing online tests skipped. The
+  latest Capsule projection also passed its 46-test focused suite. Focused
+  storage, worker HTTP, lifecycle, visual-context and collection tests passed.
+  Desktop navigation and real Capsule results were clicked in the local app;
+  the 390 by 844 mobile result view had no horizontal overflow and the viewport
+  override was reset. This is not a full browser regression of every route.
+- `pnpm build` passed, including TypeScript, page generation and route tracing.
+  `make pr-ready` passed lint and typecheck and classified the combined change
+  as Lane B. CI remains the complete GitHub gate. No deployment or merge is part
+  of this task.
+- Remaining limits: independently supervised production worker and queue-age
+  monitoring, database-wide Capsule text quota for multiple workers, and an
+  atomic active-draft check inside `finish_create_operation` for the narrow
+  concurrent discard/commit race. These limits are documented in
+  [AI-WORKER.md](AI-WORKER.md); no unreviewed hosted migration was applied.
+
+### Production-readiness follow-up, 8 November 2026
+
+- Scope: the user-authorized cost, quality, automatic recovery and live-flow
+  audit on `o4/ai-reliability-audit`, for the single PR #77 update. This
+  follow-up includes additive hosted migrations and generated types; the
+  earlier local-worker checkpoint above describes its own prior source and
+  evaluation run.
+- Source: per-task model, reasoning and output limits are validated and captured
+  in operation identity. Create uses canonical JSON fingerprints and its current
+  runtime checks before provider work or checkpoint reuse. Validated private
+  result checkpoints preserve output across transient publication failures.
+  Shared quotas, persisted backoff, canonical retry codes and Retry-After govern
+  recovery. Invalid output, refusal, stale context and invalid configuration
+  retain terminal behavior for unchanged inputs after any eligible correction.
+  Database claims enforce three text slots and one image slot; Create
+  publication checks the active draft atomically. See
+  [AI-WORKER.md](AI-WORKER.md) for the execution and activation contract.
+- Hosted contract: the coordinator confirmed application of
+  `20261108044718_workflow_reliability.sql`,
+  `20261108050029_shopping_request_budget.sql`,
+  `20261108052354_workflow_retry_code_compat.sql` and
+  `20261108054402_preview_cached_image_claim.sql`. These add shared daily
+  request accounting, durable result recovery, retry-code compatibility and
+  cached Preview claims. A running local worker and these hosted changes do
+  not establish app deployment or a supervised production consumer.
+- Create browser regression: selecting an occasion immediately before upload
+  exposed a stale generation flag that left the page saving indefinitely.
+  The fix drains context edits before switching upload generation and settles
+  saving flags by their active intent. Deferred-save and navigation regressions
+  passed. The coordinator's browser retake reached a saved Everyday occasion,
+  five described pieces, a ready confidence review and wardrobe matches.
+- Cost policy: matching may prefetch during stable Review. New automatic outfit
+  generation now requires the current Match, Ideas or Details step, current
+  matches and no dirty editor, busy upload or pending context save. Returning to
+  Review preserves existing jobs and results while pausing new outfit
+  allocations. This policy is reflected in `create-page.tsx` and TDD section
+  8.3. The v9 production-build retake held Review at two existing outfit
+  operations while confidence and matching refreshed (daily text 14 to 16).
+  Entering Matches allocated one new outfit operation (text 17), which produced
+  three directions. Complete owned-only detail needed no search. Returning to
+  Review and reloading retained five pieces and the saved draft with no extra
+  provider call. Runtime v10 later changes only the supplied-preference output
+  guard and context directions; that new guard has regression-test evidence.
+- Live evidence in the external `production-evaluation/browser-journal.json`
+  records successful Create analysis and outfit operations, a Capsule with
+  three outfits and one provider request, saved-avatar work, and successful
+  Preview reuse with zero additional provider calls. The coordinator also
+  exercised wardrobe description followed by Add to wardrobe, and explicit
+  Mark as owned with confirmation for a marketplace candidate. These are
+  individual connected-flow checks, not an exhaustive browser regression.
+- Research evidence: six isolated text comparisons passed their real adapters
+  and domain validators; the measured default remains Luna with low reasoning.
+  Image comparison and the deep-swatch personalization regression are documented
+  in [AI-RESEARCH.md](AI-RESEARCH.md). A valid PNG from prompt v4 failed the visual
+  skin-material requirement. The repaired v5 prompt passed the recorded
+  deep-swatch comparison pair; this does not establish general personalization
+  accuracy. The HTTP journal contains 18 successful local production-server
+  responses across six routes, with three samples each. These are HTTP timings,
+  with no Core Web Vitals or deployed-latency claim.
+- Checks: an intermediate `npm run test` completed with 501 tests passed;
+  final `npm test` completed with 526 passed and two skipped, across 74 passed
+  test files and one skipped file, in 27.96 seconds. The Capsule worker test mock was updated for checkpoint and
+  shared quota contracts; its focused `pnpm exec vitest run
+src/features/capsules/generate.test.ts` passed all 11 tests. Create upload,
+  canonical failure and Retry-After regressions passed their focused 51-test
+  suite, scoped ESLint and `pnpm typecheck`. These checks use synthetic fixtures
+  and mocked transports; they are separate from the real provider and browser
+  evidence above.
+- Real recovery: an external test-only fetch shim returned one 503 from
+  `commit_capsule_generation` after a real Luna response had been validated and
+  checkpointed. The worker was stopped; reads showed attempt 1, one provider
+  call and `CHECKPOINT_COMMIT_PENDING`. After restarting the local app and
+  worker, automatic deferral and checkpoint restoration published three outfits
+  on attempt 2. Provider count stayed one and the daily text ledger stayed 13.
+  The external `recovery-proof.mjs assert` passed. No model response was faked.
+  The harness needed a Windows signal-exit correction before the restart;
+  this was separate from the application recovery mechanism.
+- Final Preview: the built app rendered prompt v5 with the saved depth-6 swatch,
+  warm undertone, rectangle reference and oversized intent. Manual inspection
+  found dark mannequin material and the selected tee, pink jeans and sneakers.
+  Its 93.815-second operation includes deliberately interrupted consumer time;
+  isolated image-provider latency is not persisted. Save returned the existing
+  immutable snapshot with zero extra image calls, and View saved look opened
+  that detail route. The historical saved v4 image was not silently replaced.
+- Share retest: Keep link and Escape cancelled only the nested confirmation.
+  Explicit confirmation revoked the fixture publication and its public page
+  then showed the unavailable state. Native viewport inspection at 390 by 844
+  showed the full figure with `object-contain` and no horizontal overflow.
+  Full-page browser capture produced inconsistent layout, so native viewport
+  capture was used as evidence. The temporary viewport override was reset.
+- Final source checks: `make pr-ready` passed lint and typecheck and reported
+  Lane B. The external process-only production-build controller passed
+  `next build --webpack`, including TypeScript and route generation. The final
+  image commit/status changes passed 22 focused tests and scoped ESLint.
+  All 15 SQL suites passed on disposable PostgreSQL 16; the four new rollback-only
+  suites also passed against the hosted PostgreSQL 17 project. No deployment
+  or merge has been performed. Final cleanup, journey totals and GitHub CI are
+  recorded below after closeout.
+- Capsule edit and deletion: Save capsule returned to the collection. Edit
+  retained all six selected items, one pin and one exclusion. Build required an
+  Apply confirmation even though the edited draft shared its Capsule ID.
+  Cancel kept the edit; Apply generated three combinations with one text call.
+  Deleting each combination required confirmation. The empty state survived
+  reload with no automatic regeneration or additional call; saved snapshots
+  remained intact.
+- Final quality corrections: raw preference keys are now human labels, with
+  swatch and body fields deduplicated and unsupplied signals excluded. The
+  original model prose remains intact. One real option incorrectly emitted the
+  absent-preferences template; the new finite validator rejects that claim
+  when preferences exist and uses the existing bounded correction path.
+  Runtime v10 prevents treating the old validation contract as current.
+- A disconnected Preview request had incorrectly changed image state to failed
+  while background work could still continue. The client now retains its last
+  job state, reports a status advisory and automatically checks again. Known
+  operation GETs retry transport and 502/503/504 responses with bounded backoff
+  and Retry-After; they do not replay POST or model work. Thirteen client tests
+  passed, including interrupted body reads and terminal-error handling.
+- The final production build included the v10 validator and GET recovery.
+  A loopback test proxy then returned one 503 for Preview status at 06:30:58 UTC.
+  Automatic GETs succeeded at 06:31:09 and 06:31:11, before any POST appeared in
+  the recovery receipt. The status advisory cleared without a Retry click.
+  A later bottom selection change at 06:31:34 was persisted, but its origin was
+  not established; it is excluded from recovery and latency claims. Its new
+  image operation spent zero provider calls and waited for the next UTC budget.
+  Activity now explains that wait instead of reporting only a generic queue.
+- At the full four-image evaluation quota, opening the immutable saved Preview
+  composition created a separate draft and reused the ready v5 asset. The
+  operation succeeded with zero provider calls; the UI reached Ready in five
+  seconds. The final desktop screenshot records this composition and selected
+  visual preferences. Browser tabs and viewport overrides were cleaned up.
+- Actual follow-up usage: 17 app text requests, four app image requests and
+  four catalog requests; six isolated text comparisons and four isolated image
+  comparisons. Total 23 text, eight images and four searches, within the final
+  30/8/6 evaluation caps. The app's process limits were 24/4/6. Real provider
+  outcomes and controlled injected failures are distinguished above; no failed
+  image or contradictory recommendation is counted as a quality success.
+- Cleanup completed through the reviewed external `cleanup-production.mjs`
+  plan. The guarded database transaction first passed with ROLLBACK, then
+  committed. Read-only verification found zero remaining target rows across
+  all 18 recorded table groups: 26 operations, 12 drafts, one look, one Capsule,
+  nine options, three saved snapshots/media rows each, one share, nine wardrobe
+  fixtures, 12 products, 15 assets and their recorded children were removed.
+  All 45 pre-existing wardrobe rows and 45 assets remained, including the teal
+  piece involved in the unattributed selection. Original preference values
+  were restored only after the exact fixture values/revision/time matched.
+  The separate guarded Storage phase completed for all 15 scoped fixture paths.
+  Daily usage stayed 17 text, four images and four searches. No reset or refund
+  was applied to usage. No listeners remain on ports 3114 or 3115; the task's
+  app, worker, proxy and disposable SQL-test server are stopped.
+- Final source delivery remains the single PR #77 on `o4/ai-reliability-audit`.
+  `make pr-ready` passed again after the last execution changes and classified
+  Lane B; the final full local suite passed 526 tests with two existing online
+  tests skipped. Production compilation, TypeScript, page generation and route
+  tracing passed. A final six-line Activity wait-message change followed those
+  checks; GitHub CI is the exact-head full check/build gate. Deployed load,
+  device Core Web Vitals, production worker supervision and alert delivery are
+  unverified operational release checks. No merge or deployment is authorized
+  by this closeout; activation instructions are in AI-WORKER.md.
+
 ## PR 75 conflict resolution, 7 November 2026
 
 - Rebased `o1/progress-feedback` onto main `a2bf348`. Preserved both owners' progress records, the PWA installation provider and service worker, capsule saving skeleton and duplicate-submit guard, and studio save and image preparation indicators.
@@ -90,6 +320,7 @@
 - Reproduction: `OWNER2_EXPLICIT_ANALYSIS_SMOKE=GO` starts the gated full runner; continuations require `OWNER2_SMOKE_CONTINUE_BUDGET=true` and preserve its atomic counter. Final command used `OWNER2_FINISH_RETAINED_SMOKE=GO`, `OWNER2_SMOKE_WARDROBE_AI=true`, `STYLORA_TEST_APP_DIR=C:/Users/Pongo/Desktop/Stylora-owner2-smoke`, then `node scripts/finish-owner2-retained-smoke.mjs`. The separate detached checkout prevents the user's port 3000 dev server from sharing Next's cache/lock with the smoke runner. No further provider request is planned.
 - Final local checks before delivery synchronization: `pnpm lint`, `pnpm typecheck`, and targeted backend Vitest **43 tests across nine files** passed. Diagnostic test expectations now assert the explicit missing-operation code; integer-key schema tests assert bounds and reject invalid indices. No rule or guard was weakened.
 - User-reviewed UI: matching cards now order owned, alternatives, then missing; excluded candidate lists are hidden from presentation while backend evidence is retained. Missing uses a category icon and `To find`, with `No match yet`, one concise reason and vertically centered reference title. Actual desktop/mobile screenshots were inspected at 1440 and 390 px in a read-only isolated app using the real look, with zero frontend inference. Landing initial Scan and moving blue band were inspected too. Local artifacts: `.next/owner2-recovery-visual/`. No automated frontend interaction test or local production build was run.
+
 ## Owner 1 workspace feedback, 7 November 2026
 
 - Task: O1.5 and the user's explicit request for consistent feedback across all features. Lane B; shared layout, shell, UI primitives and feature request boundaries. Contract and source audit: [FEEDBACK-AUDIT.md](FEEDBACK-AUDIT.md).
@@ -111,7 +342,7 @@
   initially had zero wardrobe rows, including owned, candidate, archived and
   sample queries. A later read found 45 active owned sample rows. A guarded
   `node --env-file=.env.local scripts/seed-wardrobe.mjs --dry-run
-  --expected-workspace demo` validated 45 images and preserved all 45 existing
+--expected-workspace demo` validated 45 images and preserved all 45 existing
   rows. No seed apply, provider call or hosted mutation was performed here;
   the concurrent data change is not attributed to this task.
 - Removed redundant collection eyebrow labels supplied in the user's
@@ -128,7 +359,7 @@
   has a manual refresh action and renders one error message per current view.
 - Windows, Node.js 22.23.3, pnpm 10.26.2: frozen install passed. Focused
   `pnpm exec vitest run src/components/shell/navigation.test.tsx
-  src/features/wardrobe/client.test.ts` passed 3 tests across 2 files. Editor
+src/features/wardrobe/client.test.ts` passed 3 tests across 2 files. Editor
   diagnostics reported no errors in navigation, wardrobe collection and capsule
   draft components. `make pr-ready` passed ESLint, Next route type generation
   and TypeScript, then reported Lane B (270 changed lines at that checkpoint).
@@ -152,7 +383,6 @@
 - Runtime uses an isolated dev server at `http://127.0.0.1:3027`; root env values
   are passed through process environment without copying credential files into
   the worktree. No production deployment or provider-backed feature execution.
-
 
 ## Owner 1 deployment quota policy: 7 November 2026
 
@@ -1165,7 +1395,7 @@ which data, code revision or provider behavior was verified.
   immutable expiry, irreversible revocation, foreign workspace rejection and
   denied direct anon access. Synthetic fixtures were rolled back.
 - Root `corepack pnpm exec vitest run src/features/products/provider.test.ts
-  src/features/products/search-context.test.ts` passed seven tests. Sharing
+src/features/products/search-context.test.ts` passed seven tests. Sharing
   schema tests passed four tests. `corepack pnpm typecheck` and
   `corepack pnpm lint` passed (the fast-gate equivalent; Make is unavailable
   locally). CI remains the full build gate. PR #49 contains the integrated work.
@@ -1275,7 +1505,7 @@ which data, code revision or provider behavior was verified.
   skipped or silently rewritten, and no garment details are invented.
 - The regression failed against the old reader with the reported missing
   fields, then `corepack pnpm exec vitest run
-  src/features/wardrobe/schema.test.ts` passed all four tests. Coverage includes
+src/features/wardrobe/schema.test.ts` passed all four tests. Coverage includes
   unknown confidence, saved candidates becoming owned, user edits, and retained
   rejection of invalid confidence, garment attributes and unrelated provenance.
 - A temporary read-only Vitest harness invoked the actual GET route against
@@ -1317,7 +1547,7 @@ which data, code revision or provider behavior was verified.
   `make pr-ready PNPM="corepack pnpm"` passed lint and typecheck and reported
   Lane B. `corepack pnpm build` passed, including the static manifest route.
 - `corepack pnpm exec vitest run src/components/pwa/service-worker.test.mjs
-  src/components/shell/navigation.test.tsx` passed five tests. The new cache
+src/components/shell/navigation.test.tsx` passed five tests. The new cache
   boundary tests cover excluded requests, live navigation, network failure and
   cache cleanup. No provider, online test or shared-data fixture ran.
 - `node scripts/generate-app-icons.mjs` generated the committed assets. A local
@@ -1392,3 +1622,71 @@ which data, code revision or provider behavior was verified.
   metadata after Mark as owned on desktop and 390 px mobile, without horizontal
   overflow. The initial connection refusal cleared after startup. CI is the
   complete build gate; paid image execution was not repeated.
+
+## Owner 4 serverless queue follow-up, 8 November 2026
+
+- Task O4.1, same `o4/ai-reliability-audit` branch and PR #77. The user approved
+  a serverless deployment path with all existing features and no always-on
+  host. `STYLORA_EXECUTION_MODE=queue` uses Vercel's private
+  `queue/v2beta` consumers, existing database claims and result checkpoints,
+  and an atomic dispatch outbox. Optional Node worker and inline modes remain
+  available. Marketplace keeps its separate bounded request path.
+- The pinned `@vercel/queue` 0.11.0 API, declarations and authentication were
+  checked against official Vercel documentation and the published package.
+  SDK visibility renews separately from the 300-second Function budget.
+  Trigger concurrency is three text consumers and one image consumer; the
+  database's shared three-text and one-image provider limits remain authoritative.
+- The outbox keeps token-fenced publication, persisted backoff and current
+  generations. Supabase Cron repairs only due work; idle ticks issue no HTTP
+  request. The dedicated repair secret is separate from model and Supabase
+  privileged keys. Vault protects it at rest, but `pg_net` temporarily exposes
+  decrypted request headers to database login roles while awaiting send.
+- Callback security relies on Vercel's private trigger. The SDK callback does
+  not authenticate arbitrary incoming HTTP requests. Application guards reject
+  unconfigured execution and non-Vercel production; queue readiness also
+  requires the dispatch secret alongside supported SDK deployment identity.
+- Integration checkpoint: the full Vitest suite passed 610 tests with two
+  online tests skipped. Targeted suites passed 71 queue tests and 32 HTTP
+  boundary tests. All 20 migrations and all 16 SQL policy suites passed
+  on native PostgreSQL 16.4. These are local integration results, not deployed
+  Vercel delivery or hosted migration evidence; later final counts and hosted
+  application are recorded separately.
+- TDD section 8.2, Workflow section 5 and the runbooks now describe queue mode,
+  outbox repair and current shared capacity. `.env.production.example` starts
+  at 50 text, 5 image and 30 search requests per UTC day. Runtime and local
+  compatibility defaults remain 150, 20 and 100. Complete features stay subject
+  to finite infrastructure allowances and separately billed provider usage.
+- [SERVERLESS-DEPLOYMENT.md](SERVERLESS-DEPLOYMENT.md) records official limits
+  checked on 8 November 2026, automatic platform OIDC, local broker behavior,
+  guarded activation, rollback and the release verification matrix. A local
+  SDK configuration can contact real Queues without a selected broker; offline
+  tests mock that boundary. Runbook formatting and scoped `git diff --check`
+  passed using the installed tools.
+- Live Vercel delivery, OIDC, private-trigger verification, Vault and Cron
+  activation, and deployed recovery remain unrun at this checkpoint. Earlier
+  local worker, browser and checkpoint-replay evidence is preserved for its
+  original environment. No additional provider request was needed for the
+  serverless integration checks above.
+- Final integration: `pnpm exec vitest run` passed 642 tests, with two existing
+  online tests skipped. `make pr-ready` passed lint and typecheck and reported
+  Lane B. `pnpm build` passed compilation, TypeScript, generation and tracing.
+  A final callback alignment uses the same bounded `hnd1` QueueClient as
+  publication; exact-head CI is the release build gate after that change.
+- Applied `20261108075309_workflow_dispatch_outbox.sql` to the approved hosted
+  project. Its rollback-only SQL suite passed, including direct access denial,
+  foreign-workspace rejection, lease-token races, saturated transport retries,
+  Retry-After and delayed failed-operation rescheduling. Types were regenerated
+  with the connected Supabase generator. Hosted checks found zero test
+  workspaces and preserved 45 baseline wardrobe items and 45 baseline assets.
+- Bootstrap created four dispatch references for existing queued demo jobs
+  (three Preview images and one saved avatar); it executed none. Review those
+  pending jobs before activating demo consumption. No Cron or queue delivery
+  has been activated. Vault exists; `pg_cron` and `pg_net` were absent at the
+  hosted extension check. There is no linked Vercel project or usable local
+  CLI authentication in this checkout. No new provider calls were made.
+
+## Owner 4 secret-scan fixture correction, 8 November 2026
+
+- GitGuardian incident 39819137 flagged a hardcoded UUID used only as a mocked dispatch lease token in queue-publish.test.ts. The queue client and database are mocked; this fixture does not authenticate to a service. Replaced the four test IDs with explicit low-entropy UUID fixtures, preserving UUID validation and distinct identities.
+- Targeted queue-publish suite: 12 tests passed. No provider calls, database changes, credential rotation or history rewrite. Historical incident resolution still requires marking the finding as a test fixture in GitGuardian.
+

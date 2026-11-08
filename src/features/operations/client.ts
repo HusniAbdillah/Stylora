@@ -32,6 +32,13 @@ type RequestSnapshot = {
   envelope?: z.infer<typeof nestedSchema>["data"];
   previewDraftId?: string;
 };
+type AllocatedRequest = { response: Response; previewDraftId?: string };
+
+function backgroundResponse(response: Response) {
+  return ["worker", "queue"].includes(
+    response.headers.get("x-stylora-executor") ?? "",
+  );
+}
 
 async function responseOperation(
   response: Response,
@@ -63,22 +70,65 @@ async function executeRequest(
   key: string,
   url: string,
   init: Omit<RequestInit, "signal">,
+  allocated?: AllocatedRequest,
 ) {
   const deadline = Date.now() + 300_000;
-  let response = await fetch(url, {
-    method: "POST",
-    ...init,
-    cache: "no-store",
-    signal: undefined,
-  });
+  let response =
+    allocated?.response ??
+    (await fetch(url, {
+      method: "POST",
+      ...init,
+      cache: "no-store",
+      signal: AbortSignal.timeout(295_000),
+    }));
+  const backgroundManaged = backgroundResponse(response);
   let snapshot = await responseOperation(response);
   const knownId = z.uuid().safeParse(key);
   let operationId =
     snapshot?.operation.id ?? (knownId.success ? knownId.data : undefined);
   let envelope = snapshot?.envelope;
-  let previewDraftId = snapshot?.previewDraftId;
+  let previewDraftId = snapshot?.previewDraftId ?? allocated?.previewDraftId;
   if (!operationId || (!response.ok && response.status !== 409))
     return response;
+
+  async function readStatus(statusUrl: string): Promise<Response> {
+    let failures = 0;
+    while (Date.now() < deadline) {
+      let latest: Response | undefined;
+      try {
+        latest = await fetch(statusUrl, {
+          method: "GET",
+          cache: "no-store",
+          signal: AbortSignal.timeout(
+            Math.max(1, Math.min(15_000, deadline - Date.now())),
+          ),
+        });
+        if (![502, 503, 504].includes(latest.status)) {
+          if (latest.ok) await latest.clone().arrayBuffer();
+          return latest;
+        }
+      } catch {
+        latest = undefined;
+      }
+      failures += 1;
+      const remaining = deadline - Date.now();
+      if (failures >= 8 || remaining <= 0) break;
+      let delay = Math.min(1000 * 2 ** (failures - 1), 15_000);
+      const retryAfter = latest?.headers.get("Retry-After");
+      if (retryAfter) {
+        const specified = /^\d+$/.test(retryAfter.trim())
+          ? Number(retryAfter) * 1000
+          : Date.parse(retryAfter) - Date.now();
+        if (Number.isFinite(specified) && specified >= 0) {
+          if (specified >= remaining) break;
+          delay = Math.max(delay, specified);
+        }
+      }
+      if (delay >= remaining) break;
+      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+    }
+    throw new Error("OPERATION_STATUS_UNAVAILABLE");
+  }
 
   while (Date.now() < deadline) {
     if (
@@ -92,10 +142,7 @@ async function executeRequest(
       setTimeout(resolve, Math.min(3000, deadline - Date.now())),
     );
     if (Date.now() >= deadline) break;
-    response = await fetch(`/api/workflow-operations/${operationId}`, {
-      method: "GET",
-      cache: "no-store",
-    });
+    response = await readStatus(`/api/workflow-operations/${operationId}`);
     snapshot = await responseOperation(response);
     if (!response.ok || !snapshot) return response;
     const operation = snapshot.operation;
@@ -108,12 +155,12 @@ async function executeRequest(
     const expired =
       typeof operation.leaseUntil === "string" &&
       Date.parse(operation.leaseUntil) <= Date.now();
-    if (operation.status === "queued" || expired) {
+    if (!backgroundManaged && (operation.status === "queued" || expired)) {
       response = await fetch(url, {
         method: "POST",
         ...init,
         cache: "no-store",
-        signal: undefined,
+        signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
       });
       snapshot = await responseOperation(response);
       if (response.status === 409 && !snapshot) continue;
@@ -125,9 +172,8 @@ async function executeRequest(
     }
   }
   if (previewDraftId && !snapshot?.previewDraftId) {
-    return fetch(
+    return readStatus(
       `/api/previews?draftId=${encodeURIComponent(previewDraftId)}`,
-      { method: "GET", cache: "no-store" },
     );
   }
   if (envelope && snapshot) {
@@ -139,14 +185,15 @@ async function executeRequest(
   return response;
 }
 
-export async function startOperationRequest(
+async function operationRequest(
   operationId: string,
   url: string,
   init: Omit<RequestInit, "signal"> = { method: "POST" },
+  allocated?: AllocatedRequest,
 ): Promise<Response> {
   let pending = pendingRequests.get(operationId);
   if (!pending) {
-    pending = executeRequest(operationId, url, init)
+    pending = executeRequest(operationId, url, init, allocated)
       .then(async (response) => {
         await reportOperationResponse(response, operationId);
         return response;
@@ -165,6 +212,14 @@ export async function startOperationRequest(
     pendingRequests.set(operationId, pending);
   }
   return (await pending).clone();
+}
+
+export function startOperationRequest(
+  operationId: string,
+  url: string,
+  init: Omit<RequestInit, "signal"> = { method: "POST" },
+): Promise<Response> {
+  return operationRequest(operationId, url, init);
 }
 
 export function requestOperation(
@@ -191,6 +246,21 @@ export async function retryOperationRequest(
   if (!response.ok) {
     await reportOperationResponse(response, operationId);
     return response;
+  }
+  if (backgroundResponse(response)) {
+    const preview =
+      executeUrl === "/api/previews"
+        ? z.object({ draftId: z.uuid() }).safeParse(body)
+        : undefined;
+    return operationRequest(
+      operationId,
+      executeUrl,
+      { method: "POST" },
+      {
+        response,
+        previewDraftId: preview?.success ? preview.data.draftId : undefined,
+      },
+    );
   }
   return requestOperation(operationId, executeUrl, body);
 }

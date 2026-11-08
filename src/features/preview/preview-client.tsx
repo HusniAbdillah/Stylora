@@ -22,6 +22,21 @@ import { previewSelectionSchema } from "./schema";
 import { imageRenderSettingsSchema } from "@/features/ai/image-settings";
 import { isCurrentPreviewResponse } from "./request-context";
 import type { readPreview } from "./data";
+import { operationStatusSchema } from "@/features/operations/schema";
+import { previewJobStatus } from "./job-status";
+
+const pollResponse = z.object({
+  data: z.object({
+    mode: z.literal("poll"),
+    draftId: z.uuid(),
+    revision: z.number().int().positive(),
+    renderRequestId: z.uuid().optional(),
+    preferenceRevision: z.number().int().nonnegative(),
+    operationId: z.uuid().nullable(),
+    operationStatus: operationStatusSchema.nullable(),
+    elapsedSeconds: z.number().optional(),
+  }),
+});
 
 const statusResponse = z.object({
   data: z.object({
@@ -201,6 +216,7 @@ export function PreviewClient({
         )
           return;
         draft.current = { draftId: result.draftId, revision: result.revision };
+        setStatusFailed(false);
         setDraftRevision(result.revision);
         setSavedSelection(true);
         pendingRender.current = undefined;
@@ -220,12 +236,7 @@ export function PreviewClient({
           current.preferenceRevision === preferenceRevision.current &&
           draft.current.revision === current.revision
         )
-          setJob((previous) => ({
-            ...previous,
-            status: "failed",
-            errorMessage:
-              "The image could not finish. Your selection is kept. Retry image to continue.",
-          }));
+          setStatusFailed(true);
       } finally {
         pendingLaunches.current.delete(launchKey);
         if (superseded && latestSelection.current === renderSelection)
@@ -268,23 +279,53 @@ export function PreviewClient({
   useEffect(() => {
     if (!activeDraftId) return;
     let active = true;
-    async function refresh() {
+    async function refresh(full = false): Promise<void> {
       const version = ++refreshVersion.current;
       const selection = latestSelection.current;
-      const response = await fetch(`/api/previews?draftId=${activeDraftId}`, {
-        cache: "no-store",
-      });
+      const epoch = contextEpoch.current;
+      const lightweight =
+        !full && (job.status === "queued" || job.status === "running");
+      const response = await fetch(
+        `/api/previews?draftId=${activeDraftId}${lightweight ? "&poll=1" : ""}`,
+        {
+          cache: "no-store",
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
       if (!active) return;
       if (!response.ok) throw new Error("PREVIEW_STATUS_UNAVAILABLE");
-      const result = statusResponse.parse(await response.json()).data;
+      const payload = await response.json();
+      const result = lightweight
+        ? pollResponse.parse(payload).data
+        : statusResponse.parse(payload).data;
       if (
         !active ||
         version !== refreshVersion.current ||
+        epoch !== contextEpoch.current ||
         result.draftId !== draft.current.draftId ||
         selection !== latestSelection.current ||
         result.preferenceRevision < preferenceRevision.current
       )
         return;
+      if ("mode" in result) {
+        if (
+          result.revision !== draft.current.revision ||
+          result.preferenceRevision !== preferenceRevision.current ||
+          !result.operationStatus ||
+          !["queued", "running", "partial"].includes(result.operationStatus)
+        )
+          return refresh(true);
+        if (persistedSelection.current !== latestSelection.current) return;
+        const nextStatus = previewJobStatus(result.operationStatus);
+        setStatusFailed(false);
+        setOperationId(result.operationId);
+        setJob((previous) => ({
+          ...previous,
+          status: nextStatus,
+          elapsedSeconds: result.elapsedSeconds,
+        }));
+        return;
+      }
       const preferencesChanged =
         result.preferenceRevision !== preferenceRevision.current ||
         result.renderFingerprint !== renderFingerprint.current ||
@@ -317,7 +358,7 @@ export function PreviewClient({
           router.refresh();
         }
         if (
-          (result.job.superseded || result.job.status === "queued") &&
+          result.job.superseded &&
           initial.writesEnabled &&
           initial.job.status !== "unavailable" &&
           Object.keys(selection).length
@@ -325,17 +366,21 @@ export function PreviewClient({
           void launch("resume", result.operationId);
       }
     }
-    const check = () => {
-      void refresh().catch(() => {
+    const check = (full = false) => {
+      void refresh(full).catch(() => {
         if (active) setStatusFailed(true);
       });
     };
-    refreshStatus.current = check;
+    refreshStatus.current = () => check(true);
     const interval = setInterval(
       () => {
         check();
       },
-      job.status === "queued" || job.status === "running" ? 2500 : 240000,
+      statusFailed
+        ? 10000
+        : job.status === "queued" || job.status === "running"
+          ? 2500
+          : 240000,
     );
     const focus = () => {
       if (document.visibilityState !== "visible") return;
@@ -348,7 +393,7 @@ export function PreviewClient({
         activeCategory.current = next.data;
         setSelectedCategory(next.data);
       }
-      check();
+      check(true);
     };
     const preferencesUpdated = (event: Event) => {
       const detail = z
@@ -360,7 +405,7 @@ export function PreviewClient({
       setImageOutdated(true);
       refreshPreferences.current = true;
       if (detail.success) preferenceRevision.current = detail.data.revision;
-      check();
+      check(true);
     };
     const restore = () => {
       openingPreferences.current = false;
@@ -370,7 +415,7 @@ export function PreviewClient({
     const pageShow = (event: PageTransitionEvent) => {
       if (event.persisted) restore();
     };
-    check();
+    if (!statusFailed) check();
     window.addEventListener("focus", focus);
     window.addEventListener("pageshow", pageShow);
     window.addEventListener("popstate", restore);
@@ -391,6 +436,7 @@ export function PreviewClient({
   }, [
     activeDraftId,
     job.status,
+    statusFailed,
     savedSelection,
     initial.writesEnabled,
     initial.preferenceRevision,

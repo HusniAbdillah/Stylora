@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, ConfirmDialog, Icon, Stepper } from "@/components/ui";
+import { Badge, Button, ConfirmDialog, Icon, Stepper } from "@/components/ui";
 import {
   InspirationUpload,
   ReviewPieces,
@@ -27,6 +27,7 @@ import {
   label,
   presentConfidence,
   presentIdeas,
+  presentInputSignals,
   presentMatches,
   presentPiece,
   presentPreferences,
@@ -37,6 +38,36 @@ const isActive = (operation: CreateOperation | undefined) =>
   Boolean(
     operation && ["queued", "running", "partial"].includes(operation.status),
   );
+function PreviousAnalysis({
+  noun,
+  operation,
+  onRefresh,
+}: {
+  noun: string;
+  operation?: CreateOperation;
+  onRefresh?: () => void;
+}) {
+  return (
+    <div
+      className="mt-5 rounded-xl border border-stone bg-paper p-4"
+      role="status"
+    >
+      <Badge tone="neutral">Previous {noun}</Badge>
+      <p className="mt-2 text-sm text-secondary">
+        {isActive(operation)
+          ? "Updating the analysis. The previous results stay visible below."
+          : operation?.status === "failed"
+            ? "The update could not finish. The previous results stay visible below."
+            : "Refresh to use the latest analysis."}
+      </p>
+      {onRefresh && (
+        <Button variant="secondary" className="mt-3" onClick={onRefresh}>
+          Refresh {noun}
+        </Button>
+      )}
+    </div>
+  );
+}
 const operationStatus = (
   operation: CreateOperation | undefined,
   ready = false,
@@ -101,6 +132,16 @@ export function CreatePage({
     look?.outfitOptions.filter(
       (option) => !option.stale && option.inventoryMode === state.inventoryMode,
     ).length === 3;
+  const previousMatches = Boolean(
+    look?.matches.some(
+      (match) => match.stale && match.inventoryMode === state.inventoryMode,
+    ),
+  );
+  const previousIdeas = Boolean(
+    look?.outfitOptions.some(
+      (option) => option.stale && option.inventoryMode === state.inventoryMode,
+    ),
+  );
   useEffect(() => {
     if (!look || !optionId) return;
     const identity = `${look.id}:${optionId}:${state.inventoryMode}`;
@@ -200,8 +241,9 @@ export function CreatePage({
       !look ||
       !state.draft ||
       !state.preferenceFingerprint ||
+      busy ||
+      state.uploadStatus !== "verified" ||
       state.contextSaving ||
-      !look.occasion?.trim() ||
       look.sourceType === "sample"
     )
       return;
@@ -230,7 +272,7 @@ export function CreatePage({
     )
       void session.start("wardrobe_match");
     if (
-      step !== "upload" &&
+      (step === "matches" || step === "ideas" || step === "details") &&
       matchesReady &&
       !ideasReady &&
       (!options ||
@@ -244,6 +286,8 @@ export function CreatePage({
     look,
     state.draft,
     state.preferenceFingerprint,
+    busy,
+    state.uploadStatus,
     state.contextSaving,
     state.hasEditorDraft,
     state.inventoryMode,
@@ -283,7 +327,14 @@ export function CreatePage({
     void session.visit(target).catch((error) => session.report(error));
   }
   function viewDetails(idea: OutfitIdea) {
-    if (!look || idea.status === "unavailable") return;
+    if (
+      !look ||
+      idea.status === "unavailable" ||
+      !look.outfitOptions.some(
+        (option) => option.id === idea.id && !option.stale,
+      )
+    )
+      return;
     session.selectDirection(idea.direction);
     void session.visit("details").catch((error) => session.report(error));
     router.push(
@@ -527,11 +578,7 @@ export function CreatePage({
           preferences={presentPreferences(state.preferences)}
           tasks={tasks}
           analyzeDisabled={
-            busy ||
-            state.prefilling ||
-            !look ||
-            !look.occasion?.trim() ||
-            state.contextSaving
+            busy || state.prefilling || !look || state.contextSaving
           }
           onChooseFile={(file) => void choose(file)}
           onRemove={
@@ -626,15 +673,28 @@ export function CreatePage({
       )}
       {step === "matches" && look && (
         <>
+          {previousMatches && (
+            <PreviousAnalysis
+              noun="matches"
+              operation={matching}
+              onRefresh={
+                writesEnabled &&
+                !isActive(matching) &&
+                (!matching || matching.canRetry || matching.canRestart)
+                  ? () => retryTask("wardrobe_match")
+                  : undefined
+              }
+            />
+          )}
           {state.inventoryMode === "sample" && (
             <p className="mt-5 text-xs text-secondary">
               Sample inventory · Matches use example wardrobe pieces
             </p>
           )}
           <WardrobeMatchView
-            matches={presentMatches(look, state.inventoryMode)}
+            matches={presentMatches(look, state.inventoryMode, true)}
             status={
-              matchesReady
+              matchesReady || previousMatches
                 ? "ready"
                 : matching?.status === "failed"
                   ? "error"
@@ -645,7 +705,7 @@ export function CreatePage({
             ideasStatus={operationStatus(options, ideasReady)}
             onBack={() => go("review")}
             onGenerateIdeas={
-              writesEnabled || ideasReady
+              matchesReady && (writesEnabled || ideasReady)
                 ? () => {
                     if (!options && !ideasReady)
                       void session.start("outfit_options");
@@ -661,15 +721,34 @@ export function CreatePage({
       )}
       {step === "ideas" && look && (
         <>
+          {previousIdeas && (
+            <PreviousAnalysis
+              noun="outfit ideas"
+              operation={options}
+              onRefresh={
+                writesEnabled &&
+                matchesReady &&
+                !isActive(options) &&
+                (!options || options.canRetry || options.canRestart)
+                  ? () => retryTask("outfit_options")
+                  : undefined
+              }
+            />
+          )}
           {state.inventoryMode === "sample" && (
             <p className="mt-5 text-xs text-secondary">
               Sample inventory · Matches use example wardrobe pieces
             </p>
           )}
           <OutfitIdeas
-            ideas={presentIdeas(look, state.operations, state.inventoryMode)}
+            ideas={presentIdeas(
+              look,
+              state.operations,
+              state.inventoryMode,
+              true,
+            )}
             status={
-              ideasReady
+              ideasReady || previousIdeas
                 ? "ready"
                 : options?.status === "failed"
                   ? "error"
@@ -678,33 +757,32 @@ export function CreatePage({
                     : "unavailable"
             }
             selectedDirection={state.selectedDirection}
-            onViewDetails={viewDetails}
+            onViewDetails={ideasReady ? viewDetails : undefined}
             onSelectDirection={(direction) =>
               session.selectDirection(direction)
             }
             hasPreferences={Object.values(state.preferences).some((value) =>
               Array.isArray(value) ? value.length : Boolean(value),
             )}
-            preferencesUsed={[
-              ...new Set(
-                look.outfitOptions
-                  .filter(
-                    (option) =>
-                      !option.stale &&
-                      option.inventoryMode === state.inventoryMode,
-                  )
-                  .flatMap((option) => option.explanation.inputsUsed)
-                  .filter(
-                    (key) =>
-                      key !== "inspiration" &&
-                      key !== "wardrobe" &&
-                      key !== "occasion",
-                  ),
-              ),
-            ].map(label)}
+            preferencesUsed={presentInputSignals(
+              look.outfitOptions
+                .filter(
+                  (option) =>
+                    !option.stale &&
+                    option.inventoryMode === state.inventoryMode,
+                )
+                .flatMap((option) => option.explanation.inputsUsed)
+                .filter(
+                  (key) =>
+                    key !== "inspiration" &&
+                    key !== "wardrobe" &&
+                    key !== "occasion",
+                ),
+              state.preferences,
+            )}
             onBack={() => go("matches")}
             onSuggestAnother={
-              writesEnabled
+              writesEnabled && ideasReady
                 ? (idea) => void session.regenerate(idea.direction)
                 : undefined
             }

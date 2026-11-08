@@ -14,16 +14,16 @@ export default async function CapsulePage({
 }) {
   const { capsuleId } = await params;
   if (!z.uuid().safeParse(capsuleId).success) notFound();
-  const { result, revision, generationNeeded } = await getCapsuleResult(
-    capsuleId,
-  ).catch((error: unknown) => {
-    if (error instanceof ApiError && error.status === 404) notFound();
-    throw error;
-  });
+  const { result, revision, generationNeeded, contextKey } =
+    await getCapsuleResult(capsuleId).catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 404) notFound();
+      throw error;
+    });
   return (
     <CapsuleResultScreen
       result={result}
       revision={revision}
+      contextKey={contextKey}
       generationNeeded={
         generationNeeded || (await searchParams).generate === "1"
       }

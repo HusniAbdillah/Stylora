@@ -70,7 +70,7 @@ function SharedImage({
       loading={avatar ? "eager" : "lazy"}
       fetchPriority={avatar ? "high" : "auto"}
       onError={() => setFailedUrl(src)}
-      className={avatar ? "object-cover" : "object-contain"}
+      className="object-contain"
     />
   );
 }
@@ -141,7 +141,7 @@ export function PublicShare({
         <p className="text-xs text-secondary">A look shared from Stylora</p>
       </header>
       <div className="mx-auto mt-8 grid max-w-[1200px] items-center gap-5 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)] lg:gap-[72px]">
-        <div className="relative aspect-[3/4] overflow-hidden rounded-3xl bg-sand lg:aspect-[2/3]">
+        <div className="relative aspect-[2/3] overflow-hidden rounded-3xl bg-sand">
           <SharedImage
             src={look.avatarUrl}
             alt={
@@ -232,6 +232,7 @@ export function ShareReviewDialog({
   onTurnOff,
   managing = false,
   onCreateNew,
+  confirmation,
 }: {
   open: boolean;
   look: PublicLook | null;
@@ -248,6 +249,7 @@ export function ShareReviewDialog({
   onTurnOff?: () => void;
   managing?: boolean;
   onCreateNew?: () => void;
+  confirmation?: { content: ReactNode; onCancel: () => void };
 }) {
   const safe = useRef<HTMLButtonElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -296,6 +298,11 @@ export function ShareReviewDialog({
             event.preventDefault();
             opener.current?.focus();
           }}
+          onEscapeKeyDown={(event) => {
+            if (!confirmation) return;
+            event.preventDefault();
+            if (!busy) confirmation.onCancel();
+          }}
         >
           <Dialog.Description className="sr-only">
             {managing
@@ -316,12 +323,12 @@ export function ShareReviewDialog({
                 </p>
                 {loading || !look ? (
                   <>
-                    <Skeleton className="block aspect-[3/4] w-full rounded-xl" />
+                    <Skeleton className="block aspect-[2/3] w-full rounded-xl" />
                     <Skeleton className="mt-3 block h-7 w-3/4" />
                   </>
                 ) : (
                   <>
-                    <div className="relative mx-auto aspect-[3/4] w-full max-w-44 overflow-hidden rounded-xl bg-sand sm:max-w-none">
+                    <div className="relative mx-auto aspect-[2/3] w-full max-w-44 overflow-hidden rounded-xl bg-sand sm:max-w-none">
                       <SharedImage
                         src={look.avatarUrl}
                         alt={
@@ -488,6 +495,7 @@ export function ShareReviewDialog({
               </div>
             </section>
           </div>
+          {confirmation?.content}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

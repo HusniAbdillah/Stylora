@@ -300,9 +300,9 @@ export function InspirationUpload({
             Begin with an <em className="text-crimson">inspiration.</em>
           </h1>
           <p className={styles.desktopDescription}>
-            Upload an outfit and choose an occasion. Stylora reads its pieces
-            automatically, then helps match your wardrobe and explore three
-            outfits.
+            Upload an outfit and add an occasion if you have one. Stylora reads
+            its pieces automatically, then helps match your wardrobe and explore
+            three outfits.
           </p>
         </div>
         {onAnalyze && (
@@ -318,7 +318,7 @@ export function InspirationUpload({
             <p className="mt-2 text-xs text-secondary">
               {tasks.some((task) => task.status === "running")
                 ? "Analysis is in progress"
-                : "Analysis starts after your photo is verified and an occasion is selected"}
+                : "Analysis starts after your photo is verified. Occasion is optional."}
             </p>
           </div>
         )}

@@ -54,6 +54,7 @@ export const operationRowSchema = z.object({
   input: z.record(z.string(), z.json()),
   attempt_count: z.number().int().min(0).max(3),
   lease_until: z.iso.datetime({ offset: true }).nullable(),
+  next_attempt_at: z.iso.datetime({ offset: true }).nullable().optional(),
   result_ref: z.record(z.string(), z.json()).nullable(),
   safe_error_code: z.string().nullable(),
   cancel_requested_at: z.iso.datetime({ offset: true }).nullable(),
@@ -88,6 +89,7 @@ export function operationStatus(operation: Operation) {
     status: operation.status,
     attemptCount: operation.attempt_count,
     leaseUntil: operation.lease_until,
+    nextAttemptAt: operation.next_attempt_at ?? null,
     cancelRequested: operation.cancel_requested_at !== null,
     resultRef: operation.result_ref
       ? publicResultSchema.parse(operation.result_ref)

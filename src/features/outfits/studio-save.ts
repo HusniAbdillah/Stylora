@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { readDatabaseConfig } from "@/lib/config/server";
+import { scheduleWorkflowDispatch } from "@/features/operations/queue-wake";
 
 const saveInput = z.object({
   source: z.discriminatedUnion("kind", [
@@ -61,6 +62,7 @@ export async function saveStudioLook(input: z.input<typeof saveInput>) {
     const saved = savedResult.safeParse(await response.json());
     if (!saved.success)
       return { ok: false as const, code: "LOOK_SAVE_INVALID_RESPONSE" };
+    scheduleWorkflowDispatch();
     return { ok: true as const, ...saved.data };
   } catch {
     return { ok: false as const, code: "LOOK_SAVE_CONNECTION_FAILED" };

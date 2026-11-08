@@ -1,5 +1,28 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["hnd1"],
+  "functions": {
+    "src/app/api/queues/text/route.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "stylora-text",
+          "maxConcurrency": 3,
+          "retryAfterSeconds": 30
+        }
+      ]
+    },
+    "src/app/api/queues/image/route.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "stylora-image",
+          "maxConcurrency": 1,
+          "retryAfterSeconds": 30
+        }
+      ]
+    }
+  },
   "git": {
     "deploymentEnabled": {
       "**": false,

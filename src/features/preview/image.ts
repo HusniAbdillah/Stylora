@@ -17,9 +17,11 @@ import {
 import {
   createWorkspaceSignedUpload,
   verifyWorkspaceStorageAsset,
+  readVerifiedWorkspaceStorageAsset,
 } from "@/lib/supabase/storage";
 import { prepareReferenceImage } from "@/features/ai/reference-image";
 import { avatarIoError } from "./image-errors";
+import { OperationError } from "@/features/operations/errors";
 import { buildAvatarVisualDirection } from "./visual-direction";
 import {
   getImageRenderSettings,
@@ -102,6 +104,55 @@ export function avatarRenderFingerprint(
     .digest("hex");
 }
 
+export async function restoreAvatarCheckpoint(
+  result: unknown,
+  expectedFingerprint: string,
+  signal: AbortSignal,
+  metadata: unknown = {},
+) {
+  const parsed = z
+    .strictObject({
+      assetId: z.uuid(),
+      renderFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    })
+    .safeParse(result);
+  if (!parsed.success || !z.strictObject({}).safeParse(metadata).success)
+    throw new OperationError(
+      "AVATAR_CHECKPOINT_UNUSABLE",
+      "The saved image result is invalid. Request a new image.",
+      409,
+    );
+  if (parsed.data.renderFingerprint !== expectedFingerprint)
+    throw new OperationError(
+      "INPUT_SUPERSEDED",
+      "The image inputs changed.",
+      409,
+    );
+  try {
+    const verified = await readVerifiedWorkspaceStorageAsset(
+      parsed.data.assetId,
+      { signal },
+    );
+    if (verified.bucket !== "previews" || verified.mimeType !== "image/png")
+      throw new OperationError(
+        "AVATAR_CHECKPOINT_UNUSABLE",
+        "The saved image result is unavailable.",
+        409,
+      );
+  } catch (failure) {
+    signal.throwIfAborted();
+    if (failure instanceof OperationError) throw failure;
+    const error = avatarIoError(failure, "AVATAR_CHECKPOINT_UNUSABLE");
+    if (error.retryable) throw error;
+    throw new OperationError(
+      "AVATAR_CHECKPOINT_UNUSABLE",
+      "The saved image result is unavailable. Request a new image.",
+      409,
+    );
+  }
+  return { ...parsed.data, createdAsset: false };
+}
+
 export async function renderAndStoreAvatar(input: {
   items: unknown[];
   preferences: unknown;
@@ -109,6 +160,8 @@ export async function renderAndStoreAvatar(input: {
   reuse?: boolean;
   signal?: AbortSignal;
   renderSettings?: ImageRenderSettings;
+  beforeGenerate?: () => Promise<void>;
+  afterGenerate?: () => Promise<void>;
 }) {
   const items = normalizeAvatarItems(input.items);
   const renderSettings = imageRenderSettingsSchema.parse(
@@ -176,31 +229,14 @@ export async function renderAndStoreAvatar(input: {
           throw new Error("AVATAR_IMAGE_UNAVAILABLE");
         return null;
       }
-      const {
-        data: asset,
-        error,
-        status,
-      } = await client
-        .from("assets")
-        .select("id,status")
-        .eq("workspace_id", workspaceId)
-        .eq("id", item.asset_id)
-        .eq("status", "ready")
-        .maybeSingle();
-      if (error) throw avatarIoError(error, "AVATAR_IMAGE_UNAVAILABLE", status);
-      if (!asset) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
-      const verified = await verifyWorkspaceStorageAsset(asset.id).catch(
-        (failure: unknown) => {
-          throw avatarIoError(failure, "AVATAR_IMAGE_UNAVAILABLE");
-        },
-      );
-      const { data: image, error: downloadError } = await client.storage
-        .from(verified.bucket)
-        .download(verified.storagePath);
-      if (downloadError)
-        throw avatarIoError(downloadError, "AVATAR_IMAGE_UNAVAILABLE");
-      if (!image) throw new Error("AVATAR_IMAGE_UNAVAILABLE");
-      const bytes = new Uint8Array(await image.arrayBuffer());
+      const verified = await readVerifiedWorkspaceStorageAsset(item.asset_id, {
+        signal: input.signal,
+        readyOnly: true,
+      }).catch((failure: unknown) => {
+        input.signal?.throwIfAborted();
+        throw avatarIoError(failure, "AVATAR_IMAGE_UNAVAILABLE");
+      });
+      const bytes = verified.bytes;
       // A smaller reference uploads and processes faster. If it cannot be
       // decoded here, send the verified original unchanged.
       return prepareReferenceImage(bytes).catch(() => ({
@@ -210,6 +246,7 @@ export async function renderAndStoreAvatar(input: {
     }),
   );
   const images = loaded.filter((image) => image !== null);
+  await input.beforeGenerate?.();
   const generated = await generateFashionImage({
     items: items.map((item) => ({
       ...item,
@@ -224,6 +261,12 @@ export async function renderAndStoreAvatar(input: {
     signal: input.signal,
     allowDescriptionOnly: input.allowIllustrativeItems,
     renderSettings,
+  }).finally(async () => {
+    try {
+      await input.afterGenerate?.();
+    } catch {
+      console.warn(JSON.stringify({ event: "avatar_provider_release_failed" }));
+    }
   });
   const asset = await createWorkspaceSignedUpload({
     bucket: "previews",
@@ -246,7 +289,6 @@ export async function renderAndStoreAvatar(input: {
         throw avatarIoError(failure, "AVATAR_IMAGE_UPLOAD_FAILED");
       },
     );
-    input.signal?.throwIfAborted();
     return { assetId: asset.assetId, renderFingerprint, createdAsset: true };
   } catch (error) {
     await discardPendingAvatar(asset.assetId);

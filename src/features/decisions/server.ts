@@ -1,4 +1,5 @@
 import "server-only";
+import { scheduleWorkflowDispatch } from "@/features/operations/queue-wake";
 import { z } from "zod";
 import { ApiError } from "@/lib/http";
 import {
@@ -424,6 +425,7 @@ export async function saveLook(lookId: string, input: unknown) {
     p_title: parsed.title,
   });
   failure(result.error);
+  scheduleWorkflowDispatch();
   return savedDto(context, required(result.data));
 }
 
@@ -436,6 +438,7 @@ export async function retrySavedMedia(savedId: string) {
     p_saved_look_id: savedId,
   });
   failure(result.error);
+  scheduleWorkflowDispatch();
   return {
     savedLookId: savedId,
     media: await resolveMedia(context, savedId, required(result.data)),
@@ -454,6 +457,7 @@ export async function regenerateSavedMedia(savedId: string, input: unknown) {
     p_idempotency_key: parsed.idempotencyKey,
   });
   failure(result.error);
+  scheduleWorkflowDispatch();
   return {
     savedLookId: savedId,
     media: await resolveMedia(context, savedId, required(result.data)),

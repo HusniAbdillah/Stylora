@@ -12,6 +12,7 @@ import {
   StorageAssetError,
   type StorageUploadInput,
   verifyWorkspaceStorageAsset,
+  readVerifiedWorkspaceStorageAsset,
 } from "./storage";
 
 vi.mock("server-only", () => ({}));
@@ -43,6 +44,7 @@ function setup(asset: ReturnType<typeof assetFixture> | null = assetFixture()) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
+    abortSignal: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue({ data: asset, error: null }),
     insert: vi.fn().mockResolvedValue({ error: null }),
   };
@@ -289,6 +291,72 @@ describe("workspace Storage upload", () => {
 });
 
 describe("workspace Storage reads", () => {
+  it("returns the exact verified bytes from one download and preserves the caller deadline", async () => {
+    const image = await pngFixture();
+    const { query, storage } = setup(assetFixture({ byte_size: image.size }));
+    storage.download.mockResolvedValue({ data: image, error: null });
+    const signal = AbortSignal.timeout(5000);
+    const result = await readVerifiedWorkspaceStorageAsset(assetId, {
+      signal,
+      readyOnly: true,
+    });
+    expect(result.bytes).toEqual(new Uint8Array(await image.arrayBuffer()));
+    expect(result).toMatchObject({
+      width: 2,
+      height: 3,
+      byteSize: image.size,
+      mimeType: "image/png",
+    });
+    expect(query.in).toHaveBeenCalledWith("status", ["ready"]);
+    expect(query.abortSignal).toHaveBeenCalledWith(signal);
+    expect(storage.download).toHaveBeenCalledExactlyOnceWith(
+      assetFixture().storage_path,
+      undefined,
+      { signal },
+    );
+  });
+
+  it("keeps verified bytes out of the public upload verification result", async () => {
+    const image = await pngFixture();
+    const { storage } = setup(
+      assetFixture({ byte_size: image.size, status: "pending" }),
+    );
+    storage.download.mockResolvedValue({ data: image, error: null });
+    const result = await verifyWorkspaceStorageAsset(assetId);
+    expect(Object.keys(result).sort()).toEqual(
+      [
+        "assetId",
+        "bucket",
+        "storagePath",
+        "mimeType",
+        "byteSize",
+        "width",
+        "height",
+      ].sort(),
+    );
+    expect(storage.download).toHaveBeenCalledOnce();
+  });
+
+  it("rejects an expired deadline before any asset lookup or byte download", async () => {
+    const { client, storage } = setup();
+    const reason = new Error("Caller deadline expired");
+    await expect(
+      readVerifiedWorkspaceStorageAsset(assetId, {
+        signal: AbortSignal.abort(reason),
+      }),
+    ).rejects.toBe(reason);
+    expect(client.from).not.toHaveBeenCalled();
+    expect(storage.download).not.toHaveBeenCalled();
+  });
+
+  it("rejects a pending reference before download when ready bytes are required", async () => {
+    const { storage } = setup(assetFixture({ status: "pending" }));
+    await expect(
+      readVerifiedWorkspaceStorageAsset(assetId, { readyOnly: true }),
+    ).rejects.toMatchObject({ code: "INVALID_STORAGE_ASSET" });
+    expect(storage.download).not.toHaveBeenCalled();
+  });
+
   it("scopes ready asset lookup before issuing a short-lived signed read", async () => {
     const { context, query, storage } = setup();
     context.writesEnabled = false;
@@ -472,5 +540,102 @@ describe("createWorkspaceSignedReads", () => {
     const { client } = bulkSetup([]);
     expect((await createWorkspaceSignedReads(["bad"])).size).toBe(0);
     expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { workspace_id: foreignWorkspaceId },
+    { status: "pending" },
+    { bucket: "public" },
+    { storage_path: `${foreignWorkspaceId}/${assetId}/${objectId}.png` },
+    { storage_path: `${workspaceId}/${assetId}/../${objectId}.png` },
+    { storage_path: `${workspaceId}/${assetId}/${objectId}.jpg` },
+    { bucket: "previews", mime_type: "image/jpeg" },
+    { byte_size: STORAGE_MAX_BYTES + 1 },
+    { id: "8028ac62-eae5-4f8e-8b32-46f7cb6b1e0b" },
+  ])(
+    "never signs invalid or unrequested asset metadata %j",
+    async (overrides) => {
+      const { rows, storage } = bulkSetup([]);
+      rows[0] = assetFixture(overrides);
+      await createWorkspaceSignedReads([assetId, otherId]);
+      expect(storage.createSignedUrls).toHaveBeenCalledWith(
+        [rows[1].storage_path],
+        STORAGE_READ_TTL_SECONDS,
+      );
+    },
+  );
+
+  it("ignores signed paths outside the validated batch", async () => {
+    const { rows, storage } = bulkSetup([]);
+    storage.createSignedUrls.mockResolvedValue({
+      data: [
+        {
+          path: `${foreignWorkspaceId}/${assetId}/${objectId}.png`,
+          signedUrl: "https://example.supabase.co/foreign",
+          error: null,
+        },
+        {
+          path: rows[1].storage_path,
+          signedUrl: "https://example.supabase.co/valid",
+          error: null,
+        },
+      ],
+      error: null,
+    });
+    const urls = await createWorkspaceSignedReads([assetId, otherId]);
+    expect([...urls.keys()]).toEqual([otherId]);
+  });
+
+  it("preserves available images when one bucket fails to sign", async () => {
+    const { rows, storage } = bulkSetup([]);
+    rows[1] = assetFixture({
+      id: otherId,
+      bucket: "previews",
+      storage_path: `${workspaceId}/${otherId}/${objectId}.png`,
+    });
+    storage.createSignedUrls
+      .mockResolvedValueOnce({
+        data: null,
+        error: new StorageApiError("unavailable", 503, "503"),
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            path: rows[1].storage_path,
+            signedUrl: "https://example.supabase.co/valid",
+            error: null,
+          },
+        ],
+        error: null,
+      });
+    const urls = await createWorkspaceSignedReads([assetId, otherId]);
+    expect([...urls.keys()]).toEqual([otherId]);
+  });
+
+  it("bounds metadata and signing batches for larger inventories", async () => {
+    const { query, storage } = bulkSetup([]);
+    const rows = Array.from({ length: 101 }, (_, index) => {
+      const id = `00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`;
+      return assetFixture({
+        id,
+        storage_path: `${workspaceId}/${id}/${objectId}.png`,
+      });
+    });
+    query.in.mockImplementation(async (_field, ids) => ({
+      data: rows.filter((row) => ids.includes(row.id)),
+      error: null,
+    }));
+    storage.createSignedUrls.mockImplementation(async (paths) => ({
+      data: paths.map((path: string) => ({
+        path,
+        signedUrl: "https://example.supabase.co/valid",
+        error: null,
+      })),
+      error: null,
+    }));
+    const urls = await createWorkspaceSignedReads(rows.map((row) => row.id));
+    expect(urls.size).toBe(101);
+    expect(query.in.mock.calls.map((call) => call[1].length)).toEqual([100, 1]);
+    expect(storage.createSignedUrls).toHaveBeenCalledTimes(2);
   });
 });

@@ -80,6 +80,15 @@ export function WardrobeIntakeFlow({
             `/api/wardrobe/operations/${operationId}/run`,
             { method: "POST" },
           );
+          if (
+            response.ok &&
+            ["worker", "queue"].includes(
+              response.headers.get("x-stylora-executor") ?? "",
+            )
+          ) {
+            if (current.current) setWatchingDraft(current.current.id);
+            return;
+          }
           if (!response.body)
             throw new Error(
               "Photo description could not start. Retry or enter details manually.",
@@ -189,8 +198,13 @@ export function WardrobeIntakeFlow({
         const state = await wardrobeRequest<{
           operation: { id: string; status: string } | null;
           leaseExpired: boolean;
+          executionMode?: "worker" | "inline" | "queue";
+          provisionalCount?: number;
         }>(`/drafts/${watchingDraft}/analyze`);
         if (!active) return;
+        const backgroundManaged =
+          state.executionMode === "worker" || state.executionMode === "queue";
+        if (backgroundManaged) setProvisionalCount(state.provisionalCount ?? 0);
         if (state.operation?.status === "succeeded") {
           const saved = await wardrobeRequest<WardrobeDraft>(
             `/drafts/${watchingDraft}`,
@@ -209,16 +223,17 @@ export function WardrobeIntakeFlow({
           setWatchingDraft(undefined);
           setBusy(false);
         } else if (
-          state.operation.status === "queued" ||
-          (state.leaseExpired &&
-            ["running", "partial"].includes(state.operation.status))
+          !backgroundManaged &&
+          (state.operation.status === "queued" ||
+            (state.leaseExpired &&
+              ["running", "partial"].includes(state.operation.status)))
         ) {
-          setWatchingDraft(undefined);
           await runExistingAnalysis(state.operation.id);
+          if (active) timer = window.setTimeout(() => void check(), 3000);
         } else if (
           state.operation &&
           ["queued", "running", "partial"].includes(state.operation.status) &&
-          !state.leaseExpired
+          (!state.leaseExpired || backgroundManaged)
         ) {
           setStage("analyzing");
           setBusy(true);
@@ -359,7 +374,6 @@ export function WardrobeIntakeFlow({
     )
       return;
     const value = occasion.trim();
-    if (!value && !draft.payload.metadata.occasion) return;
     const version = occasionVersion.current;
     const id = draft.id;
     const timer = window.setTimeout(() => {
@@ -369,8 +383,7 @@ export function WardrobeIntakeFlow({
           if (
             !saved ||
             current.current?.id !== id ||
-            version !== occasionVersion.current ||
-            !value
+            version !== occasionVersion.current
           )
             return;
           setWatchingDraft(undefined);

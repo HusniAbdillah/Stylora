@@ -162,9 +162,9 @@ export function StudioSaveButton({
       {saved ? (
         <Link
           className="text-sm text-crimson underline"
-          href={`/preview?savedLookId=${saved.savedLookId}`}
+          href={`/saved-looks/${saved.savedLookId}`}
         >
-          Open saved preview
+          View saved look
         </Link>
       ) : null}
       {saved && retryable ? (

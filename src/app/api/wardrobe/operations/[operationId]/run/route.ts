@@ -1,11 +1,25 @@
 import { executeWardrobeAnalysis } from "@/features/wardrobe/analysis";
 import { wardrobeRoute } from "@/features/wardrobe/http";
+import {
+  executorResponse,
+  usesBackgroundExecution,
+} from "@/features/operations/execution-mode";
+import { readOperation, operationStatus } from "@/features/operations/server";
 export const maxDuration = 300;
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ operationId: string }> },
 ) {
   const { operationId } = await params;
+  if (usesBackgroundExecution())
+    return executorResponse(
+      await wardrobeRoute(async () => {
+        const operation = await readOperation(operationId);
+        if (operation.kind !== "wardrobe_description")
+          throw new Error("Unexpected operation kind");
+        return { operation: operationStatus(operation) };
+      }),
+    );
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {

@@ -5,6 +5,7 @@
 /.vercel/
 .env*
 !/.env.example
+!/.env.production.example
 /next-env.d.ts
 *.tsbuildinfo
 *.log

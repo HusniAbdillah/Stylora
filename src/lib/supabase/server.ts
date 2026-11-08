@@ -27,6 +27,15 @@ export function getWorkspaceDatabase() {
   }
 
   const client = createClient<Database>(config.url, config.secretKey, {
+    global: {
+      fetch: (url, options) =>
+        fetch(url, {
+          ...options,
+          signal: options?.signal
+            ? AbortSignal.any([options.signal, AbortSignal.timeout(30_000)])
+            : AbortSignal.timeout(30_000),
+        }),
+    },
     auth: {
       persistSession: false,
       autoRefreshToken: false,
