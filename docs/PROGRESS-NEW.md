@@ -1684,3 +1684,9 @@ src/components/shell/navigation.test.tsx` passed five tests. The new cache
   has been activated. Vault exists; `pg_cron` and `pg_net` were absent at the
   hosted extension check. There is no linked Vercel project or usable local
   CLI authentication in this checkout. No new provider calls were made.
+
+## Owner 4 secret-scan fixture correction, 8 November 2026
+
+- GitGuardian incident 39819137 flagged a hardcoded UUID used only as a mocked dispatch lease token in queue-publish.test.ts. The queue client and database are mocked; this fixture does not authenticate to a service. Replaced the four test IDs with explicit low-entropy UUID fixtures, preserving UUID validation and distinct identities.
+- Targeted queue-publish suite: 12 tests passed. No provider calls, database changes, credential rotation or history rewrite. Historical incident resolution still requires marking the finding as a test fixture in GitGuardian.
+

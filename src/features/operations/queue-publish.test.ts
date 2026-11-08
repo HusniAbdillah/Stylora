@@ -17,10 +17,10 @@ vi.mock("./queue-client", () => ({
   workflowQueueClient: () => ({ send: mocks.send }),
 }));
 
-const workspaceId = "cccf56bf-ac67-417e-bef1-f43dc6a87aa1";
-const operationId = "208eddd1-b0af-4bf1-99f6-3d6e79f3000c";
-const dispatchId = "c65c4e91-049a-4fae-879c-20c4512ba9d6";
-const leaseToken = "681b61d2-680c-44eb-bd39-bb407775573a";
+const workspaceId = "00000000-0000-4000-8000-000000000001";
+const operationId = "00000000-0000-4000-8000-000000000002";
+const dispatchId = "00000000-0000-4000-8000-000000000003";
+const leaseToken = "00000000-0000-4000-8000-000000000004";
 const dispatch = {
   id: dispatchId,
   operation_id: operationId,
