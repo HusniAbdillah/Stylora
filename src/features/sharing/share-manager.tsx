@@ -277,6 +277,23 @@ function SharingSession({
               }
             : undefined
         }
+        confirmation={
+          revoking && open && writesEnabled
+            ? {
+                content: (
+                  <ShareRevocationDialog
+                    open
+                    lookTitle={saved?.title ?? "this saved look"}
+                    busy={busy}
+                    error={revokeError}
+                    onClose={() => setRevoking(null)}
+                    onRevoke={() => void revoke()}
+                  />
+                ),
+                onCancel: () => setRevoking(null),
+              }
+            : undefined
+        }
       >
         {!writesEnabled && (
           <p
@@ -365,14 +382,6 @@ function SharingSession({
           </details>
         )}
       </ShareReviewDialog>
-      <ShareRevocationDialog
-        open={!!revoking && open && writesEnabled}
-        lookTitle={saved?.title ?? "this saved look"}
-        busy={busy}
-        error={revokeError}
-        onClose={() => setRevoking(null)}
-        onRevoke={() => void revoke()}
-      />
     </>
   );
 }

@@ -83,7 +83,7 @@ export function SavedLookAvatar({
   detail?: boolean;
 }) {
   const [failedSource, setFailedSource] = useState<string | null>(null);
-  const geometry = detail ? "aspect-[3/4] md:aspect-[2/3]" : "aspect-[3/4]";
+  const geometry = detail ? "aspect-[2/3]" : "aspect-[3/4]";
   if (look.avatarUrl && failedSource !== look.avatarUrl) {
     return (
       <div
@@ -99,7 +99,7 @@ export function SavedLookAvatar({
               : "(max-width: 640px) 50vw, 280px"
           }
           unoptimized
-          className="object-cover"
+          className="object-contain"
           onError={() => setFailedSource(look.avatarUrl ?? null)}
         />
         <span className="absolute left-3 top-3 rounded-full bg-paper px-2 py-1 text-xs">
