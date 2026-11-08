@@ -88,7 +88,7 @@ export async function runSavedAvatar(operationId: string) {
         items,
       );
       const current = await readOperation(claim.operationId);
-      let captured = current.result_ref?.renderContext;
+      let captured: unknown = current.result_ref?.renderContext;
       if (!captured) {
         const history = await context.client
           .from("workflow_operation_events")
