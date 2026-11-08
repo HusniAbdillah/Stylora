@@ -30,10 +30,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const completed = (data: unknown) =>
+const completed = (
+  data: unknown,
+  usage?: { input_tokens: number; output_tokens: number; total_tokens: number },
+) =>
   new Response(
     JSON.stringify({
       status: "completed",
+      usage,
       output: [
         {
           type: "message",
@@ -126,6 +130,75 @@ describe("accounted validation correction", () => {
       correctionAttempt: true,
       retryable: false,
     });
+  });
+  it("records usage for invalid and corrected responses and reports the known total", async () => {
+    const { context } = setup([
+      completed(
+        { count: -1 },
+        { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+      ),
+      completed(
+        { count: 2 },
+        { input_tokens: 20, output_tokens: 7, total_tokens: 27 },
+      ),
+    ]);
+    const result = await withFashionOperation(context, () =>
+      requestFashion({
+        task: "outfit_options",
+        schema: z.object({ count: z.number().positive() }),
+        context: {},
+      }),
+    );
+    expect(result.metadata.usage).toEqual({
+      input_tokens: 30,
+      output_tokens: 12,
+      total_tokens: 42,
+    });
+    expect(result.metadata.requests).toMatchObject([
+      {
+        attempt: 1,
+        correctionAttempt: false,
+        responseStatus: "completed",
+        providerCode: "output_schema",
+        usage: { total_tokens: 15 },
+      },
+      {
+        attempt: 2,
+        correctionAttempt: true,
+        responseStatus: "completed",
+        providerCode: null,
+        usage: { total_tokens: 27 },
+      },
+    ]);
+  });
+  it("preserves safe per-attempt usage receipts on terminal output failure", async () => {
+    const { context } = setup([
+      completed(
+        { count: -1 },
+        { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+      ),
+      completed(
+        { count: -2 },
+        { input_tokens: 20, output_tokens: 7, total_tokens: 27 },
+      ),
+    ]);
+    const error = await withFashionOperation(context, () =>
+      requestFashion({
+        task: "outfit_options",
+        schema: z.object({ count: z.number().positive() }),
+        context: {},
+      }),
+    ).catch((error: unknown) => error);
+    expect(safeProviderError(error)).toMatchObject({
+      requests: [
+        { usage: { total_tokens: 15 } },
+        { usage: { total_tokens: 27 } },
+      ],
+      providerSettings: { model: "unit-test-model" },
+    });
+    expect(JSON.stringify(safeProviderError(error))).not.toContain(
+      '"count":-1',
+    );
   });
   it("keeps refusal terminal without a corrective request", async () => {
     const { fetch, context } = setup([

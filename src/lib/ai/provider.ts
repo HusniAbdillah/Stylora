@@ -46,6 +46,33 @@ const responseTextSchema = z.object({
 });
 
 type ProviderUsage = z.infer<typeof responseTextSchema>["usage"];
+type ProviderReceipt = {
+  attempt: number;
+  requestId: string | null;
+  httpStatus: number | null;
+  latencyMs: number;
+  usage: ProviderUsage | null;
+  responseStatus: string | null;
+  providerCode: string | null;
+  correctionAttempt: boolean;
+};
+const receiptSchema = z.object({
+  id: z.string().optional(),
+  status: z.string().optional(),
+  usage: responseTextSchema.shape.usage,
+});
+
+function totalUsage(receipts: ProviderReceipt[]): ProviderUsage | null {
+  if (!receipts.length || receipts.some((entry) => !entry.usage)) return null;
+  return receipts.reduce(
+    (sum, entry) => ({
+      input_tokens: sum.input_tokens + entry.usage!.input_tokens,
+      output_tokens: sum.output_tokens + entry.usage!.output_tokens,
+      total_tokens: sum.total_tokens + entry.usage!.total_tokens,
+    }),
+    { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+  );
+}
 
 export type FashionRequest<T extends z.ZodType> = {
   task: Exclude<FashionTask, "preview_image">;
@@ -73,6 +100,7 @@ export type ProviderMetadata = {
   correctionAttemptCount: number;
   providerSettings: FashionTaskSettings;
   slotReleaseFailed: boolean;
+  requests: ProviderReceipt[];
 };
 
 type FashionOperationContext = {
@@ -96,6 +124,8 @@ type ProviderFailureDetails = {
   responseStatus: string | null;
   incompleteReason: string | null;
   correctionAttempt: boolean;
+  providerSettings: FashionTaskSettings | null;
+  requests: ProviderReceipt[];
 };
 const operationScope = new AsyncLocalStorage<FashionOperationContext>();
 const failures = new WeakMap<Error, ProviderFailureDetails>();
@@ -129,6 +159,8 @@ export function safeProviderError(
       responseStatus: null,
       incompleteReason: null,
       correctionAttempt: false,
+      providerSettings: null,
+      requests: [],
     }
   );
 }
@@ -152,6 +184,8 @@ function diagnosticError(
     responseStatus: null,
     incompleteReason: null,
     correctionAttempt: false,
+    providerSettings: null,
+    requests: [],
     ...details,
     code,
     retryable,
@@ -385,6 +419,7 @@ export function parseFashionResponse<T extends z.ZodType>(
 async function readStream<T extends z.ZodType>(
   response: Response,
   request: FashionRequest<T>,
+  onResponse: (value: unknown) => void,
 ) {
   if (!response.body) throw invalidOutput();
   const reader = response.body.getReader();
@@ -418,6 +453,7 @@ async function readStream<T extends z.ZodType>(
       }
     } else if (event.type === "response.completed") {
       completion = event.response;
+      onResponse(completion);
     } else if (
       event.type === "response.refusal.delta" ||
       event.type === "response.refusal.done"
@@ -430,6 +466,7 @@ async function readStream<T extends z.ZodType>(
     } else if (
       ["response.failed", "response.incomplete"].includes(event.type)
     ) {
+      onResponse(event.response);
       parseFashionResponse(request.schema, event.response);
       throw invalidOutput({ providerCode: "stream_failed" });
     } else if (event.type === "error") {
@@ -564,6 +601,7 @@ export async function requestFashion<T extends z.ZodType>(
   const deadline = Math.min(started + 240_000, scope.deadline ?? Infinity);
   const workspaceId = process.env.STYLORA_WORKSPACE_ID || "unconfigured";
   let provisionalOutput = false;
+  const receipts: ProviderReceipt[] = [];
   let correction:
     | {
         type: "correction_attempt";
@@ -589,6 +627,17 @@ export async function requestFashion<T extends z.ZodType>(
     let validatedResult:
       { data: z.output<T>; metadata: ProviderMetadata } | undefined;
     let slotReleaseFailed = false;
+    let requestSent = false;
+    let responseUsage: ProviderUsage | null = null;
+    let responseStatus: string | null = null;
+    const attemptStarted = Date.now();
+    const recordEnvelope = (value: unknown) => {
+      const parsed = receiptSchema.safeParse(value);
+      if (parsed.success) {
+        responseUsage = parsed.data.usage ?? null;
+        responseStatus = safeIdentifier(parsed.data.status);
+      }
+    };
     let details: Partial<ProviderFailureDetails> = {
       attemptCount: attempt,
       operationId: scope.operationId,
@@ -614,6 +663,7 @@ export async function requestFashion<T extends z.ZodType>(
       await scope.reserveCall();
       reserved = true;
       timeout.throwIfAborted();
+      requestSent = true;
       const response = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: {
@@ -673,9 +723,14 @@ export async function requestFashion<T extends z.ZodType>(
           details,
         );
       }
-      const result = request.onPiece
-        ? await readStream(response, streamingRequest)
-        : parseFashionResponse(request.schema, await response.json());
+      let result: ReturnType<typeof parseFashionResponse<T>>;
+      if (request.onPiece)
+        result = await readStream(response, streamingRequest, recordEnvelope);
+      else {
+        const envelope: unknown = await response.json();
+        recordEnvelope(envelope);
+        result = parseFashionResponse(request.schema, envelope);
+      }
       request.validate?.(result.data);
       validatedResult = {
         data: result.data,
@@ -690,6 +745,7 @@ export async function requestFashion<T extends z.ZodType>(
           correctionAttemptCount: correction ? 1 : 0,
           providerSettings: settings,
           slotReleaseFailed: false,
+          requests: [],
         },
       };
     } catch (error) {
@@ -744,6 +800,19 @@ export async function requestFashion<T extends z.ZodType>(
         retryable: failure.retryable,
       });
     } finally {
+      if (requestSent)
+        receipts.push({
+          attempt,
+          requestId: details.requestId ?? null,
+          httpStatus: details.httpStatus ?? null,
+          latencyMs: Date.now() - attemptStarted,
+          usage: responseUsage,
+          responseStatus,
+          providerCode: failure
+            ? (safeProviderError(failure)?.providerCode ?? null)
+            : null,
+          correctionAttempt: Boolean(correction),
+        });
       try {
         if (reserved) {
           try {
@@ -758,9 +827,17 @@ export async function requestFashion<T extends z.ZodType>(
     }
     if (validatedResult) {
       validatedResult.metadata.slotReleaseFailed = slotReleaseFailed;
+      validatedResult.metadata.requests = [...receipts];
+      validatedResult.metadata.usage = totalUsage(receipts);
+      validatedResult.metadata.latencyMs = Date.now() - started;
       return validatedResult;
     }
     if (!failure) throw invalidOutput();
+    failures.set(failure, {
+      ...safeProviderError(failure)!,
+      providerSettings: settings,
+      requests: [...receipts],
+    });
     if (slotReleaseFailed) throw failure;
     const validation = safeProviderError(failure);
     const correctable =
