@@ -333,7 +333,7 @@ BEGIN
   SELECT * INTO op FROM public.workflow_operations WHERE workspace_id = p_workspace_id AND id = p_operation_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'STYLORA_OPERATION_NOT_FOUND'; END IF;
   IF op.status <> 'failed' OR op.attempt_count >= 3 OR op.cancel_requested_at IS NOT NULL
-    OR op.result_ref->>'retryable' IS DISTINCT FROM 'true' OR NOT coalesce(public.stylora_workflow_retryable_code(op.safe_error_code), false)
+    OR coalesce(op.result_ref->'retryable' = 'false'::jsonb, false) OR NOT coalesce(public.stylora_workflow_retryable_code(op.safe_error_code), false)
     OR (op.safe_error_code = 'CHECKPOINT_COMMIT_PENDING' AND NOT EXISTS (SELECT 1 FROM public.operation_result_checkpoints
       WHERE workspace_id = p_workspace_id AND operation_id = op.id AND input_fingerprint = op.input_fingerprint))
     OR (op.provider_call_count >= 3 AND NOT EXISTS (SELECT 1 FROM public.operation_result_checkpoints
@@ -525,4 +525,32 @@ BEGIN
 END;
 $$;
 
+
+CREATE OR REPLACE FUNCTION public.stylora_guard_option_item() RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+DECLARE v_type text; v_combined boolean; v_current boolean; v_status text;
+BEGIN
+  SELECT o.option_type, coalesce(o.provider_metadata->>'inventoryMode'='combined',false), o.is_current, o.status INTO v_type,v_combined,v_current,v_status FROM public.outfit_options o
+    WHERE o.workspace_id = NEW.workspace_id AND o.look_id = NEW.look_id AND o.id = NEW.option_id
+    FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = '23503', MESSAGE = 'STYLORA_OPTION_PARENT_NOT_FOUND';
+  END IF;
+  IF v_type = 'from_wardrobe' AND NEW.item_kind <> 'owned' AND NOT (TG_OP = 'UPDATE' AND NOT v_current AND v_status = 'unavailable' AND OLD.item_kind = 'owned' AND NEW.item_kind = 'missing' AND NEW.wardrobe_item_id IS NULL) THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'STYLORA_OWNED_ONLY_OPTION';
+  END IF;
+  IF NEW.item_kind = 'owned' AND NOT EXISTS (
+    SELECT 1 FROM public.wardrobe_items w WHERE w.workspace_id = NEW.workspace_id
+      AND w.id = NEW.wardrobe_item_id AND w.inventory_status = 'owned' AND (v_combined OR w.archived_at IS NULL)
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'STYLORA_OWNED_ITEM_REQUIRED';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.outfit_option_items i WHERE i.workspace_id = NEW.workspace_id
+    AND i.option_id = NEW.option_id AND i.slot_id = NEW.slot_id AND i.id <> NEW.id
+    AND (i.category <> NEW.category OR i.position <> NEW.position)) THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'STYLORA_SLOT_CONTRACT_MISMATCH';
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
