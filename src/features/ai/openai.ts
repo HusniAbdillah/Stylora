@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { buildFashionPrompt, getFashionVersions } from "@/prompts/fashion";
 import {
@@ -10,6 +11,16 @@ import {
   avatarVisualDirectionSchema,
   type AvatarVisualDirection,
 } from "@/features/preview/visual-direction";
+import {
+  capsuleGenerationConfig,
+  capsuleGenerationConfigSchema,
+  type CapsuleGenerationConfig,
+} from "@/features/capsules/generation-context";
+import {
+  CapsuleOutputError,
+  capsuleDiagnostics,
+  type CapsuleDiagnostic,
+} from "@/features/capsules/generation-schema";
 
 export const FASHION_SCHEMA_VERSION = "fashion-item.v1";
 export const FASHION_KNOWLEDGE_VERSION =
@@ -22,12 +33,26 @@ export const TEXT_MODEL =
   "gpt-5-mini";
 export const IMAGE_MODEL =
   process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1.5";
+const capsulePrompt = buildFashionPrompt("capsule_generation");
+const capsuleDirections =
+  "Return exactly brief.targetOutfits complete, meaningfully distinct outfits. Every item ID and evidence reference must be one of the supplied owned IDs. inputsUsed must use exact allowedSignals strings, not paraphrases. Use exactly two concise Why this reasons per outfit, with short summaries, differences and uncertainty. Do not recommend additions unless a real role gap unlocks at least two listed outfits. All addition indices are zero-based and every claimed use must reference the addition in that outfit. Required IDs must appear somewhere in the capsule. Never repair an unknown ID by guessing.";
+const capsuleInstructions =
+  capsulePrompt.instructions + "\n\n" + capsuleDirections;
+export const CAPSULE_SOURCE_VERSIONS = {
+  ...capsulePrompt.versions,
+  promptAssemblyHash: createHash("sha256")
+    .update(capsuleInstructions)
+    .digest("hex"),
+};
+export const CAPSULE_PROMPT_VERSION = `stylora-fashion-v1.capsule-3.${CAPSULE_SOURCE_VERSIONS.promptAssemblyHash}`;
 
 export class OpenAIUnavailableError extends Error {
+  providerAttempts = 0;
   constructor(
     public readonly code: string,
     public readonly retryable = false,
     public readonly retryAfterSeconds?: number,
+    public readonly diagnostics: CapsuleDiagnostic[] = [],
   ) {
     super(code);
     this.name = "OpenAIUnavailableError";
@@ -91,6 +116,10 @@ async function request(
 
 const textResponse = z.object({
   status: z.string(),
+  incomplete_details: z
+    .object({ reason: z.string().optional() })
+    .nullable()
+    .optional(),
   output: z.array(
     z.object({
       type: z.string(),
@@ -101,56 +130,211 @@ const textResponse = z.object({
   ),
 });
 
+export function parseFashionJsonOutput<T>(
+  value: unknown,
+  validate: (value: unknown) => T,
+): T {
+  const envelope = textResponse.safeParse(value);
+  if (!envelope.success)
+    throw new OpenAIUnavailableError(
+      "OPENAI_RESPONSE_SCHEMA_INVALID",
+      false,
+      undefined,
+      capsuleDiagnostics(envelope.error.issues),
+    );
+  const content = envelope.data.output.flatMap(
+    (output) => output.content ?? [],
+  );
+  if (content.some((part) => part.type === "refusal"))
+    throw new OpenAIUnavailableError(
+      "OPENAI_RESPONSE_REFUSED",
+      false,
+      undefined,
+      [{ code: "REFUSAL", path: "output" }],
+    );
+  if (envelope.data.status !== "completed") {
+    const truncated =
+      envelope.data.incomplete_details?.reason === "max_output_tokens";
+    throw new OpenAIUnavailableError(
+      truncated ? "OPENAI_OUTPUT_TRUNCATED" : "OPENAI_RESPONSE_INCOMPLETE",
+      false,
+      undefined,
+      [
+        {
+          code: truncated ? "MAX_OUTPUT_TOKENS" : "INCOMPLETE_RESPONSE",
+          path: "status",
+        },
+      ],
+    );
+  }
+  const text = content
+    .filter((part) => part.type === "output_text")
+    .map((part) => part.text ?? "")
+    .join("");
+  if (!text.trim())
+    throw new OpenAIUnavailableError("OPENAI_OUTPUT_EMPTY", false, undefined, [
+      { code: "EMPTY_OUTPUT", path: "output" },
+    ]);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new OpenAIUnavailableError(
+      "OPENAI_OUTPUT_JSON_INVALID",
+      false,
+      undefined,
+      [{ code: "INVALID_JSON", path: "output" }],
+    );
+  }
+  try {
+    return validate(parsed);
+  } catch (error) {
+    if (error instanceof CapsuleOutputError) throw error;
+    if (error instanceof z.ZodError)
+      throw new OpenAIUnavailableError(
+        "OPENAI_OUTPUT_SCHEMA_INVALID",
+        false,
+        undefined,
+        capsuleDiagnostics(error.issues),
+      );
+    throw new OpenAIUnavailableError(
+      "OPENAI_VALIDATION_FAILED",
+      false,
+      undefined,
+      [{ code: "VALIDATION_FAILED", path: "output" }],
+    );
+  }
+}
+
 export async function generateFashionJson<T>(input: {
   task: "capsule";
   context: unknown;
   schema: Record<string, unknown>;
   validate: (value: unknown) => T;
   signal?: AbortSignal;
+  config?: CapsuleGenerationConfig;
+  legacy?: boolean;
+  beforeCorrection?: () => Promise<void>;
 }) {
-  const response = await request(
-    "responses",
-    JSON.stringify({
-      model: TEXT_MODEL,
-      store: false,
-      instructions: instructions(input.task),
-      input: JSON.stringify(input.context),
-      max_output_tokens: 10000,
-      text: {
-        format: {
-          type: "json_schema",
-          name: "capsule_result",
-          schema: input.schema,
-          strict: true,
-        },
-      },
-    }),
-    110000,
-    true,
-    input.signal,
+  const target = z
+    .object({
+      brief: z.object({ targetOutfits: z.number().int().min(3).max(6) }),
+    })
+    .safeParse(input.context);
+  const config = capsuleGenerationConfigSchema.parse(
+    input.config ??
+      capsuleGenerationConfig(
+        TEXT_MODEL,
+        target.success ? target.data.brief.targetOutfits : 3,
+      ),
   );
-  try {
-    const parsed = textResponse.parse(await response.json());
-    if (parsed.status !== "completed") throw new Error("incomplete");
-    const content = parsed.output.flatMap((output) => output.content ?? []);
-    if (content.some((part) => part.type === "refusal"))
-      throw new Error("refused");
-    const text = content
-      .filter((part) => part.type === "output_text")
-      .map((part) => part.text ?? "")
-      .join("");
-    const value = input.validate(JSON.parse(text));
-    return {
-      value,
-      model: TEXT_MODEL,
-      promptVersion: FASHION_PROMPT_VERSION,
-      schemaVersion: FASHION_SCHEMA_VERSION,
-      knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
-      providerRequestId: response.headers.get("x-request-id"),
-    };
-  } catch {
-    throw new OpenAIUnavailableError("OPENAI_INVALID_OUTPUT");
+  const deadline = Date.now() + (input.legacy ? 110000 : config.deadlineMs);
+  const maximum = input.legacy ? 1 : config.maxProviderRequests;
+  let feedback: { code: string; diagnostics: CapsuleDiagnostic[] } | undefined;
+  for (let attempt = 1; attempt <= maximum; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining < 1000 || input.signal?.aborted)
+      throw new OpenAIUnavailableError("OPENAI_DEADLINE_EXCEEDED");
+    try {
+      const response = await request(
+        "responses",
+        JSON.stringify({
+          model: config.model,
+          store: false,
+          instructions: input.legacy
+            ? instructions(input.task)
+            : capsuleInstructions,
+          input: JSON.stringify(
+            feedback
+              ? {
+                  context: input.context,
+                  validationFeedback: {
+                    ...feedback,
+                    instruction:
+                      "Return one complete corrected result from the same captured context. Fix only the stated schema/domain failures; do not invent references or relax constraints.",
+                  },
+                }
+              : input.context,
+          ),
+          max_output_tokens: input.legacy ? 10000 : config.maxOutputTokens,
+          ...(!input.legacy && config.reasoningEffort
+            ? { reasoning: { effort: config.reasoningEffort } }
+            : {}),
+          text: {
+            ...(!input.legacy && config.reasoningEffort
+              ? { verbosity: "low" }
+              : {}),
+            format: {
+              type: "json_schema",
+              name: "capsule_result",
+              schema: input.schema,
+              strict: true,
+            },
+          },
+        }),
+        Math.min(input.legacy ? 110000 : 100000, remaining),
+        true,
+        input.signal,
+      );
+      let envelope: unknown;
+      try {
+        envelope = await response.json();
+      } catch (error) {
+        throw new OpenAIUnavailableError(
+          error instanceof SyntaxError
+            ? "OPENAI_RESPONSE_JSON_INVALID"
+            : "OPENAI_CONNECTION_FAILED",
+          !(error instanceof SyntaxError),
+          undefined,
+          [
+            {
+              code:
+                error instanceof SyntaxError
+                  ? "INVALID_RESPONSE_JSON"
+                  : "RESPONSE_READ_FAILED",
+              path: "response",
+            },
+          ],
+        );
+      }
+      const value = parseFashionJsonOutput(envelope, input.validate);
+      return {
+        value,
+        model: config.model,
+        promptVersion: input.legacy
+          ? FASHION_PROMPT_VERSION
+          : CAPSULE_PROMPT_VERSION,
+        schemaVersion: FASHION_SCHEMA_VERSION,
+        knowledgeVersion: FASHION_KNOWLEDGE_VERSION,
+        sourceVersions: input.legacy
+          ? capsulePrompt.versions
+          : CAPSULE_SOURCE_VERSIONS,
+        providerRequestId: response.headers.get("x-request-id"),
+        providerAttempts: attempt,
+      };
+    } catch (error) {
+      const failure =
+        error instanceof OpenAIUnavailableError ||
+        error instanceof CapsuleOutputError
+          ? error
+          : new OpenAIUnavailableError("OPENAI_VALIDATION_FAILED");
+      failure.providerAttempts = attempt;
+      const correctable =
+        failure instanceof CapsuleOutputError
+          ? !["CAPSULE_CONTEXT_INVALID"].includes(failure.code)
+          : failure.code === "OPENAI_OUTPUT_SCHEMA_INVALID";
+      if (
+        !correctable ||
+        attempt >= maximum ||
+        deadline - Date.now() < 15000 ||
+        input.signal?.aborted
+      )
+        throw failure;
+      await input.beforeCorrection?.();
+      feedback = { code: failure.code, diagnostics: failure.diagnostics };
+    }
   }
+  throw new OpenAIUnavailableError("OPENAI_VALIDATION_FAILED");
 }
 
 const imageResponse = z.object({

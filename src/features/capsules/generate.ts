@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { attributesSchema } from "@/lib/ai/fashion-schema";
 import { resolveEffectiveAttributes } from "@/features/matching/gates";
@@ -13,6 +13,8 @@ import {
   FASHION_KNOWLEDGE_VERSION,
   FASHION_PROMPT_VERSION,
   FASHION_SCHEMA_VERSION,
+  CAPSULE_PROMPT_VERSION,
+  CAPSULE_SOURCE_VERSIONS,
   TEXT_MODEL,
   generateFashionJson,
 } from "@/features/ai/openai";
@@ -21,6 +23,9 @@ import {
   runOperation,
   operationStatus,
   assertWorkflowRpc,
+  readOperation,
+  OperationError,
+  type OperationClaim,
 } from "@/features/operations/server";
 import { getCapsuleDraft } from "./drafts";
 import { getCapsule } from "./queries";
@@ -33,7 +38,19 @@ import { CAPSULE_TEMPLATES } from "./capsule-types";
 import {
   capsuleGenerationSchema,
   validateCapsuleGeneration,
+  capsuleProviderSchema,
+  CapsuleOutputError,
+  capsuleDiagnostics,
 } from "./generation-schema";
+import {
+  capsuleFingerprint,
+  capsuleGenerationConfig,
+  capsuleProviderContext,
+  compactCapsuleItem,
+  readCapturedCapsule,
+  stableCapsuleValue,
+  type CapturedCapsule,
+} from "./generation-context";
 
 export async function prepareCapsule(input: unknown) {
   const context = getWorkspaceDatabase();
@@ -155,7 +172,10 @@ export async function prepareCapsule(input: unknown) {
   return { capsuleId, capsuleRevision, draftRevision: linked.revision };
 }
 
-async function capsuleContext(id: string) {
+async function capsuleContext(
+  id: string,
+  options: { legacy?: boolean; model?: string } = {},
+) {
   const capsule = await getCapsule(id);
   const { client, workspaceId } = getWorkspaceDatabase();
   const { data, error } = await client
@@ -217,14 +237,16 @@ async function capsuleContext(id: string) {
   const signals = [
     "Owned wardrobe",
     `Weather: ${capsule.brief.weather}`,
-    `Activities: ${capsule.brief.activities.join(", ")}`,
+    ...(options.legacy
+      ? [`Activities: ${capsule.brief.activities.join(", ")}`]
+      : capsule.brief.activities.map((activity) => `Activity: ${activity}`)),
     `Dress code: ${capsule.brief.dressCode}`,
     `Palette: ${capsule.brief.palette}`,
     ...Object.keys(personalization.preferences).map(
       (key) => `Preference: ${key}`,
     ),
   ];
-  const input = {
+  const legacyInput = {
     brief: capsule.brief,
     capsuleRevision: capsule.revision,
     items,
@@ -238,27 +260,46 @@ async function capsuleContext(id: string) {
     instructions:
       "Return the requested number of complete, meaningfully distinct outfits. Use exact allowedSignals in inputsUsed. Only use supplied owned IDs. Respect required and excluded IDs. Additions must unlock at least two demonstrated outfits. Keep all uncertainty explicit.",
   };
-  if (Buffer.byteLength(JSON.stringify(input)) > 100 * 1024)
+  const model = options.model ?? TEXT_MODEL;
+  const input: CapturedCapsule = options.legacy
+    ? legacyInput
+    : readCapturedCapsule({
+        ...legacyInput,
+        items: items.map(compactCapsuleItem),
+        contractVersion: "capsule-context.v2",
+        generationConfig: capsuleGenerationConfig(
+          model,
+          capsule.brief.targetOutfits,
+        ),
+        sourceVersions: CAPSULE_SOURCE_VERSIONS,
+      });
+  if (
+    Buffer.byteLength(JSON.stringify(capsuleProviderContext(input))) >
+      100 * 1024 ||
+    Buffer.byteLength(JSON.stringify(input)) > 240 * 1024
+  )
     throw new ApiError(
       "capsule_context_too_large",
       "Choose fewer pieces so their complete descriptions fit the analysis request.",
       422,
     );
-  const fingerprint = createHash("sha256")
-    .update(
-      JSON.stringify({
-        input,
-        prompt: FASHION_PROMPT_VERSION,
-        schema: FASHION_SCHEMA_VERSION,
-        knowledge: FASHION_KNOWLEDGE_VERSION,
-        model: TEXT_MODEL,
-      }),
-    )
-    .digest("hex");
+  const fingerprint = capsuleFingerprint(
+    input,
+    {
+      prompt: options.legacy ? FASHION_PROMPT_VERSION : CAPSULE_PROMPT_VERSION,
+      schema: FASHION_SCHEMA_VERSION,
+      knowledge: FASHION_KNOWLEDGE_VERSION,
+      model,
+    },
+    options.legacy,
+  );
   return { capsule, input, fingerprint };
 }
 
-export async function generateCapsule(id: string) {
+export async function generateCapsule(
+  id: string,
+  options: { execute?: boolean } = {},
+) {
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
   await assertWorkflowRpc("commit_capsule_generation");
@@ -270,47 +311,181 @@ export async function generateCapsule(id: string) {
     inputRevision: current.capsule.revision,
     inputFingerprint: current.fingerprint,
     input: current.input,
-    promptVersion: FASHION_PROMPT_VERSION,
+    promptVersion: CAPSULE_PROMPT_VERSION,
     schemaVersion: FASHION_SCHEMA_VERSION,
     model: TEXT_MODEL,
   });
-  const complete = await runOperation(operation.id, {
-    execute: async (claim) => {
-      const fresh = await capsuleContext(id);
-      if (fresh.fingerprint !== claim.inputFingerprint)
-        throw new ApiError(
-          "capsule_superseded",
-          "The capsule inputs changed. Generate the current revision.",
-          409,
+  return operationStatus(
+    options.execute === false
+      ? operation
+      : await runCapsuleOperation(operation.id),
+  );
+}
+
+const metadataSchema = z.strictObject({
+  model: z.string().min(1).max(120),
+  prompt_version: z.string().min(1).max(120),
+  schema_version: z.string().min(1).max(120),
+});
+type ExecutionMetadata = z.infer<typeof metadataSchema>;
+
+export async function runCapsuleOperation(operationId: string) {
+  const context = getWorkspaceDatabase();
+  requireWorkspaceWrites(context);
+  const operation = await readOperation(z.uuid().parse(operationId));
+  if (
+    operation.kind !== "capsule_generation" ||
+    operation.subject_type !== "capsule"
+  )
+    throw new OperationError(
+      "CAPSULE_OPERATION_INVALID",
+      "This capsule operation is unavailable.",
+      404,
+    );
+  if (
+    ["succeeded", "failed", "cancelled", "superseded"].includes(
+      operation.status,
+    )
+  )
+    return operation;
+  await assertWorkflowRpc("commit_capsule_generation");
+  const id = operation.subject_id;
+  async function metadata(claim: OperationClaim) {
+    const result = await context.client
+      .from("workflow_operations")
+      .select("model,prompt_version,schema_version")
+      .eq("workspace_id", context.workspaceId)
+      .eq("id", claim.operationId)
+      .eq("kind", "capsule_generation")
+      .eq("subject_type", "capsule")
+      .eq("subject_id", id)
+      .eq("attempt_count", claim.attemptCount)
+      .eq("input_fingerprint", claim.inputFingerprint)
+      .eq("status", "running")
+      .is("cancel_requested_at", null)
+      .abortSignal(claim.signal)
+      .maybeSingle();
+    if (result.error)
+      throw new OperationError(
+        "PROVIDER_NETWORK_ERROR",
+        "Capsule operation metadata could not be verified.",
+        503,
+        true,
+      );
+    if (!result.data)
+      throw new OperationError(
+        "CAPSULE_OPERATION_CHANGED",
+        "This capsule request changed or was cancelled.",
+        409,
+      );
+    const parsed = metadataSchema.safeParse(result.data);
+    if (!parsed.success)
+      throw new CapsuleOutputError(
+        "CAPSULE_CONTEXT_INVALID",
+        capsuleDiagnostics(parsed.error.issues),
+      );
+    return parsed.data;
+  }
+  async function assertCurrent(
+    claim: OperationClaim,
+    captured: CapturedCapsule,
+    capturedMetadata: ExecutionMetadata,
+  ) {
+    const currentMetadata = await metadata(claim);
+    if (
+      stableCapsuleValue(currentMetadata) !==
+        stableCapsuleValue(capturedMetadata) ||
+      capturedMetadata.prompt_version !==
+        (captured.contractVersion
+          ? CAPSULE_PROMPT_VERSION
+          : FASHION_PROMPT_VERSION) ||
+      capturedMetadata.schema_version !== FASHION_SCHEMA_VERSION
+    )
+      throw new OperationError(
+        "CAPSULE_POLICY_CHANGED",
+        "The Capsule generation policy changed. Generate the current inputs.",
+        409,
+      );
+    let fresh: Awaited<ReturnType<typeof capsuleContext>>;
+    try {
+      fresh = await capsuleContext(id, {
+        legacy: !captured.contractVersion,
+        model: capturedMetadata.model,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new CapsuleOutputError(
+          "CAPSULE_CONTEXT_INVALID",
+          capsuleDiagnostics(error.issues),
         );
+      if (error instanceof ApiError)
+        throw new OperationError(
+          error.status === 404 || error.status === 409
+            ? "CAPSULE_SUPERSEDED"
+            : "CAPSULE_CONTEXT_INVALID",
+          "Current Capsule inputs could not be verified.",
+          error.status,
+        );
+      throw error;
+    }
+    if (
+      claim.inputRevision !== captured.capsuleRevision ||
+      (captured.generationConfig?.model &&
+        captured.generationConfig.model !== capturedMetadata.model) ||
+      fresh.fingerprint !== claim.inputFingerprint ||
+      stableCapsuleValue(readCapturedCapsule(fresh.input)) !==
+        stableCapsuleValue(captured)
+    )
+      throw new OperationError(
+        "CAPSULE_SUPERSEDED",
+        "The capsule inputs changed. Generate the current revision.",
+        409,
+      );
+  }
+  return runOperation(operation.id, {
+    execute: async (claim) => {
+      const captured = readCapturedCapsule(claim.input);
+      const capturedMetadata = await metadata(claim);
+      await assertCurrent(claim, captured, capturedMetadata);
       const response = await generateFashionJson({
         task: "capsule",
-        context: fresh.input,
-        schema: z.toJSONSchema(capsuleGenerationSchema),
+        context: capsuleProviderContext(captured),
+        config:
+          captured.generationConfig ??
+          capsuleGenerationConfig(
+            capturedMetadata.model,
+            captured.brief.targetOutfits,
+          ),
+        legacy: !captured.contractVersion,
+        schema: z.toJSONSchema(
+          captured.contractVersion
+            ? capsuleProviderSchema(
+                captured.brief,
+                captured.items,
+                captured.allowedSignals,
+              )
+            : capsuleGenerationSchema,
+        ),
         signal: claim.signal,
+        beforeCorrection: () =>
+          assertCurrent(claim, captured, capturedMetadata),
         validate: (value) =>
           validateCapsuleGeneration(
             value,
-            fresh.capsule.brief,
-            fresh.input.items,
-            fresh.input.allowedSignals,
+            captured.brief,
+            captured.items,
+            captured.allowedSignals,
           ),
       });
-      return response.value;
+      return { value: response.value, captured, capturedMetadata };
     },
     commit: async (claim, output) => {
-      const fresh = await capsuleContext(id);
-      if (fresh.fingerprint !== claim.inputFingerprint)
-        throw new ApiError(
-          "capsule_superseded",
-          "The capsule inputs changed. Generate the current revision.",
-          409,
-        );
-      const outfitIds = output.outfits.map(() => randomUUID());
+      await assertCurrent(claim, output.captured, output.capturedMetadata);
+      const outfitIds = output.value.outfits.map(() => randomUUID());
       const additions = new Map(
-        output.additions.map((addition) => [addition.key, addition]),
+        output.value.additions.map((addition) => [addition.key, addition]),
       );
-      const outfits = output.outfits.map((outfit, index) => ({
+      const outfits = output.value.outfits.map((outfit, index) => ({
         id: outfitIds[index],
         title: outfit.title,
         rationale: outfit.summary,
@@ -326,7 +501,7 @@ export async function generateCapsule(id: string) {
         })),
         wardrobe_item_ids: outfit.itemIds,
       }));
-      const missing = output.additions.map(
+      const missing = output.value.additions.map(
         ({ unlockedOutfitIndices, ...addition }) => ({
           ...addition,
           unlockedOutfitIds: unlockedOutfitIndices.map(
@@ -345,12 +520,11 @@ export async function generateCapsule(id: string) {
         p_missing_additions: missing,
       });
       if (error)
-        throw new ApiError(
-          "capsule_commit_conflict",
+        throw new OperationError(
+          "CAPSULE_COMMIT_CONFLICT",
           "Your capsule changed before generation finished. Your newer choices are kept.",
           409,
         );
     },
   });
-  return operationStatus(complete);
 }
