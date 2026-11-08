@@ -52,6 +52,11 @@ export async function executeQueuedOperation(id: string) {
     return operationStatus(operation);
   if (operation.lease_until && Date.parse(operation.lease_until) > Date.now())
     return operationStatus(operation);
+  if (
+    operation.next_attempt_at &&
+    Date.parse(operation.next_attempt_at) > Date.now()
+  )
+    return operationStatus(operation);
   try {
     if ((createOperationKinds as readonly string[]).includes(operation.kind)) {
       try {

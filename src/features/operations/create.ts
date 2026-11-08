@@ -26,6 +26,7 @@ import {
   fashionValidationFailure,
 } from "@/lib/ai/provider";
 import { usesWorkflowWorker } from "./execution-mode";
+import { waitForDailyProviderBudget } from "./provider-budget";
 import { assertWorkflowExecutorAvailable } from "./health";
 import { workflowProviderLimits } from "./limits";
 import { buildFashionPrompt } from "@/prompts/fashion";
@@ -487,6 +488,11 @@ export async function executeOperation(id: string) {
       p_image_daily_limit: limits.imageDailyLimit,
     },
   );
+  if (error?.code === "55P03") {
+    if (error.message === "PROVIDER_DAILY_BUDGET_EXHAUSTED")
+      await waitForDailyProviderBudget(pending);
+    return projectOperation(await readOperation(id));
+  }
   if (error) throw sqlFailure(error);
   if (op.status !== "running") return projectOperation(op);
   const snapshot = snapshotSchema.parse(op.input);
@@ -528,6 +534,16 @@ export async function executeOperation(id: string) {
             await delay(200, undefined, { signal });
             continue;
           }
+          if (
+            reserveError.code === "54000" &&
+            reserveError.message === "PROVIDER_DAILY_BUDGET_EXHAUSTED"
+          )
+            throw new ApiError(
+              "provider_daily_budget_exhausted",
+              "The daily provider limit has been reached. This task will resume after the budget resets.",
+              429,
+              true,
+            );
           throw new ApiError(
             reserveError.code === "54000"
               ? "provider_budget_exhausted"

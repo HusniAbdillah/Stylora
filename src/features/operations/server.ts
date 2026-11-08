@@ -7,6 +7,7 @@ import {
 import { canRetryOperationCode, OperationError } from "./errors";
 import { workflowProviderLimits } from "./limits";
 import { assertWorkflowExecutorAvailable } from "./health";
+import { waitForDailyProviderBudget } from "./provider-budget";
 import {
   checkpointOperationResult,
   readOperationCheckpoint,
@@ -238,7 +239,11 @@ export async function runOperation<T>(
     p_text_daily_limit: workflowProviderLimits().textDailyLimit,
     p_image_daily_limit: workflowProviderLimits().imageDailyLimit,
   });
-  if (error?.code === "55P03") return readOperation(existing.id);
+  if (error?.code === "55P03") {
+    if (error.message === "PROVIDER_DAILY_BUDGET_EXHAUSTED")
+      await waitForDailyProviderBudget(existing);
+    return readOperation(existing.id);
+  }
   if (error) databaseError(error.code);
   const operation = operationRowSchema.parse(data);
   if (operation.status !== "running") return operation;

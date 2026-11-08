@@ -65,6 +65,10 @@ import type {
   OperationClaim,
 } from "@/features/operations/server";
 import type { CapsuleProviderMetadata } from "@/features/ai/openai";
+import {
+  readOperationCheckpoint,
+  checkpointOperationResult,
+} from "@/features/operations/checkpoints";
 
 const workspaceId = "ae781e34-b315-44a5-abfe-0c6c074a49c8";
 const capsuleId = "d270f645-b0d9-4c6f-8593-a154f31b98c9";
@@ -76,6 +80,10 @@ let sourceItems = structuredClone(capsuleFixtureItems);
 let capsuleRevision: number;
 let metadataFailure: "read" | "write" | null;
 let metadata: { model: string; prompt_version: string; schema_version: string };
+let checkpoint: {
+  result: z.infer<ReturnType<typeof z.json>>;
+  metadata: z.infer<ReturnType<typeof z.json>>;
+} | null;
 const queries: {
   table: string;
   filters: [string, string, unknown][];
@@ -133,6 +141,19 @@ function from(table: string) {
     abortSignal: () => query,
     order: async () => ({ data: structuredClone(sourceItems), error: null }),
     maybeSingle: async () => {
+      if (table === "operation_result_checkpoints") {
+        expect(entry.filters).toEqual(
+          expect.arrayContaining([
+            ["eq", "workspace_id", workspaceId],
+            ["eq", "operation_id", operationId],
+            ["eq", "input_fingerprint", operation.input_fingerprint],
+          ]),
+        );
+        return {
+          data: checkpoint ? structuredClone(checkpoint) : null,
+          error: null,
+        };
+      }
       if (
         (metadataFailure === "read" &&
           selection === "result_ref,status,provider_call_count") ||
@@ -192,6 +213,9 @@ beforeEach(() => {
   providerCount = 0;
   providerRequestId = null;
   metadataFailure = null;
+  checkpoint = null;
+  vi.stubEnv("OPENAI_CAPSULE_REASONING_EFFORT", "low");
+  vi.stubEnv("OPENAI_CAPSULE_MAX_OUTPUT_TOKENS", "9000");
   metadata = {
     model: "gpt-5-mini",
     prompt_version: "fixture-capsule-v2",
@@ -237,24 +261,46 @@ beforeEach(() => {
   });
   controls.read.mockImplementation(async () => structuredClone(operation));
   controls.fail.mockImplementation(async (_claim, failure) => {
-    operation.status = "failed";
+    operation.status = ["CAPSULE_SUPERSEDED", "INPUT_SUPERSEDED"].includes(
+      failure.code,
+    )
+      ? "superseded"
+      : "failed";
     operation.safe_error_code = failure.code;
     operation.result_ref = { retryable: failure.retryable };
   });
   controls.run.mockImplementation(
     async (_id: string, handler: OperationHandler<unknown>) => {
       operation.status = "running";
-      operation.attempt_count = 1;
+      operation.attempt_count++;
       const claim: OperationClaim = {
         operationId,
         inputRevision: operation.input_revision,
         inputFingerprint: operation.input_fingerprint,
-        attemptCount: 1,
+        attemptCount: operation.attempt_count,
         input: operation.input,
         signal: new AbortController().signal,
       };
+      let checkpointed = false;
       try {
-        await handler.commit(claim, await handler.execute(claim));
+        const stored = handler.checkpoint
+          ? await readOperationCheckpoint(claim)
+          : null;
+        const output =
+          stored && handler.checkpoint
+            ? await handler.checkpoint.restore(
+                claim,
+                stored.result,
+                stored.metadata,
+              )
+            : await handler.execute(claim);
+        if (handler.checkpoint && !stored)
+          await checkpointOperationResult(
+            claim,
+            handler.checkpoint.serialize(output),
+          );
+        checkpointed = !!handler.checkpoint;
+        await handler.commit(claim, output);
       } catch (error) {
         const failure =
           error instanceof OperationError
@@ -264,8 +310,13 @@ beforeEach(() => {
                 "Fixture failure.",
               );
         await handler.fail?.(claim, {
-          code: failure.code,
-          retryable: failure.retryable,
+          code:
+            checkpointed && failure.status >= 500
+              ? "CHECKPOINT_COMMIT_PENDING"
+              : failure.code,
+          retryable:
+            checkpointed && failure.status >= 500 ? true : failure.retryable,
+          checkpointed,
         });
       }
       return structuredClone(operation);
@@ -273,26 +324,86 @@ beforeEach(() => {
   );
   controls.generate.mockImplementation(async (input) => {
     await input.beforeRequest?.(1);
-    await input.onProviderMetadata?.(providerMetadata);
-    return {
-      value: input.validate(capsuleOutputFixture()),
-      providerMetadata,
-      providerAttempts: 1,
-    };
+    try {
+      const capturedProvider = {
+        ...providerMetadata,
+        model: input.config.model,
+        promptVersion: input.legacy
+          ? "fixture-legacy"
+          : providerMetadata.promptVersion,
+      };
+      await input.onProviderMetadata?.(capturedProvider);
+      return {
+        value: input.validate(capsuleOutputFixture()),
+        providerMetadata: capturedProvider,
+        providerAttempts: 1,
+      };
+    } finally {
+      await input.afterRequest?.(1);
+    }
   });
-  rpc.mockImplementation(async () => {
-    operation.status = "succeeded";
-    operation.result_ref = { capsuleId, outfitIds: [operationId] };
-    return { data: operation, error: null };
+  rpc.mockImplementation((name: string, input: Record<string, unknown>) => {
+    expect(input).toMatchObject({
+      p_workspace_id: workspaceId,
+      p_operation_id: operationId,
+      p_input_fingerprint: operation.input_fingerprint,
+    });
+    let data: unknown = null;
+    let error: { code: string } | null = null;
+    if (name === "reserve_workflow_provider_call") {
+      expect(input).toMatchObject({
+        p_attempt: operation.attempt_count,
+        p_text_daily_limit: expect.any(Number),
+        p_image_daily_limit: expect.any(Number),
+      });
+      if (providerCount >= 3) error = { code: "54000" };
+      else providerCount++;
+    } else if (name === "release_workflow_provider_call") {
+      expect(input.p_attempt).toBe(operation.attempt_count);
+    } else if (name === "checkpoint_workflow_result") {
+      expect(input.p_attempt).toBe(operation.attempt_count);
+      const captured = {
+        result: z.json().parse(input.p_result),
+        metadata: z.json().parse(input.p_metadata),
+      };
+      if (checkpoint) expect(captured).toEqual(checkpoint);
+      checkpoint = structuredClone(captured);
+      data = checkpoint;
+    } else if (name === "commit_capsule_generation") {
+      expect(input.p_attempt_count).toBe(operation.attempt_count);
+      operation.status = "succeeded";
+      operation.result_ref = {
+        capsuleId,
+        outfitIds: z
+          .array(z.object({ id: z.uuid() }))
+          .parse(input.p_outfits)
+          .map((outfit) => outfit.id),
+      };
+      data = operation;
+    } else throw new Error(`Unexpected fixture RPC: ${name}`);
+    const response = Promise.resolve({ data, error });
+    return Object.assign(response, { abortSignal: () => response });
   });
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 
 describe("Capsule captured worker execution", () => {
   it("allocates without provider work and executes the exact operation without another start", async () => {
     await generateCapsule(capsuleId, { execute: false });
     expect(controls.run).not.toHaveBeenCalled();
     expect(controls.generate).not.toHaveBeenCalled();
+    expect(operation.input).toMatchObject({
+      contractVersion: "capsule-context.v2",
+      generationConfig: {
+        version: "capsule-generation.v3",
+        model: metadata.model,
+        reasoningEffort: "low",
+        maxOutputTokens: 6000,
+      },
+    });
     const capturedFingerprint = operation.input_fingerprint;
     const result = await runCapsuleOperation(operationId);
     expect(result.status).toBe("succeeded");
@@ -309,6 +420,16 @@ describe("Capsule captured worker execution", () => {
     );
     expect(providerCount).toBe(1);
     expect(providerRequestId).toBe("req_fixture");
+    expect(checkpoint).toMatchObject({
+      result: { outfits: expect.any(Array) },
+      metadata: { capturedMetadata: metadata },
+    });
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual([
+      "reserve_workflow_provider_call",
+      "release_workflow_provider_call",
+      "checkpoint_workflow_result",
+      "commit_capsule_generation",
+    ]);
     expect(result.result_ref).toMatchObject({
       capsuleId,
       provider: {
@@ -346,7 +467,7 @@ describe("Capsule captured worker execution", () => {
     await generateCapsule(capsuleId, { execute: false });
     sourceItems[0].revision = 2;
     expect(await runCapsuleOperation(operationId)).toMatchObject({
-      status: "failed",
+      status: "superseded",
       safe_error_code: "CAPSULE_SUPERSEDED",
     });
     expect(controls.generate).not.toHaveBeenCalled();
@@ -361,10 +482,12 @@ describe("Capsule captured worker execution", () => {
       return { value: capsuleOutputFixture(), providerMetadata };
     });
     expect(await runCapsuleOperation(operationId)).toMatchObject({
-      status: "failed",
+      status: "superseded",
       safe_error_code: "CAPSULE_SUPERSEDED",
     });
-    expect(rpc).not.toHaveBeenCalled();
+    expect(
+      rpc.mock.calls.some(([name]) => name === "commit_capsule_generation"),
+    ).toBe(false);
     expect(providerCount).toBe(1);
   });
   it("keeps reserved calls and safe metadata after transport failure", async () => {
@@ -410,13 +533,13 @@ describe("Capsule captured worker execution", () => {
     expect(providerCount).toBe(3);
     expect(result).toMatchObject({
       status: "failed",
-      safe_error_code: "CAPSULE_PROVIDER_BUDGET_EXHAUSTED",
+      safe_error_code: "PROVIDER_BUDGET_EXHAUSTED",
     });
     expect(
-      queries.filter(
-        (query) => query.changes?.provider_call_count !== undefined,
+      rpc.mock.calls.filter(
+        ([name]) => name === "reserve_workflow_provider_call",
       ),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
   });
   it.each([
     ["succeeded", "read"],

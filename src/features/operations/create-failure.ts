@@ -1,3 +1,4 @@
+import { workflowDailyBudgetReset } from "./limits";
 type Failure = { code: string; retryable: boolean; status: number };
 type FailureContext = {
   checkpointed: boolean;
@@ -14,6 +15,7 @@ const retryableCodes = new Set([
   "PROVIDER_CAPACITY_BUSY",
   "CHECKPOINT_UNAVAILABLE",
   "WORKFLOW_COMMIT_UNAVAILABLE",
+  "PROVIDER_DAILY_BUDGET_EXHAUSTED",
 ]);
 
 export function isRetryableCreateFailureCode(code: string | null | undefined) {
@@ -46,7 +48,10 @@ export function createFailureState(failure: Failure, context: FailureContext) {
     failure.status >= 500
   )
     code = "CHECKPOINT_COMMIT_PENDING";
-  const delay = context.provider?.retryAfterMs;
+  const delay =
+    code === "PROVIDER_DAILY_BUDGET_EXHAUSTED"
+      ? workflowDailyBudgetReset(context.now).retryAfterSeconds * 1000
+      : context.provider?.retryAfterMs;
   const retryAt = new Date((context.now ?? Date.now()) + (delay ?? 0));
   return {
     code,

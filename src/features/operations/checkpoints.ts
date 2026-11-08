@@ -62,7 +62,12 @@ export async function checkpointOperationResult(
         409,
       );
     if (["22023", "23514"].includes(error.code))
-      throw new OperationError("CHECKPOINT_INVALID", "The task result did not meet the storage contract.", 502, false);
+      throw new OperationError(
+        "CHECKPOINT_INVALID",
+        "The task result did not meet the storage contract.",
+        502,
+        false,
+      );
     if (attempt === 1)
       throw new OperationError(
         "CHECKPOINT_UNAVAILABLE",

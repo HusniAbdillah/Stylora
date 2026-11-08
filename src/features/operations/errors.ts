@@ -21,6 +21,7 @@ export function canRetryOperationCode(code: string): boolean {
       "OPENAI_CONNECTION_FAILED",
       "CHECKPOINT_COMMIT_PENDING",
       "CHECKPOINT_UNAVAILABLE",
+      "PROVIDER_DAILY_BUDGET_EXHAUSTED",
     ].includes(code) || /^OPENAI_HTTP_(429|500|502|503|504)$/.test(code)
   );
 }

@@ -25,10 +25,39 @@ describe("worker recovery policy", () => {
     expect(operationLane("capsule_generation")).toBe("text");
   });
   it("respects persisted scheduling and only recovers explicitly retryable failures", () => {
-    expect(operationIsDue({ ...row, status: "queued", next_attempt_at: "2026-01-01T00:00:10Z" }, Date.parse("2026-01-01T00:00:09Z"))).toBe(false);
-    expect(operationIsDue({ ...row, status: "queued", next_attempt_at: "2026-01-01T00:00:10Z" }, Date.parse("2026-01-01T00:00:10Z"))).toBe(true);
-    expect(operationIsDue({ ...row, status: "failed", result_ref: { retryable: true } })).toBe(true);
-    expect(operationIsDue({ ...row, status: "failed", attempt_count: 3, result_ref: { retryable: true, checkpointed: true } })).toBe(false);
-    expect(operationIsDue({ ...row, status: "failed", result_ref: { retryable: "true" } })).toBe(false);
+    expect(
+      operationIsDue(
+        { ...row, status: "queued", next_attempt_at: "2026-01-01T00:00:10Z" },
+        Date.parse("2026-01-01T00:00:09Z"),
+      ),
+    ).toBe(false);
+    expect(
+      operationIsDue(
+        { ...row, status: "queued", next_attempt_at: "2026-01-01T00:00:10Z" },
+        Date.parse("2026-01-01T00:00:10Z"),
+      ),
+    ).toBe(true);
+    expect(
+      operationIsDue({
+        ...row,
+        status: "failed",
+        result_ref: { retryable: true },
+      }),
+    ).toBe(true);
+    expect(
+      operationIsDue({
+        ...row,
+        status: "failed",
+        attempt_count: 3,
+        result_ref: { retryable: true, checkpointed: true },
+      }),
+    ).toBe(false);
+    expect(
+      operationIsDue({
+        ...row,
+        status: "failed",
+        result_ref: { retryable: "true" },
+      }),
+    ).toBe(false);
   });
 });

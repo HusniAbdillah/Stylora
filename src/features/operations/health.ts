@@ -13,11 +13,20 @@ export async function workflowWorkerHealth() {
     .order("last_seen_at", { ascending: false })
     .limit(10)
     .abortSignal(AbortSignal.timeout(5000));
-  return { available: !error && !!data?.length, workers: error ? 0 : (data?.length ?? 0) };
+  return {
+    available: !error && !!data?.length,
+    workers: error ? 0 : (data?.length ?? 0),
+  };
 }
 
 export async function assertWorkflowExecutorAvailable() {
   if (!usesWorkflowWorker()) return;
   if (!(await workflowWorkerHealth()).available)
-    throw new OperationError("EXECUTOR_OFFLINE", "Background tasks are temporarily unavailable. Your draft is saved. Try again shortly.", 503, true, 30);
+    throw new OperationError(
+      "EXECUTOR_OFFLINE",
+      "Background tasks are temporarily unavailable. Your draft is saved. Try again shortly.",
+      503,
+      true,
+      30,
+    );
 }

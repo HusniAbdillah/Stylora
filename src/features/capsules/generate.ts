@@ -535,12 +535,10 @@ export async function runCapsuleOperation(operationId: string) {
     checkpoint: {
       serialize: (output) => ({
         result: z.json().parse(output.value),
-        metadata: z
-          .json()
-          .parse({
-            capturedMetadata: output.capturedMetadata,
-            providerMetadata: latestProviderMetadata,
-          }),
+        metadata: z.json().parse({
+          capturedMetadata: output.capturedMetadata,
+          providerMetadata: latestProviderMetadata,
+        }),
       }),
       restore: async (claim, result, savedMetadata) => {
         const captured = readCapturedCapsule(claim.input);
@@ -659,9 +657,12 @@ export async function runCapsuleOperation(operationId: string) {
       });
       if (error)
         throw new OperationError(
-          "CAPSULE_COMMIT_CONFLICT",
-          "Your capsule changed before generation finished. Your newer choices are kept.",
-          409,
+          ["40001", "23514", "P0002"].includes(error.code)
+            ? "CAPSULE_COMMIT_CONFLICT"
+            : "CAPSULE_COMMIT_UNAVAILABLE",
+          "The Capsule result could not be attached. Your draft and validated result are kept.",
+          ["40001", "23514", "P0002"].includes(error.code) ? 409 : 503,
+          !["40001", "23514", "P0002"].includes(error.code),
         );
       await recordProviderMetadata(claim);
     },

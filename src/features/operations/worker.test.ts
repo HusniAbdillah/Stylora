@@ -97,6 +97,36 @@ function setup(current = operation()) {
 beforeEach(() => vi.resetAllMocks());
 
 describe("workflow worker dispatch", () => {
+  it("persists a retry schedule without dispatching work before its due time", async () => {
+    const failed = operation({
+      status: "failed",
+      attempt_count: 1,
+      safe_error_code: "PROVIDER_RATE_LIMITED",
+      result_ref: { retryable: true },
+    });
+    const { client } = setup(failed);
+    const deferred = {
+      ...failed,
+      status: "queued",
+      next_attempt_at: new Date(Date.now() + 60000).toISOString(),
+    };
+    const rpc = vi.fn().mockResolvedValue({ data: deferred, error: null });
+    Object.assign(client, { rpc });
+    expect(await executeQueuedOperation(operationId)).toEqual({
+      id: operationId,
+      status: "queued",
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      "defer_workflow_operation",
+      expect.objectContaining({
+        p_workspace_id: workspaceId,
+        p_operation_id: operationId,
+        p_attempt_count: 1,
+        p_safe_error_code: "PROVIDER_RATE_LIMITED",
+      }),
+    );
+    for (const execute of executors) expect(execute).not.toHaveBeenCalled();
+  });
   it.each(["running", "partial"] as const)(
     "keeps a live %s lease without invoking an executor or mutation",
     async (status) => {
