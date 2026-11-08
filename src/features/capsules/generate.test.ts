@@ -458,9 +458,10 @@ describe("Capsule captured worker execution", () => {
     const input = {
       brief,
       capsuleRevision: 1,
-      items: sourceItems.map(
-        ({ inferred_attributes: _inferred, ...item }) => item,
-      ),
+      items: sourceItems.map(({ inferred_attributes, ...item }) => ({
+        ...item,
+        attributes: { ...inferred_attributes, ...item.attributes },
+      })),
       knowledgeVersion: "a".repeat(64),
       itemRevisions: Object.fromEntries(
         sourceItems.map((item) => [item.id, item.revision]),

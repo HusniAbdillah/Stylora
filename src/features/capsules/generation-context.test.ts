@@ -18,14 +18,15 @@ const versions = {
   knowledge: "a".repeat(64),
   model: "gpt-5-mini",
 };
-const sourceItems = items.map(
-  ({ inferred_attributes: _inferred, ...item }) => item,
-);
+const sourceItems = items.map(({ inferred_attributes, ...item }) => ({
+  ...item,
+  attributes: { ...inferred_attributes, ...item.attributes },
+}));
 function legacy() {
   return {
     brief,
     capsuleRevision: 1,
-    items: items.map(({ inferred_attributes: _inferred, ...item }) => item),
+    items: sourceItems,
     knowledgeVersion: versions.knowledge,
     itemRevisions: Object.fromEntries(
       items.map((item) => [item.id, item.revision]),

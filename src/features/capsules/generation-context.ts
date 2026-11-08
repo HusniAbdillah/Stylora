@@ -63,6 +63,20 @@ const itemSchema = z.strictObject({
   sourceFingerprint: hash.optional(),
 });
 export type CapsuleSourceItem = z.infer<typeof itemSchema>;
+const compactItemSchema = itemSchema
+  .omit({ corrections: true, provenance: true })
+  .strip();
+const providerItemSchema = itemSchema
+  .omit({
+    sourceFingerprint: true,
+    revision: true,
+    corrections: true,
+    provenance: true,
+  })
+  .strip();
+const providerBriefSchema = z
+  .object(capsuleBriefSchema.shape)
+  .omit({ includedItemIds: true });
 export const capturedCapsuleSchema = z
   .strictObject({
     brief: capsuleBriefSchema,
@@ -215,14 +229,13 @@ function fieldFacts(item: CapsuleSourceItem) {
   );
 }
 export function compactCapsuleItem(item: CapsuleSourceItem): CapsuleSourceItem {
-  const { corrections: _corrections, provenance: _provenance, ...base } = item;
   const attributes = Object.fromEntries(
     Object.entries(item.attributes).filter(
       ([, value]) => value != null && (!Array.isArray(value) || value.length),
     ),
   );
   return itemSchema.parse({
-    ...base,
+    ...compactItemSchema.parse(item),
     attributes,
     facts: fieldFacts(item),
     sourceFingerprint: createHash("sha256")
@@ -232,18 +245,9 @@ export function compactCapsuleItem(item: CapsuleSourceItem): CapsuleSourceItem {
 }
 export function capsuleProviderContext(input: CapturedCapsule) {
   if (!input.contractVersion) return input;
-  const { includedItemIds: _included, ...brief } = input.brief;
   return {
-    brief,
-    items: input.items.map(
-      ({
-        sourceFingerprint: _source,
-        revision: _revision,
-        corrections: _corrections,
-        provenance: _provenance,
-        ...item
-      }) => item,
-    ),
+    brief: providerBriefSchema.parse(input.brief),
+    items: input.items.map((item) => providerItemSchema.parse(item)),
     preferences: input.preferences,
     allowedSignals: input.allowedSignals,
   };
