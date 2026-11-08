@@ -473,4 +473,101 @@ describe("createWorkspaceSignedReads", () => {
     expect((await createWorkspaceSignedReads(["bad"])).size).toBe(0);
     expect(client.from).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { workspace_id: foreignWorkspaceId },
+    { status: "pending" },
+    { bucket: "public" },
+    { storage_path: `${foreignWorkspaceId}/${assetId}/${objectId}.png` },
+    { storage_path: `${workspaceId}/${assetId}/../${objectId}.png` },
+    { storage_path: `${workspaceId}/${assetId}/${objectId}.jpg` },
+    { bucket: "previews", mime_type: "image/jpeg" },
+    { byte_size: STORAGE_MAX_BYTES + 1 },
+    { id: "8028ac62-eae5-4f8e-8b32-46f7cb6b1e0b" },
+  ])(
+    "never signs invalid or unrequested asset metadata %j",
+    async (overrides) => {
+      const { rows, storage } = bulkSetup([]);
+      rows[0] = assetFixture(overrides);
+      await createWorkspaceSignedReads([assetId, otherId]);
+      expect(storage.createSignedUrls).toHaveBeenCalledWith(
+        [rows[1].storage_path],
+        STORAGE_READ_TTL_SECONDS,
+      );
+    },
+  );
+
+  it("ignores signed paths outside the validated batch", async () => {
+    const { rows, storage } = bulkSetup([]);
+    storage.createSignedUrls.mockResolvedValue({
+      data: [
+        {
+          path: `${foreignWorkspaceId}/${assetId}/${objectId}.png`,
+          signedUrl: "https://example.supabase.co/foreign",
+          error: null,
+        },
+        {
+          path: rows[1].storage_path,
+          signedUrl: "https://example.supabase.co/valid",
+          error: null,
+        },
+      ],
+      error: null,
+    });
+    const urls = await createWorkspaceSignedReads([assetId, otherId]);
+    expect([...urls.keys()]).toEqual([otherId]);
+  });
+
+  it("preserves available images when one bucket fails to sign", async () => {
+    const { rows, storage } = bulkSetup([]);
+    rows[1] = assetFixture({
+      id: otherId,
+      bucket: "previews",
+      storage_path: `${workspaceId}/${otherId}/${objectId}.png`,
+    });
+    storage.createSignedUrls
+      .mockResolvedValueOnce({
+        data: null,
+        error: new StorageApiError("unavailable", 503, "503"),
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            path: rows[1].storage_path,
+            signedUrl: "https://example.supabase.co/valid",
+            error: null,
+          },
+        ],
+        error: null,
+      });
+    const urls = await createWorkspaceSignedReads([assetId, otherId]);
+    expect([...urls.keys()]).toEqual([otherId]);
+  });
+
+  it("bounds metadata and signing batches for larger inventories", async () => {
+    const { query, storage } = bulkSetup([]);
+    const rows = Array.from({ length: 101 }, (_, index) => {
+      const id = `00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`;
+      return assetFixture({
+        id,
+        storage_path: `${workspaceId}/${id}/${objectId}.png`,
+      });
+    });
+    query.in.mockImplementation(async (_field, ids) => ({
+      data: rows.filter((row) => ids.includes(row.id)),
+      error: null,
+    }));
+    storage.createSignedUrls.mockImplementation(async (paths) => ({
+      data: paths.map((path: string) => ({
+        path,
+        signedUrl: "https://example.supabase.co/valid",
+        error: null,
+      })),
+      error: null,
+    }));
+    const urls = await createWorkspaceSignedReads(rows.map((row) => row.id));
+    expect(urls.size).toBe(101);
+    expect(query.in.mock.calls.map((call) => call[1].length)).toEqual([100, 1]);
+    expect(storage.createSignedUrls).toHaveBeenCalledTimes(2);
+  });
 });
