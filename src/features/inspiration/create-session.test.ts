@@ -1,5 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ request: vi.fn(), execute: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  request: vi.fn(),
+  execute: vi.fn(),
+  preferences: vi.fn(),
+}));
+vi.mock("@/features/preferences/client-contract", async (original) => ({
+  ...(await original<
+    typeof import("@/features/preferences/client-contract")
+  >()),
+  readPreferences: mocks.preferences,
+}));
 vi.mock("./client-contract", async (original) => ({
   ...(await original<typeof import("./client-contract")>()),
   createRequest: mocks.request,
@@ -70,6 +80,10 @@ function session() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.preferences.mockResolvedValue({
+    preferences: {},
+    fingerprint: "current",
+  });
   vi.stubGlobal("localStorage", {
     getItem: vi.fn(() => null),
     setItem: vi.fn(),
@@ -79,6 +93,109 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Create session allocation recovery", () => {
+  it.each([{ choices: ["Everyday"] }, { choices: ["Work", "Everyday"] }])(
+    "flushes queued occasion selections before an immediate upload: $choices",
+    async ({ choices }) => {
+      const value = session();
+      let stored = draftSchema.parse({ ...draft, lookId: null, assetId: null });
+      value.state = { ...value.state, draft: stored, look: null };
+      let resolve!: () => void;
+      const pending = new Promise<void>((done) => {
+        resolve = done;
+      });
+      let patches = 0;
+      mocks.request.mockImplementation(
+        async (url: string, _schema: unknown, init?: RequestInit) => {
+          if (
+            url === `/api/workflow-drafts/${draftId}` &&
+            init?.method === "PATCH"
+          ) {
+            const body = JSON.parse(String(init.body));
+            if (++patches === 1) await pending;
+            stored = draftSchema.parse({
+              ...stored,
+              revision: stored.revision + 1,
+              payload: body.payload,
+            });
+            return stored;
+          }
+          if (url === "/api/inspiration/uploads")
+            return {
+              assetId,
+              signedUrl: "https://example.invalid/synthetic-upload",
+              mimeType: "image/png",
+            };
+          if (url === `/api/inspiration/uploads/${assetId}/verify`) {
+            expect(JSON.parse(String(init?.body))).toMatchObject({
+              expectedRevision: stored.revision,
+              occasion: "Everyday",
+            });
+            stored = {
+              ...stored,
+              lookId,
+              assetId,
+              revision: stored.revision + 1,
+            };
+            return { lookId, revision: 1 };
+          }
+          if (url === `/api/workflow-drafts/${draftId}`) return stored;
+          if (url === `/api/looks/${lookId}`)
+            return { ...look, occasion: "Everyday" };
+          throw new Error(`Unexpected fixture request: ${url}`);
+        },
+      );
+      const fetch = vi
+        .fn()
+        .mockResolvedValue(new Response(null, { status: 200 }));
+      vi.stubGlobal("fetch", fetch);
+      const contexts = choices.map((occasion) => value.setOccasion(occasion));
+      const upload = value.upload(
+        new File(["synthetic image"], "fixture.png", { type: "image/png" }),
+      );
+      await vi.waitFor(() => expect(patches).toBe(1));
+      expect(value.state.contextSaving).toBe(true);
+      expect(fetch).not.toHaveBeenCalled();
+      resolve();
+      await Promise.all([...contexts, upload]);
+      expect(value.state).toMatchObject({
+        contextSaving: false,
+        draftStatus: "saved",
+        uploadStatus: "verified",
+        look: { occasion: "Everyday" },
+        draft: { payload: { occasion: "Everyday" } },
+      });
+      expect(patches).toBe(choices.length);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(mocks.execute).not.toHaveBeenCalled();
+    },
+  );
+  it("does not leave a stale queued draft save marked saving after navigation", async () => {
+    const value = session();
+    const otherId = "47cf494d-de80-4d4f-8f64-e96e179d4003";
+    mocks.request.mockImplementation(
+      async (url: string, _schema: unknown, init?: RequestInit) => {
+        if (url === `/api/workflow-drafts/${otherId}`)
+          return { ...draft, id: otherId };
+        if (url === `/api/looks/${lookId}`) return look;
+        throw new Error(
+          `Unexpected fixture request: ${url} ${init?.method ?? "GET"}`,
+        );
+      },
+    );
+    const saved = value
+      .saveDraft({ payload: { occasion: "Everyday" } })
+      .catch((error: unknown) => error);
+    await value.hydrate(otherId);
+    expect(await saved).toBeInstanceOf(Error);
+    expect(value.state).toMatchObject({
+      draft: { id: otherId },
+      draftStatus: "saved",
+      contextSaving: false,
+    });
+    expect(
+      mocks.request.mock.calls.some(([url]) => url === "/api/workflow-drafts"),
+    ).toBe(false);
+  });
   it("can allocate again after a connection failure but does not loop a validated terminal failure", async () => {
     const value = session();
     mocks.request

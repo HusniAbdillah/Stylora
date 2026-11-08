@@ -543,8 +543,11 @@ export class CreateSession {
     const next = this.draftQueue
       .catch(() => undefined)
       .then(async () => {
+        if (generation !== this.generation)
+          throw new Error(
+            "The active inspiration changed. Reopen the original draft to apply this edit.",
+          );
         const draft = await this.ensureDraft();
-        this.update({ draftStatus: "saving" });
         if (
           generation !== this.generation ||
           (expectedId && draft.id !== expectedId)
@@ -552,6 +555,7 @@ export class CreateSession {
           throw new Error(
             "The active inspiration changed. Reopen the original draft to apply this edit.",
           );
+        this.update({ draftStatus: "saving" });
         try {
           const saved = await createRequest(
             `/api/workflow-drafts/${draft.id}`,
@@ -577,6 +581,12 @@ export class CreateSession {
           if (generation === this.generation)
             this.update({ draftStatus: "failed" });
           throw error;
+        } finally {
+          if (
+            generation !== this.generation &&
+            this.state.draftStatus === "saving"
+          )
+            this.update({ draftStatus: "saved" });
         }
       });
     this.draftQueue = next;
@@ -601,6 +611,21 @@ export class CreateSession {
       file.size === 0
     )
       throw new Error("Choose a JPEG, PNG or WebP image up to 10 MiB.");
+    const requestedGeneration = this.generation;
+    try {
+      let context: Promise<void>;
+      let draft: Promise<unknown>;
+      do {
+        context = this.contextQueue;
+        await context;
+        draft = this.draftQueue;
+        await draft;
+      } while (context !== this.contextQueue || draft !== this.draftQueue);
+    } catch (error) {
+      this.report(error);
+      throw error;
+    }
+    if (requestedGeneration !== this.generation) return;
     const generation = ++this.generation;
     const feedbackId = `inspiration-upload:${this.scope}:${generation}`;
     publishFeedback({
@@ -711,7 +736,7 @@ export class CreateSession {
         await this.applyOccasion(occasion);
       })
       .finally(() => {
-        if (generation === this.generation && intent === this.contextIntent)
+        if (intent === this.contextIntent)
           this.update({ contextSaving: false });
       });
     this.contextQueue = request;

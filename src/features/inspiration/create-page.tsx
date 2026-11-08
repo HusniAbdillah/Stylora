@@ -240,6 +240,8 @@ export function CreatePage({
       !look ||
       !state.draft ||
       !state.preferenceFingerprint ||
+      busy ||
+      state.uploadStatus !== "verified" ||
       state.contextSaving ||
       look.sourceType === "sample"
     )
@@ -283,6 +285,8 @@ export function CreatePage({
     look,
     state.draft,
     state.preferenceFingerprint,
+    busy,
+    state.uploadStatus,
     state.contextSaving,
     state.hasEditorDraft,
     state.inventoryMode,
