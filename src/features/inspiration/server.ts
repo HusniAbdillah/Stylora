@@ -209,7 +209,7 @@ export function toCanonicalPiece(row: PieceRow, assetId: string | null) {
   };
 }
 
-export async function getLookContext(lookId: string) {
+export async function getLookContext(lookId: string, signal = AbortSignal.timeout(15000)) {
   uuid.parse(lookId);
   const { client, workspaceId } = getWorkspaceDatabase();
   const { data: look, error } = await client
@@ -217,7 +217,7 @@ export async function getLookContext(lookId: string) {
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("id", lookId)
-    .maybeSingle();
+    .maybeSingle().abortSignal(signal);
   if (error)
     throw new ApiError(
       "look_read_failed",
@@ -232,7 +232,7 @@ export async function getLookContext(lookId: string) {
     .eq("workspace_id", workspaceId)
     .eq("look_id", lookId)
     .is("removed_at", null)
-    .order("position");
+    .order("position").abortSignal(signal);
   if (piecesError)
     throw new ApiError(
       "pieces_read_failed",
@@ -442,7 +442,7 @@ export async function getLook(lookId: string) {
     }).safeParse(operation.input);
     const kind = createKindSchema.safeParse(operation.kind);
     let currentFingerprint: string | null = null;
-    if (captured.success && kind.success && look.source_type !== "sample" && inspirationImage?.status === "ready" && look.occasion?.trim()) {
+    if (captured.success && kind.success && look.source_type !== "sample" && inspirationImage?.status === "ready") {
       const needsPieces = ["wardrobe_match", "outfit_options", "option_regeneration"].includes(kind.data);
       const inventory = currentInventory.get(captured.data.inventoryMode);
       const option = captured.data.optionType

@@ -201,7 +201,6 @@ export function CreatePage({
       !state.draft ||
       !state.preferenceFingerprint ||
       state.contextSaving ||
-      !look.occasion?.trim() ||
       look.sourceType === "sample"
     )
       return;
@@ -527,11 +526,7 @@ export function CreatePage({
           preferences={presentPreferences(state.preferences)}
           tasks={tasks}
           analyzeDisabled={
-            busy ||
-            state.prefilling ||
-            !look ||
-            !look.occasion?.trim() ||
-            state.contextSaving
+            busy || state.prefilling || !look || state.contextSaving
           }
           onChooseFile={(file) => void choose(file)}
           onRemove={
@@ -645,7 +640,7 @@ export function CreatePage({
             ideasStatus={operationStatus(options, ideasReady)}
             onBack={() => go("review")}
             onGenerateIdeas={
-              writesEnabled || ideasReady
+              matchesReady && (writesEnabled || ideasReady)
                 ? () => {
                     if (!options && !ideasReady)
                       void session.start("outfit_options");

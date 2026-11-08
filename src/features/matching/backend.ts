@@ -50,7 +50,10 @@ const inventoryRowSchema = z.object({
   archived_at: z.string().nullable(),
 });
 
-export async function listInventory(mode: InventoryMode, signal = AbortSignal.timeout(15000)) {
+export async function listInventory(
+  mode: InventoryMode,
+  signal = AbortSignal.timeout(15000),
+) {
   const { client, workspaceId } = getWorkspaceDatabase();
   const rows: z.infer<typeof inventoryRowSchema>[] = [];
   const pageSize = 500;
@@ -70,7 +73,8 @@ export async function listInventory(mode: InventoryMode, signal = AbortSignal.ti
     }
     const { data, error } = await query
       .order("id")
-      .range(offset, offset + pageSize - 1).abortSignal(signal);
+      .range(offset, offset + pageSize - 1)
+      .abortSignal(signal);
     if (error)
       throw new ApiError(
         "inventory_read_failed",
@@ -160,7 +164,9 @@ export function validateExplanation(
         (evidence.source === "preference" || evidence.source === "context") &&
         evidence.id !== null
       )
-        throw fashionValidationFailure("invalid_explanation_evidence", [{ code: "context_id_invalid", path }]);
+        throw fashionValidationFailure("invalid_explanation_evidence", [
+          { code: "context_id_invalid", path },
+        ]);
       let source: unknown;
       if (evidence.source === "inspiration")
         source = pieces.find((piece) => piece.id === evidence.id);
@@ -174,7 +180,9 @@ export function validateExplanation(
         value === null ||
         (Array.isArray(value) && !value.length)
       )
-        throw fashionValidationFailure("invalid_explanation_evidence", [{ code: "evidence_unavailable", path }]);
+        throw fashionValidationFailure("invalid_explanation_evidence", [
+          { code: "evidence_unavailable", path },
+        ]);
     }
 }
 

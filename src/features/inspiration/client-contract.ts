@@ -28,6 +28,8 @@ export const operationSchema = z
       "superseded",
     ]),
     inputRevision: z.number().int().positive(),
+    inputFingerprint: z.string().optional(),
+    currentInputFingerprint: z.string().nullable().optional(),
     inventoryMode: z
       .enum(["live", "sample", "combined"])
       .nullable()

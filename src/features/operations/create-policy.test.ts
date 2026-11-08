@@ -4,6 +4,7 @@ import {
   createInputSnapshot,
   createOperationFingerprint,
   createOperationPolicy,
+  matchesCoverCurrentInput,
 } from "./create-policy";
 
 const assetId = "ad77a8cf-c749-48b1-b463-d21dd65ab503";
@@ -17,6 +18,31 @@ const operation = {
 };
 
 describe("Create operation recovery policy", () => {
+  it("requires one committed match per piece for the exact inventory and preferences", () => {
+    const expected = {
+      inventoryMode: "combined" as const,
+      inventoryFingerprint: "inventory",
+      preferenceFingerprint: "preferences",
+    };
+    const row = { piece_id: assetId, input_metadata: expected };
+    expect(matchesCoverCurrentInput([row], [assetId], expected)).toBe(true);
+    expect(matchesCoverCurrentInput([], [assetId], expected)).toBe(false);
+    expect(
+      matchesCoverCurrentInput([row, row], [assetId, "other-piece"], expected),
+    ).toBe(false);
+    expect(
+      matchesCoverCurrentInput([row], [assetId], {
+        ...expected,
+        preferenceFingerprint: "new",
+      }),
+    ).toBe(false);
+    expect(
+      matchesCoverCurrentInput([row], [assetId], {
+        ...expected,
+        inventoryFingerprint: "changed",
+      }),
+    ).toBe(false);
+  });
   it("allows only an unchanged retryable failure within both budgets", () => {
     expect(createOperationPolicy(operation, "current")).toMatchObject({
       canRetry: true,

@@ -750,10 +750,12 @@ export class CreateSession {
     if (existing) return existing;
     if (!force && this.prepared.has(key)) return Promise.resolve();
     this.prepared.add(key);
+    this.update({ error: null });
     const generation = this.generation;
     const request = (async () => {
       try {
         const draft = await this.ensureDraft();
+        if (generation !== this.generation) return;
         if (!draft.lookId)
           throw new Error("Verify an inspiration image first.");
         const operation = await createRequest(
@@ -773,11 +775,16 @@ export class CreateSession {
           this.state.look?.id === draft.lookId
         )
           this.mergeOperation(operation);
-        if (active(operation)) {
+        if (
+          active(operation) &&
+          generation === this.generation &&
+          this.state.look?.id === draft.lookId
+        ) {
           this.execute(operation.id, { generation, lookId: draft.lookId });
           if (generation === this.generation) this.observe(operation.id);
         }
       } catch (error) {
+        this.prepared.delete(key);
         if (generation === this.generation) this.report(error);
       } finally {
         this.starting.delete(key);
@@ -891,7 +898,10 @@ export class CreateSession {
                 const value = z
                   .object({ review: confidenceSchema })
                   .safeParse(event.payload);
-                if (value.success)
+                if (
+                  value.success &&
+                  this.currentOperation("inspiration_confidence")?.id === id
+                )
                   this.update({ provisionalConfidence: value.data.review });
               }
             }
@@ -910,10 +920,14 @@ export class CreateSession {
             if (!active(operation)) {
               if (
                 operation.kind === "inspiration_description" &&
+                this.currentOperation("inspiration_description")?.id === id &&
                 operation.status !== "failed"
               )
                 this.update({ provisional: [] });
-              if (operation.kind === "inspiration_confidence")
+              if (
+                operation.kind === "inspiration_confidence" &&
+                this.currentOperation("inspiration_confidence")?.id === id
+              )
                 this.update({ provisionalConfidence: null });
               await this.reloadLook();
               break;
@@ -1189,6 +1203,9 @@ export class CreateSession {
       (op) =>
         op.kind === kind &&
         op.runtimeVersion === op.currentRuntimeVersion &&
+        (!op.currentInputFingerprint ||
+          !op.inputFingerprint ||
+          op.currentInputFingerprint === op.inputFingerprint) &&
         op.inputRevision === this.state.look?.revision &&
         (!op.assetId ||
           op.assetId === this.state.look?.inspirationImage?.assetId) &&

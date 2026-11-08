@@ -402,8 +402,13 @@ const descriptionScalarKeys = scalarKeys.filter((key) => key !== "dominantHex");
 const descriptionListKeys = listKeys.filter(
   (key) => key !== "accentHex" && key !== "colors",
 );
-function descriptionAttributesFor(category: z.infer<typeof categorySchema>, proposed = false) {
-  const evidence = proposed ? physicalEvidenceSchema.extend({ source: z.literal("derived") }) : physicalEvidenceSchema;
+function descriptionAttributesFor(
+  category: z.infer<typeof categorySchema>,
+  proposed = false,
+) {
+  const evidence = proposed
+    ? physicalEvidenceSchema.extend({ source: z.literal("derived") })
+    : physicalEvidenceSchema;
   const forbidden = new Set<string>([
     ...(category === "shoes" ? [] : shoeKeys),
     ...(["bottom", "dress"].includes(category) ? [] : lowerKeys),
@@ -411,23 +416,28 @@ function descriptionAttributesFor(category: z.infer<typeof categorySchema>, prop
     ...(category === "accessory" ? [] : accessoryKeys),
   ]);
   return z.union([
-  evidence.extend({
-    key: z.enum(descriptionScalarKeys.filter((key) => !forbidden.has(key))),
-    value: text.nullable(),
-  }),
-  evidence.extend({
-    key: z.enum(descriptionListKeys),
-    value: z.array(z.string().trim().min(1).max(40)).max(8),
-  }),
-  evidence.extend({
-    key: z.literal("colors"),
-    value: z.array(z.string().trim().min(1).max(40)).max(5),
-  }),
+    evidence.extend({
+      key: z.enum(descriptionScalarKeys.filter((key) => !forbidden.has(key))),
+      value: text.nullable(),
+    }),
+    evidence.extend({
+      key: z.enum(descriptionListKeys),
+      value: z.array(z.string().trim().min(1).max(40)).max(8),
+    }),
+    evidence.extend({
+      key: z.literal("colors"),
+      value: z.array(z.string().trim().min(1).max(40)).max(5),
+    }),
   ]);
 }
 
-function descriptionProjectionFor<T extends z.infer<typeof categorySchema>>(category: T, proposed = false) {
-  const evidence = proposed ? physicalEvidenceSchema.extend({ source: z.literal("derived") }) : physicalEvidenceSchema;
+function descriptionProjectionFor<T extends z.infer<typeof categorySchema>>(
+  category: T,
+  proposed = false,
+) {
+  const evidence = proposed
+    ? physicalEvidenceSchema.extend({ source: z.literal("derived") })
+    : physicalEvidenceSchema;
   return z.strictObject({
     name: z.string().trim().min(1).max(160),
     category: z.literal(category),
@@ -445,52 +455,59 @@ function descriptionProjectionFor<T extends z.infer<typeof categorySchema>>(cate
   });
 }
 
-export function compactGarmentOutputSchema(category: z.infer<typeof categorySchema>, proposed = false) {
+export function compactGarmentOutputSchema(
+  category: z.infer<typeof categorySchema>,
+  proposed = false,
+) {
   return descriptionProjectionFor(category, proposed)
-  .superRefine((piece, context) => {
-    const keys = piece.attributes.map((entry) => entry.key);
-    if (new Set(keys).size !== keys.length)
-      context.addIssue({
-        code: "custom",
-        path: ["attributes"],
-        message: "Attribute keys must be unique.",
-      });
-  })
-  .transform((piece): z.input<typeof garmentSchema> => ({
-    name: piece.name,
-    category: piece.category,
-    subcategory: piece.subcategory,
-    description: piece.description,
-    attributes: Object.fromEntries(
-      piece.attributes
-        .filter(
-          (entry) =>
-            entry.value !== null &&
-            (!Array.isArray(entry.value) || entry.value.length > 0),
-        )
-        .map(({ key, value }) => [key, value]),
-    ),
-    observations: [
-      ...Object.entries(piece.coreEvidence).map(([path, evidence]) => ({
-        path,
-        ...evidence,
-      })),
-      ...piece.attributes.map((entry) => ({
-        path: `attributes.${entry.key}`,
-        source: entry.source,
-        state: entry.state,
-        confidence: entry.confidence,
-        evidence: entry.evidence,
-        uncertainty: entry.uncertainty,
-      })),
-    ],
-    confidence: piece.confidence,
-    uncertainty: piece.uncertainty,
-  }))
-  .pipe(garmentSchema);
+    .superRefine((piece, context) => {
+      const keys = piece.attributes.map((entry) => entry.key);
+      if (new Set(keys).size !== keys.length)
+        context.addIssue({
+          code: "custom",
+          path: ["attributes"],
+          message: "Attribute keys must be unique.",
+        });
+    })
+    .transform((piece): z.input<typeof garmentSchema> => ({
+      name: piece.name,
+      category: piece.category,
+      subcategory: piece.subcategory,
+      description: piece.description,
+      attributes: Object.fromEntries(
+        piece.attributes
+          .filter(
+            (entry) =>
+              entry.value !== null &&
+              (!Array.isArray(entry.value) || entry.value.length > 0),
+          )
+          .map(({ key, value }) => [key, value]),
+      ),
+      observations: [
+        ...Object.entries(piece.coreEvidence).map(([path, evidence]) => ({
+          path,
+          ...evidence,
+        })),
+        ...piece.attributes.map((entry) => ({
+          path: `attributes.${entry.key}`,
+          source: entry.source,
+          state: entry.state,
+          confidence: entry.confidence,
+          evidence: entry.evidence,
+          uncertainty: entry.uncertainty,
+        })),
+      ],
+      confidence: piece.confidence,
+      uncertainty: piece.uncertainty,
+    }))
+    .pipe(garmentSchema);
 }
 
-export const descriptionPieceSchema = z.union(categorySchema.options.map((category) => compactGarmentOutputSchema(category)));
+export const descriptionPieceSchema = z.union(
+  categorySchema.options.map((category) =>
+    compactGarmentOutputSchema(category),
+  ),
+);
 
 export const descriptionSchema = z
   .strictObject({

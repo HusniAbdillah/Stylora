@@ -75,9 +75,14 @@ export function projectRecommendationItem(item: MatchItem) {
 
 export function projectRecommendationIndex(item: MatchItem) {
   return {
-    id: item.id, name: item.name, category: item.category, subcategory: item.subcategory,
-    revision: item.revision, sourceType: item.sourceType,
-    inventoryStatus: item.inventoryStatus, archivedAt: item.archivedAt,
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    subcategory: item.subcategory,
+    revision: item.revision,
+    sourceType: item.sourceType,
+    inventoryStatus: item.inventoryStatus,
+    archivedAt: item.archivedAt,
   };
 }
 

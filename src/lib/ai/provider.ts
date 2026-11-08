@@ -151,11 +151,25 @@ function diagnosticError(
   return error;
 }
 
-export function fashionValidationFailure(code: string, issues: Array<{ code: string; path: string }>) {
-  return diagnosticError(code, "The recommendation did not pass validation. Review the input and retry.", 502, false, {
-    providerCode: "domain_validation",
-    validationIssues: issues.slice(0, 12).map((issue) => ({ code: safeIdentifier(issue.code) ?? "invalid_value", path: safeIdentifier(issue.path) ?? "output" })),
-  });
+export function fashionValidationFailure(
+  code: string,
+  issues: Array<{ code: string; path: string }>,
+) {
+  return diagnosticError(
+    code,
+    "The recommendation did not pass validation. Review the input and retry.",
+    502,
+    false,
+    {
+      providerCode: "domain_validation",
+      validationIssues: issues
+        .slice(0, 12)
+        .map((issue) => ({
+          code: safeIdentifier(issue.code) ?? "invalid_value",
+          path: safeIdentifier(issue.path) ?? "output",
+        })),
+    },
+  );
 }
 
 export function retryAfterMilliseconds(value: string | null, now = Date.now()) {
@@ -526,7 +540,13 @@ export async function requestFashion<T extends z.ZodType>(
   const deadline = Math.min(started + 240_000, scope.deadline ?? Infinity);
   const workspaceId = process.env.STYLORA_WORKSPACE_ID || "unconfigured";
   let provisionalOutput = false;
-  let correction: { type: "correction_attempt"; code: string; issues: ProviderFailureDetails["validationIssues"] } | undefined;
+  let correction:
+    | {
+        type: "correction_attempt";
+        code: string;
+        issues: ProviderFailureDetails["validationIssues"];
+      }
+    | undefined;
   const streamingRequest = request.onPiece
     ? {
         ...request,
@@ -558,7 +578,10 @@ export async function requestFashion<T extends z.ZodType>(
         details,
       );
     }
-    const timeout = AbortSignal.any([AbortSignal.timeout(Math.min(90_000, remaining)), ...(scope.signal ? [scope.signal] : [])]);
+    const timeout = AbortSignal.any([
+      AbortSignal.timeout(Math.min(90_000, remaining)),
+      ...(scope.signal ? [scope.signal] : []),
+    ]);
     try {
       timeout.throwIfAborted();
       await scope.reserveCall();
@@ -570,10 +593,25 @@ export async function requestFashion<T extends z.ZodType>(
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ...requestBody, input: [{ role: "user", content: [
-          ...content,
-          ...(correction ? [{ type: "input_text", text: `The previous response failed deterministic validation. Return a complete corrected response using the same supplied context and schema. Do not invent evidence or remove required information. Safe validation feedback: ${JSON.stringify(correction)}` }] : []),
-        ] }] }),
+        body: JSON.stringify({
+          ...requestBody,
+          input: [
+            {
+              role: "user",
+              content: [
+                ...content,
+                ...(correction
+                  ? [
+                      {
+                        type: "input_text",
+                        text: `The previous response failed deterministic validation. Return a complete corrected response using the same supplied context and schema. Do not invent evidence or remove required information. Safe validation feedback: ${JSON.stringify(correction)}`,
+                      },
+                    ]
+                  : []),
+              ],
+            },
+          ],
+        }),
         signal: timeout,
       });
       details = {
@@ -685,14 +723,29 @@ export async function requestFashion<T extends z.ZodType>(
     }
     if (!failure) throw invalidOutput();
     const validation = safeProviderError(failure);
-    const correctable = validation?.providerCode === "domain_validation" ||
-      (failure.code === "provider_invalid_output" && ["output_schema", "invalid_json", "garment_schema"].includes(validation?.providerCode ?? ""));
-    if (!correction && correctable && !provisionalOutput && !timeout.aborted && attempt < 3) {
-      correction = { type: "correction_attempt", code: failure.code, issues: validation?.validationIssues ?? [] };
+    const correctable =
+      validation?.providerCode === "domain_validation" ||
+      (failure.code === "provider_invalid_output" &&
+        ["output_schema", "invalid_json", "garment_schema"].includes(
+          validation?.providerCode ?? "",
+        ));
+    if (
+      !correction &&
+      correctable &&
+      !provisionalOutput &&
+      !timeout.aborted &&
+      attempt < 3
+    ) {
+      correction = {
+        type: "correction_attempt",
+        code: failure.code,
+        issues: validation?.validationIssues ?? [],
+      };
       continue;
     }
     if (details.correctionAttempt) throw failure;
-    if (!eligibleRetry || provisionalOutput || scope.signal?.aborted) throw failure;
+    if (!eligibleRetry || provisionalOutput || scope.signal?.aborted)
+      throw failure;
     if (attempt === 3) {
       throw diagnosticError(
         failure.code,

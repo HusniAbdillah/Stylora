@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Json } from "@/types/database";
 
-export const CREATE_RUNTIME_VERSION = "owner2-create.v6";
+export const CREATE_RUNTIME_VERSION = "owner2-create.v7";
 export const createKindSchema = z.enum([
   "inspiration_description",
   "inspiration_confidence",
@@ -11,6 +11,32 @@ export const createKindSchema = z.enum([
   "option_regeneration",
 ]);
 export type CreateKind = z.infer<typeof createKindSchema>;
+
+export function matchesCoverCurrentInput(
+  rows: { piece_id: string; input_metadata: unknown }[],
+  pieceIds: string[],
+  expected: {
+    inventoryMode: "sample" | "live" | "combined";
+    inventoryFingerprint: string;
+    preferenceFingerprint: string;
+  },
+) {
+  const metadata = z.object({
+    inventoryMode: z.literal(expected.inventoryMode),
+    inventoryFingerprint: z.literal(expected.inventoryFingerprint),
+    preferenceFingerprint: z.literal(expected.preferenceFingerprint),
+  });
+  return (
+    rows.length === pieceIds.length &&
+    rows.length > 0 &&
+    new Set(rows.map((row) => row.piece_id)).size === pieceIds.length &&
+    rows.every(
+      (row) =>
+        pieceIds.includes(row.piece_id) &&
+        metadata.safeParse(row.input_metadata).success,
+    )
+  );
+}
 
 export function createInputSnapshot(input: {
   kind: CreateKind;
@@ -33,6 +59,7 @@ export function createInputSnapshot(input: {
   };
   optionType?: string;
   intentId?: string;
+  draftId?: string;
 }): Record<string, Json> {
   const snapshot: Record<string, Json> = {
     lookId: input.look.id,
@@ -64,6 +91,7 @@ export function createInputSnapshot(input: {
     snapshot.pieces = z.json().parse(input.pieces);
   }
   if (input.optionType) snapshot.optionType = input.optionType;
+  if (input.draftId) snapshot.draftId = input.draftId;
   if (input.intentId) snapshot.intentId = input.intentId;
   return snapshot;
 }

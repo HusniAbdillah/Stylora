@@ -23,7 +23,9 @@ import {
   requestFashion,
   withFashionOperation,
   safeProviderError,
+  fashionValidationFailure,
 } from "@/lib/ai/provider";
+import { usesWorkflowWorker } from "./execution-mode";
 import { buildFashionPrompt } from "@/prompts/fashion";
 import type { Database, Json } from "@/types/database";
 import {
@@ -32,6 +34,7 @@ import {
   createInputSnapshot,
   createOperationFingerprint,
   createOperationPolicy,
+  matchesCoverCurrentInput,
 } from "./create-policy";
 
 type Operation = Database["public"]["Tables"]["workflow_operations"]["Row"];
@@ -51,6 +54,7 @@ const snapshotSchema = z.object({
   assetId: z.uuid().optional(),
   runtimeVersion: z.string().optional(),
   intentId: z.uuid().optional(),
+  draftId: z.uuid().optional(),
 });
 const asJson = (value: unknown): Json => z.json().parse(value);
 
@@ -77,7 +81,8 @@ async function readOperation(id: string) {
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("id", id)
-    .maybeSingle();
+    .maybeSingle()
+    .abortSignal(AbortSignal.timeout(15000));
   if (error) throw sqlFailure(error);
   if (!data)
     throw new ApiError(
@@ -118,14 +123,9 @@ async function operationInput(
   kind: z.infer<typeof kindSchema>,
   inventoryMode: "sample" | "live" | "combined",
   optionType?: z.infer<typeof optionTypeSchema>,
+  requestedDraftId?: string,
 ) {
   const { look, pieces } = await getLookContext(lookId);
-  if (!look.occasion?.trim())
-    throw new ApiError(
-      "occasion_required",
-      "Choose an occasion before starting analysis.",
-      409,
-    );
   const { client, workspaceId } = getWorkspaceDatabase();
   if (!look.inspiration_asset_id)
     throw new ApiError(
@@ -176,8 +176,91 @@ async function operationInput(
     personalization,
     inventory,
     optionType,
+    draftId: await requireActiveCreateDraft(look.id, requestedDraftId),
   });
+  if (
+    ["outfit_options", "option_regeneration"].includes(kind) &&
+    inventory &&
+    personalization
+  )
+    await currentMatches(look, pieces, {
+      inventoryMode,
+      inventoryFingerprint: inventory.fingerprint,
+      preferenceFingerprint: personalization.fingerprint,
+    });
   return { look, input };
+}
+
+async function requireActiveCreateDraft(
+  lookId: string,
+  capturedId?: string,
+  signal = AbortSignal.timeout(15000),
+) {
+  const { client, workspaceId } = getWorkspaceDatabase();
+  let query = client
+    .from("workflow_drafts")
+    .select("id,status")
+    .eq("workspace_id", workspaceId)
+    .eq("look_id", lookId)
+    .eq("feature_kind", "inspiration");
+  query = capturedId
+    ? query.eq("id", capturedId)
+    : query.eq("status", "active");
+  const result = await query.limit(1).abortSignal(signal).maybeSingle();
+  if (result.error) throw sqlFailure(result.error);
+  if (result.data?.status === "active") return result.data.id;
+  if (!capturedId) {
+    const existing = await client
+      .from("workflow_drafts")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("look_id", lookId)
+      .eq("feature_kind", "inspiration")
+      .limit(1)
+      .abortSignal(signal)
+      .maybeSingle();
+    if (existing.error) throw sqlFailure(existing.error);
+    if (!existing.data) return undefined;
+  }
+  throw new ApiError(
+    "input_superseded",
+    "This inspiration draft was discarded or replaced. Reopen the current draft.",
+    409,
+  );
+}
+
+async function currentMatches(
+  look: { id: string; revision: number },
+  pieces: { id: string }[],
+  expected: {
+    inventoryMode: "sample" | "live" | "combined";
+    inventoryFingerprint: string;
+    preferenceFingerprint: string;
+  },
+) {
+  const { client, workspaceId } = getWorkspaceDatabase();
+  const { data, error } = await client
+    .from("wardrobe_matches")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("look_id", look.id)
+    .eq("source_revision", look.revision)
+    .eq("is_current", true)
+    .abortSignal(AbortSignal.timeout(15000));
+  if (error) throw sqlFailure(error);
+  if (
+    !matchesCoverCurrentInput(
+      data ?? [],
+      pieces.map((piece) => piece.id),
+      expected,
+    )
+  )
+    throw new ApiError(
+      "matches_not_ready",
+      "Complete wardrobe matching for the current pieces and preferences before generating outfits.",
+      409,
+    );
+  return data ?? [];
 }
 
 async function projectOperation(op: Operation) {
@@ -191,6 +274,7 @@ async function projectOperation(op: Operation) {
         kind.data,
         captured.data.inventoryMode,
         captured.data.optionType,
+        captured.data.draftId,
       );
       let subjectId = look.id;
       let revision = look.revision;
@@ -231,6 +315,7 @@ export async function startLookOperation(
   request: unknown,
   optionType?: z.infer<typeof optionTypeSchema>,
   expectedOptionId?: string,
+  draftId?: string,
 ) {
   const context = getWorkspaceDatabase();
   requireWorkspaceWrites(context);
@@ -250,6 +335,7 @@ export async function startLookOperation(
     parsed.kind,
     parsed.inventoryMode,
     optionType,
+    draftId,
   );
   if (look.source_type === "sample")
     throw new ApiError(
@@ -324,18 +410,20 @@ export async function startDraftOperation(draftId: string, input: unknown) {
       "Verify the draft's inspiration image first.",
       409,
     );
-  return startLookOperation(data.look_id, input);
+  return startLookOperation(data.look_id, input, undefined, undefined, draftId);
 }
 
 async function append(op: Operation, type: string, payload: unknown) {
   const { client, workspaceId } = getWorkspaceDatabase();
-  const { error } = await client.rpc("append_create_event", {
-    p_workspace_id: workspaceId,
-    p_operation_id: op.id,
-    p_attempt: op.attempt_count,
-    p_type: type,
-    p_payload: asJson(payload),
-  });
+  const { error } = await client
+    .rpc("append_create_event", {
+      p_workspace_id: workspaceId,
+      p_operation_id: op.id,
+      p_attempt: op.attempt_count,
+      p_type: type,
+      p_payload: asJson(payload),
+    })
+    .abortSignal(AbortSignal.timeout(10000));
   if (error) throw sqlFailure(error);
 }
 
@@ -369,29 +457,33 @@ export async function executeOperation(id: string) {
       p_workspace_id: context.workspaceId,
       p_operation_id: id,
       p_input_revision: pending.input_revision,
-      p_lease_seconds: 900,
+      p_lease_seconds: 280,
     },
   );
   if (error) throw sqlFailure(error);
   if (op.status !== "running") return projectOperation(op);
   const snapshot = snapshotSchema.parse(op.input);
+  const deadline = Date.now() + 240_000;
+  const signal = AbortSignal.timeout(240_000);
   let metadata: unknown = {};
   return withFashionOperation(
     {
       operationId: op.id,
+      signal,
+      deadline,
       reserveCall: async () => {
-        for (let wait = 0; wait < 240; wait++) {
-          const { error: reserveError } = await context.client.rpc(
-            "reserve_create_provider_call",
-            {
+        for (let wait = 0; wait < 10; wait++) {
+          signal.throwIfAborted();
+          const { error: reserveError } = await context.client
+            .rpc("reserve_create_provider_call", {
               p_workspace_id: context.workspaceId,
               p_operation_id: id,
               p_attempt: op.attempt_count,
-            },
-          );
+            })
+            .abortSignal(signal);
           if (!reserveError) return;
           if (reserveError.code === "55P03") {
-            await delay(500);
+            await delay(200, undefined, { signal });
             continue;
           }
           throw new ApiError(
@@ -410,21 +502,25 @@ export async function executeOperation(id: string) {
         );
       },
       releaseCall: async () => {
-        const { error: releaseError } = await context.client.rpc(
-          "release_create_provider_call",
-          {
+        const { error: releaseError } = await context.client
+          .rpc("release_create_provider_call", {
             p_workspace_id: context.workspaceId,
             p_operation_id: id,
             p_attempt: op.attempt_count,
-          },
-        );
+          })
+          .abortSignal(AbortSignal.timeout(10000));
         if (releaseError) throw sqlFailure(releaseError);
       },
     },
     async () => {
       try {
         await append(op, "started", { provisional: true });
-        const { look, pieces } = await getLookContext(snapshot.lookId);
+        await requireActiveCreateDraft(
+          snapshot.lookId,
+          snapshot.draftId,
+          signal,
+        );
+        const { look, pieces } = await getLookContext(snapshot.lookId, signal);
         if (look.revision !== snapshot.lookRevision)
           throw new ApiError(
             "input_superseded",
@@ -471,7 +567,7 @@ export async function executeOperation(id: string) {
             );
           const downloaded = await context.client.storage
             .from(asset.bucket)
-            .download(asset.storage_path);
+            .download(asset.storage_path, {}, { signal });
           if (downloaded.error || !downloaded.data)
             throw new ApiError(
               "image_download_failed",
@@ -567,11 +663,12 @@ export async function executeOperation(id: string) {
                 ),
               )
             )
-              throw new ApiError(
-                "invalid_explanation_evidence",
-                "The review referenced unavailable context.",
-                502,
-              );
+              throw fashionValidationFailure("invalid_explanation_evidence", [
+                {
+                  code: "unsupported_review_reference",
+                  path: "explanation.whyThis",
+                },
+              ]);
             result = response.data;
             await append(op, "confidence_completed", {
               review: response.data,
@@ -579,7 +676,7 @@ export async function executeOperation(id: string) {
             });
           }
         } else {
-          const inventory = await listInventory(snapshot.inventoryMode);
+          const inventory = await listInventory(snapshot.inventoryMode, signal);
           if (
             inventory.fingerprint !==
             z.object({ inventoryFingerprint: z.string() }).parse(op.input)
@@ -609,42 +706,12 @@ export async function executeOperation(id: string) {
               ),
             };
           else {
-            const { data: matches, error: matchError } = await context.client
-              .from("wardrobe_matches")
-              .select("*")
-              .eq("workspace_id", context.workspaceId)
-              .eq("look_id", look.id)
-              .eq("source_revision", look.revision)
-              .eq("is_current", true);
-            if (matchError) throw sqlFailure(matchError);
-            const matchInputs = z.object({
-              inventoryMode: z.enum(["sample", "live", "combined"]),
-              inventoryFingerprint: z.string(),
-              preferenceFingerprint: z.string(),
+            const matches = await currentMatches(look, pieces, {
+              inventoryMode: snapshot.inventoryMode,
+              inventoryFingerprint: inventory.fingerprint,
+              preferenceFingerprint: snapshot.preferenceFingerprint ?? "",
             });
-            const currentMatches = matches ?? [];
-            if (
-              currentMatches.length !== pieces.length ||
-              new Set(currentMatches.map((match) => match.piece_id)).size !==
-                pieces.length ||
-              currentMatches.some((match) => {
-                const inputs = matchInputs.safeParse(match.input_metadata);
-                return (
-                  !pieces.some((piece) => piece.id === match.piece_id) ||
-                  !inputs.success ||
-                  inputs.data.inventoryMode !== snapshot.inventoryMode ||
-                  inputs.data.inventoryFingerprint !== inventory.fingerprint ||
-                  inputs.data.preferenceFingerprint !==
-                    snapshot.preferenceFingerprint
-                );
-              })
-            )
-              throw new ApiError(
-                "matches_not_ready",
-                "Refresh wardrobe matching for the current inputs before generating outfits.",
-                409,
-              );
-            const parsedMatches = currentMatches.map((match) =>
+            const parsedMatches = matches.map((match) =>
               matchResultSchema.parse({
                 pieceId: match.piece_id,
                 wardrobeItemId: match.wardrobe_item_id,
@@ -691,21 +758,32 @@ export async function executeOperation(id: string) {
               .parse(op.input).inventoryFingerprint ?? null,
           inventoryMode: snapshot.inventoryMode,
         };
-        const { data: finished, error: finishError } = await context.client.rpc(
-          "finish_create_operation",
-          {
+        signal.throwIfAborted();
+        await requireActiveCreateDraft(
+          snapshot.lookId,
+          snapshot.draftId,
+          signal,
+        );
+        const { data: finished, error: finishError } = await context.client
+          .rpc("finish_create_operation", {
             p_workspace_id: context.workspaceId,
             p_operation_id: id,
             p_attempt: op.attempt_count,
             p_result: asJson(result),
             p_metadata: asJson(resultMetadata),
-          },
-        );
+          })
+          .abortSignal(AbortSignal.timeout(10000));
         if (finishError) throw sqlFailure(finishError);
         return projectOperation(finished);
       } catch (failure) {
-        const safe =
-          failure instanceof ApiError
+        const safe = signal.aborted
+          ? new ApiError(
+              "provider_timeout",
+              "The analysis took too long. Check its status before retrying.",
+              504,
+              true,
+            )
+          : failure instanceof ApiError
             ? failure
             : new ApiError(
                 "operation_failed",
@@ -736,9 +814,10 @@ export async function executeOperation(id: string) {
           .eq("workspace_id", context.workspaceId)
           .eq("id", id)
           .eq("attempt_count", op.attempt_count)
-          .in("status", ["running", "partial"]);
+          .in("status", ["running", "partial"])
+          .abortSignal(AbortSignal.timeout(10000));
         if (updateError) throw sqlFailure(updateError);
-        return projectOperation(await readOperation(id));
+        return toOperation(await readOperation(id));
       }
     },
   );
@@ -772,7 +851,9 @@ export async function controlOperation(id: string, action: "retry" | "cancel") {
       "The operation cannot be changed in its current state.",
       409,
     );
-  return action === "retry" ? executeOperation(id) : projectOperation(data);
+  return action === "retry" && !usesWorkflowWorker()
+    ? executeOperation(id)
+    : projectOperation(data);
 }
 
 export async function getEvents(id: string, after = 0) {
