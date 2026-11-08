@@ -4,2859 +4,2904 @@ export type Json =
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[]
+  | Json[];
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.18"
-  }
   public: {
     Tables: {
       assets: {
         Row: {
-          bucket: string
-          byte_size: number
-          created_at: string
-          deleted_at: string | null
-          id: string
-          mime_type: string
-          revision: number
-          source_type: string
-          status: string
-          storage_path: string
-          updated_at: string
-          workspace_id: string
-        }
+          bucket: string;
+          byte_size: number;
+          created_at: string;
+          deleted_at: string | null;
+          id: string;
+          mime_type: string;
+          revision: number;
+          source_type: string;
+          status: string;
+          storage_path: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          bucket: string
-          byte_size: number
-          created_at?: string
-          deleted_at?: string | null
-          id?: string
-          mime_type: string
-          revision?: number
-          source_type?: string
-          status?: string
-          storage_path: string
-          updated_at?: string
-          workspace_id: string
-        }
+          bucket: string;
+          byte_size: number;
+          created_at?: string;
+          deleted_at?: string | null;
+          id?: string;
+          mime_type: string;
+          revision?: number;
+          source_type?: string;
+          status?: string;
+          storage_path: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          bucket?: string
-          byte_size?: number
-          created_at?: string
-          deleted_at?: string | null
-          id?: string
-          mime_type?: string
-          revision?: number
-          source_type?: string
-          status?: string
-          storage_path?: string
-          updated_at?: string
-          workspace_id?: string
-        }
+          bucket?: string;
+          byte_size?: number;
+          created_at?: string;
+          deleted_at?: string | null;
+          id?: string;
+          mime_type?: string;
+          revision?: number;
+          source_type?: string;
+          status?: string;
+          storage_path?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "assets_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "assets_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       capsule_items: {
         Row: {
-          capsule_id: string
-          wardrobe_item_id: string
-          workspace_id: string
-        }
+          capsule_id: string;
+          wardrobe_item_id: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          capsule_id: string
-          wardrobe_item_id: string
-          workspace_id: string
-        }
+          capsule_id: string;
+          wardrobe_item_id: string;
+          workspace_id: string;
+        };
         Update: {
-          capsule_id?: string
-          wardrobe_item_id?: string
-          workspace_id?: string
-        }
+          capsule_id?: string;
+          wardrobe_item_id?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "capsule_items_workspace_id_capsule_id_fkey"
-            columns: ["workspace_id", "capsule_id"]
-            isOneToOne: false
-            referencedRelation: "capsules"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "capsule_items_workspace_id_capsule_id_fkey";
+            columns: ["workspace_id", "capsule_id"];
+            isOneToOne: false;
+            referencedRelation: "capsules";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "capsule_items_workspace_id_wardrobe_item_id_fkey"
-            columns: ["workspace_id", "wardrobe_item_id"]
-            isOneToOne: false
-            referencedRelation: "active_owned_wardrobe"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "capsule_items_workspace_id_wardrobe_item_id_fkey";
+            columns: ["workspace_id", "wardrobe_item_id"];
+            isOneToOne: false;
+            referencedRelation: "active_owned_wardrobe";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "capsule_items_workspace_id_wardrobe_item_id_fkey"
-            columns: ["workspace_id", "wardrobe_item_id"]
-            isOneToOne: false
-            referencedRelation: "wardrobe_items"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "capsule_items_workspace_id_wardrobe_item_id_fkey";
+            columns: ["workspace_id", "wardrobe_item_id"];
+            isOneToOne: false;
+            referencedRelation: "wardrobe_items";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       capsule_outfit_items: {
         Row: {
-          capsule_id: string
-          outfit_id: string
-          position: number
-          wardrobe_item_id: string
-          workspace_id: string
-        }
+          capsule_id: string;
+          outfit_id: string;
+          position: number;
+          wardrobe_item_id: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          capsule_id: string
-          outfit_id: string
-          position: number
-          wardrobe_item_id: string
-          workspace_id: string
-        }
+          capsule_id: string;
+          outfit_id: string;
+          position: number;
+          wardrobe_item_id: string;
+          workspace_id: string;
+        };
         Update: {
-          capsule_id?: string
-          outfit_id?: string
-          position?: number
-          wardrobe_item_id?: string
-          workspace_id?: string
-        }
+          capsule_id?: string;
+          outfit_id?: string;
+          position?: number;
+          wardrobe_item_id?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "capsule_outfit_items_workspace_id_capsule_id_outfit_id_fkey"
-            columns: ["workspace_id", "capsule_id", "outfit_id"]
-            isOneToOne: false
-            referencedRelation: "capsule_outfits"
-            referencedColumns: ["workspace_id", "capsule_id", "id"]
+            foreignKeyName: "capsule_outfit_items_workspace_id_capsule_id_outfit_id_fkey";
+            columns: ["workspace_id", "capsule_id", "outfit_id"];
+            isOneToOne: false;
+            referencedRelation: "capsule_outfits";
+            referencedColumns: ["workspace_id", "capsule_id", "id"];
           },
           {
-            foreignKeyName: "capsule_outfit_items_workspace_id_capsule_id_wardrobe_item_fkey"
-            columns: ["workspace_id", "capsule_id", "wardrobe_item_id"]
-            isOneToOne: false
-            referencedRelation: "capsule_items"
+            foreignKeyName: "capsule_outfit_items_workspace_id_capsule_id_wardrobe_item_fkey";
+            columns: ["workspace_id", "capsule_id", "wardrobe_item_id"];
+            isOneToOne: false;
+            referencedRelation: "capsule_items";
             referencedColumns: [
               "workspace_id",
               "capsule_id",
               "wardrobe_item_id",
-            ]
+            ];
           },
-        ]
-      }
+        ];
+      };
       capsule_outfits: {
         Row: {
-          capsule_id: string
-          created_at: string
-          explanation: Json
-          id: string
-          inputs_used: Json
-          proposed_slots: Json
-          rationale: string
-          source_revision: number
-          source_type: string
-          title: string
-          uncertainty: Json
-          workspace_id: string
-        }
+          capsule_id: string;
+          created_at: string;
+          explanation: NonNullable<Json>;
+          id: string;
+          inputs_used: NonNullable<Json>;
+          proposed_slots: NonNullable<Json>;
+          rationale: string;
+          source_revision: number;
+          source_type: string;
+          title: string;
+          uncertainty: NonNullable<Json>;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          capsule_id: string
-          created_at?: string
-          explanation?: Json
-          id?: string
-          inputs_used?: Json
-          proposed_slots?: Json
-          rationale?: string
-          source_revision: number
-          source_type?: string
-          title: string
-          uncertainty?: Json
-          workspace_id: string
-        }
+          capsule_id: string;
+          created_at?: string;
+          explanation?: NonNullable<Json>;
+          id?: string;
+          inputs_used?: NonNullable<Json>;
+          proposed_slots?: NonNullable<Json>;
+          rationale?: string;
+          source_revision: number;
+          source_type?: string;
+          title: string;
+          uncertainty?: NonNullable<Json>;
+          workspace_id: string;
+        };
         Update: {
-          capsule_id?: string
-          created_at?: string
-          explanation?: Json
-          id?: string
-          inputs_used?: Json
-          proposed_slots?: Json
-          rationale?: string
-          source_revision?: number
-          source_type?: string
-          title?: string
-          uncertainty?: Json
-          workspace_id?: string
-        }
+          capsule_id?: string;
+          created_at?: string;
+          explanation?: NonNullable<Json>;
+          id?: string;
+          inputs_used?: NonNullable<Json>;
+          proposed_slots?: NonNullable<Json>;
+          rationale?: string;
+          source_revision?: number;
+          source_type?: string;
+          title?: string;
+          uncertainty?: NonNullable<Json>;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "capsule_outfits_workspace_id_capsule_id_fkey"
-            columns: ["workspace_id", "capsule_id"]
-            isOneToOne: false
-            referencedRelation: "capsules"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "capsule_outfits_workspace_id_capsule_id_fkey";
+            columns: ["workspace_id", "capsule_id"];
+            isOneToOne: false;
+            referencedRelation: "capsules";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       capsules: {
         Row: {
-          brief: Json
-          created_at: string
-          description: string
-          id: string
-          missing_additions: Json
-          occasion: string | null
-          revision: number
-          season: string | null
-          timeframe: string | null
-          title: string
-          updated_at: string
-          workspace_id: string
-        }
+          brief: NonNullable<Json>;
+          created_at: string;
+          description: string;
+          id: string;
+          missing_additions: NonNullable<Json>;
+          occasion: string | null;
+          revision: number;
+          season: string | null;
+          timeframe: string | null;
+          title: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          brief?: Json
-          created_at?: string
-          description?: string
-          id?: string
-          missing_additions?: Json
-          occasion?: string | null
-          revision?: number
-          season?: string | null
-          timeframe?: string | null
-          title: string
-          updated_at?: string
-          workspace_id: string
-        }
+          brief?: NonNullable<Json>;
+          created_at?: string;
+          description?: string;
+          id?: string;
+          missing_additions?: NonNullable<Json>;
+          occasion?: string | null;
+          revision?: number;
+          season?: string | null;
+          timeframe?: string | null;
+          title: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          brief?: Json
-          created_at?: string
-          description?: string
-          id?: string
-          missing_additions?: Json
-          occasion?: string | null
-          revision?: number
-          season?: string | null
-          timeframe?: string | null
-          title?: string
-          updated_at?: string
-          workspace_id?: string
-        }
+          brief?: NonNullable<Json>;
+          created_at?: string;
+          description?: string;
+          id?: string;
+          missing_additions?: NonNullable<Json>;
+          occasion?: string | null;
+          revision?: number;
+          season?: string | null;
+          timeframe?: string | null;
+          title?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "capsules_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "capsules_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       inspiration_pieces: {
         Row: {
-          attributes: Json
-          category: string
-          confidence: number | null
-          corrections: Json
-          created_at: string
-          description: string
-          id: string
-          image_context: Json
-          look_id: string
-          name: string
-          position: number
-          provenance: Json
-          removed_at: string | null
-          revision: number
-          source_type: string
-          subcategory: string | null
-          uncertainty: Json
-          updated_at: string
-          workspace_id: string
-        }
+          attributes: NonNullable<Json>;
+          category: string;
+          confidence: number | null;
+          corrections: NonNullable<Json>;
+          created_at: string;
+          description: string;
+          id: string;
+          image_context: NonNullable<Json>;
+          look_id: string;
+          name: string;
+          position: number;
+          provenance: NonNullable<Json>;
+          removed_at: string | null;
+          revision: number;
+          source_type: string;
+          subcategory: string | null;
+          uncertainty: NonNullable<Json>;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          attributes?: Json
-          category: string
-          confidence?: number | null
-          corrections?: Json
-          created_at?: string
-          description?: string
-          id?: string
-          image_context?: Json
-          look_id: string
-          name: string
-          position?: number
-          provenance?: Json
-          removed_at?: string | null
-          revision?: number
-          source_type?: string
-          subcategory?: string | null
-          uncertainty?: Json
-          updated_at?: string
-          workspace_id: string
-        }
+          attributes?: NonNullable<Json>;
+          category: string;
+          confidence?: number | null;
+          corrections?: NonNullable<Json>;
+          created_at?: string;
+          description?: string;
+          id?: string;
+          image_context?: NonNullable<Json>;
+          look_id: string;
+          name: string;
+          position?: number;
+          provenance?: NonNullable<Json>;
+          removed_at?: string | null;
+          revision?: number;
+          source_type?: string;
+          subcategory?: string | null;
+          uncertainty?: NonNullable<Json>;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          attributes?: Json
-          category?: string
-          confidence?: number | null
-          corrections?: Json
-          created_at?: string
-          description?: string
-          id?: string
-          image_context?: Json
-          look_id?: string
-          name?: string
-          position?: number
-          provenance?: Json
-          removed_at?: string | null
-          revision?: number
-          source_type?: string
-          subcategory?: string | null
-          uncertainty?: Json
-          updated_at?: string
-          workspace_id?: string
-        }
+          attributes?: NonNullable<Json>;
+          category?: string;
+          confidence?: number | null;
+          corrections?: NonNullable<Json>;
+          created_at?: string;
+          description?: string;
+          id?: string;
+          image_context?: NonNullable<Json>;
+          look_id?: string;
+          name?: string;
+          position?: number;
+          provenance?: NonNullable<Json>;
+          removed_at?: string | null;
+          revision?: number;
+          source_type?: string;
+          subcategory?: string | null;
+          uncertainty?: NonNullable<Json>;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "inspiration_pieces_workspace_id_look_id_fkey"
-            columns: ["workspace_id", "look_id"]
-            isOneToOne: false
-            referencedRelation: "looks"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "inspiration_pieces_workspace_id_look_id_fkey";
+            columns: ["workspace_id", "look_id"];
+            isOneToOne: false;
+            referencedRelation: "looks";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       look_reviews: {
         Row: {
-          created_at: string
-          explanation: Json
-          id: string
-          input_metadata: Json
-          inputs_used: Json
-          is_current: boolean
-          look_id: string
-          preference_revision: number | null
-          source_revision: number
-          source_type: string
-          uncertainty: Json
-          workspace_id: string
-        }
+          created_at: string;
+          explanation: NonNullable<Json>;
+          id: string;
+          input_metadata: NonNullable<Json>;
+          inputs_used: NonNullable<Json>;
+          is_current: boolean;
+          look_id: string;
+          preference_revision: number | null;
+          source_revision: number;
+          source_type: string;
+          uncertainty: NonNullable<Json>;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          created_at?: string
-          explanation: Json
-          id?: string
-          input_metadata?: Json
-          inputs_used?: Json
-          is_current?: boolean
-          look_id: string
-          preference_revision?: number | null
-          source_revision: number
-          source_type?: string
-          uncertainty?: Json
-          workspace_id: string
-        }
+          created_at?: string;
+          explanation: NonNullable<Json>;
+          id?: string;
+          input_metadata?: NonNullable<Json>;
+          inputs_used?: NonNullable<Json>;
+          is_current?: boolean;
+          look_id: string;
+          preference_revision?: number | null;
+          source_revision: number;
+          source_type?: string;
+          uncertainty?: NonNullable<Json>;
+          workspace_id: string;
+        };
         Update: {
-          created_at?: string
-          explanation?: Json
-          id?: string
-          input_metadata?: Json
-          inputs_used?: Json
-          is_current?: boolean
-          look_id?: string
-          preference_revision?: number | null
-          source_revision?: number
-          source_type?: string
-          uncertainty?: Json
-          workspace_id?: string
-        }
+          created_at?: string;
+          explanation?: NonNullable<Json>;
+          id?: string;
+          input_metadata?: NonNullable<Json>;
+          inputs_used?: NonNullable<Json>;
+          is_current?: boolean;
+          look_id?: string;
+          preference_revision?: number | null;
+          source_revision?: number;
+          source_type?: string;
+          uncertainty?: NonNullable<Json>;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "look_reviews_workspace_id_look_id_fkey"
-            columns: ["workspace_id", "look_id"]
-            isOneToOne: false
-            referencedRelation: "looks"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "look_reviews_workspace_id_look_id_fkey";
+            columns: ["workspace_id", "look_id"];
+            isOneToOne: false;
+            referencedRelation: "looks";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       look_selection_items: {
         Row: {
-          look_id: string
-          option_id: string
-          option_item_id: string
-          selection_id: string
-          slot_id: string
-          updated_at: string
-          workspace_id: string
-        }
+          look_id: string;
+          option_id: string;
+          option_item_id: string;
+          selection_id: string;
+          slot_id: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          look_id: string
-          option_id: string
-          option_item_id: string
-          selection_id: string
-          slot_id: string
-          updated_at?: string
-          workspace_id: string
-        }
+          look_id: string;
+          option_id: string;
+          option_item_id: string;
+          selection_id: string;
+          slot_id: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          look_id?: string
-          option_id?: string
-          option_item_id?: string
-          selection_id?: string
-          slot_id?: string
-          updated_at?: string
-          workspace_id?: string
-        }
+          look_id?: string;
+          option_id?: string;
+          option_item_id?: string;
+          selection_id?: string;
+          slot_id?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "look_selection_items_workspace_id_look_id_option_id_slot_i_fkey"
+            foreignKeyName: "look_selection_items_workspace_id_look_id_option_id_slot_i_fkey";
             columns: [
               "workspace_id",
               "look_id",
               "option_id",
               "slot_id",
               "option_item_id",
-            ]
-            isOneToOne: false
-            referencedRelation: "outfit_option_items"
+            ];
+            isOneToOne: false;
+            referencedRelation: "outfit_option_items";
             referencedColumns: [
               "workspace_id",
               "look_id",
               "option_id",
               "slot_id",
               "id",
-            ]
+            ];
           },
           {
-            foreignKeyName: "look_selection_items_workspace_id_selection_id_look_id_opt_fkey"
-            columns: ["workspace_id", "selection_id", "look_id", "option_id"]
-            isOneToOne: false
-            referencedRelation: "look_selections"
-            referencedColumns: ["workspace_id", "id", "look_id", "option_id"]
+            foreignKeyName: "look_selection_items_workspace_id_selection_id_look_id_opt_fkey";
+            columns: ["workspace_id", "selection_id", "look_id", "option_id"];
+            isOneToOne: false;
+            referencedRelation: "look_selections";
+            referencedColumns: ["workspace_id", "id", "look_id", "option_id"];
           },
-        ]
-      }
+        ];
+      };
       look_selections: {
         Row: {
-          created_at: string
-          id: string
-          look_id: string
-          option_id: string
-          revision: number
-          source_option_revision: number
-          updated_at: string
-          workspace_id: string
-        }
+          created_at: string;
+          id: string;
+          look_id: string;
+          option_id: string;
+          revision: number;
+          source_option_revision: number;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          created_at?: string
-          id?: string
-          look_id: string
-          option_id: string
-          revision?: number
-          source_option_revision: number
-          updated_at?: string
-          workspace_id: string
-        }
+          created_at?: string;
+          id?: string;
+          look_id: string;
+          option_id: string;
+          revision?: number;
+          source_option_revision: number;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          look_id?: string
-          option_id?: string
-          revision?: number
-          source_option_revision?: number
-          updated_at?: string
-          workspace_id?: string
-        }
+          created_at?: string;
+          id?: string;
+          look_id?: string;
+          option_id?: string;
+          revision?: number;
+          source_option_revision?: number;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "look_selections_workspace_id_look_id_option_id_fkey"
-            columns: ["workspace_id", "look_id", "option_id"]
-            isOneToOne: true
-            referencedRelation: "outfit_options"
-            referencedColumns: ["workspace_id", "look_id", "id"]
+            foreignKeyName: "look_selections_workspace_id_look_id_option_id_fkey";
+            columns: ["workspace_id", "look_id", "option_id"];
+            isOneToOne: true;
+            referencedRelation: "outfit_options";
+            referencedColumns: ["workspace_id", "look_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       looks: {
         Row: {
-          created_at: string
-          id: string
-          inspiration_asset_id: string | null
-          notes: string
-          occasion: string | null
-          provider_metadata: Json
-          revision: number
-          selected_option_id: string | null
-          source_type: string
-          status: string
-          title: string
-          updated_at: string
-          workspace_id: string
-        }
+          created_at: string;
+          id: string;
+          inspiration_asset_id: string | null;
+          notes: string;
+          occasion: string | null;
+          provider_metadata: NonNullable<Json>;
+          revision: number;
+          selected_option_id: string | null;
+          source_type: string;
+          status: string;
+          title: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          created_at?: string
-          id?: string
-          inspiration_asset_id?: string | null
-          notes?: string
-          occasion?: string | null
-          provider_metadata?: Json
-          revision?: number
-          selected_option_id?: string | null
-          source_type?: string
-          status?: string
-          title: string
-          updated_at?: string
-          workspace_id: string
-        }
+          created_at?: string;
+          id?: string;
+          inspiration_asset_id?: string | null;
+          notes?: string;
+          occasion?: string | null;
+          provider_metadata?: NonNullable<Json>;
+          revision?: number;
+          selected_option_id?: string | null;
+          source_type?: string;
+          status?: string;
+          title: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          inspiration_asset_id?: string | null
-          notes?: string
-          occasion?: string | null
-          provider_metadata?: Json
-          revision?: number
-          selected_option_id?: string | null
-          source_type?: string
-          status?: string
-          title?: string
-          updated_at?: string
-          workspace_id?: string
-        }
+          created_at?: string;
+          id?: string;
+          inspiration_asset_id?: string | null;
+          notes?: string;
+          occasion?: string | null;
+          provider_metadata?: NonNullable<Json>;
+          revision?: number;
+          selected_option_id?: string | null;
+          source_type?: string;
+          status?: string;
+          title?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "looks_selected_option_parent_fk"
-            columns: ["workspace_id", "id", "selected_option_id"]
-            isOneToOne: false
-            referencedRelation: "outfit_options"
-            referencedColumns: ["workspace_id", "look_id", "id"]
+            foreignKeyName: "looks_selected_option_parent_fk";
+            columns: ["workspace_id", "id", "selected_option_id"];
+            isOneToOne: false;
+            referencedRelation: "outfit_options";
+            referencedColumns: ["workspace_id", "look_id", "id"];
           },
           {
-            foreignKeyName: "looks_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "looks_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "looks_workspace_id_inspiration_asset_id_fkey"
-            columns: ["workspace_id", "inspiration_asset_id"]
-            isOneToOne: false
-            referencedRelation: "assets"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "looks_workspace_id_inspiration_asset_id_fkey";
+            columns: ["workspace_id", "inspiration_asset_id"];
+            isOneToOne: false;
+            referencedRelation: "assets";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       operation_result_checkpoints: {
         Row: {
-          created_at: string
-          created_attempt: number
-          input_fingerprint: string
-          kind: string
-          metadata: Json
-          model: string
-          operation_id: string
-          prompt_version: string
-          result: Json
-          schema_version: string
-          workspace_id: string
-        }
+          created_at: string;
+          created_attempt: number;
+          input_fingerprint: string;
+          kind: string;
+          metadata: NonNullable<Json>;
+          model: string;
+          operation_id: string;
+          prompt_version: string;
+          result: NonNullable<Json>;
+          schema_version: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          created_at?: string
-          created_attempt: number
-          input_fingerprint: string
-          kind: string
-          metadata?: Json
-          model: string
-          operation_id: string
-          prompt_version: string
-          result: Json
-          schema_version: string
-          workspace_id: string
-        }
+          created_at?: string;
+          created_attempt: number;
+          input_fingerprint: string;
+          kind: string;
+          metadata?: NonNullable<Json>;
+          model: string;
+          operation_id: string;
+          prompt_version: string;
+          result: NonNullable<Json>;
+          schema_version: string;
+          workspace_id: string;
+        };
         Update: {
-          created_at?: string
-          created_attempt?: number
-          input_fingerprint?: string
-          kind?: string
-          metadata?: Json
-          model?: string
-          operation_id?: string
-          prompt_version?: string
-          result?: Json
-          schema_version?: string
-          workspace_id?: string
-        }
+          created_at?: string;
+          created_attempt?: number;
+          input_fingerprint?: string;
+          kind?: string;
+          metadata?: NonNullable<Json>;
+          model?: string;
+          operation_id?: string;
+          prompt_version?: string;
+          result?: NonNullable<Json>;
+          schema_version?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "operation_result_checkpoints_workspace_id_operation_id_fkey"
-            columns: ["workspace_id", "operation_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_operations"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "operation_result_checkpoints_workspace_id_operation_id_fkey";
+            columns: ["workspace_id", "operation_id"];
+            isOneToOne: false;
+            referencedRelation: "workflow_operations";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       outfit_option_items: {
         Row: {
-          candidate_position: number
-          category: string
-          created_at: string
-          id: string
-          item_kind: string
-          look_id: string
-          missing_brief: Json | null
-          option_id: string
-          piece_id: string | null
-          position: number
-          product_id: string | null
-          rationale: string
-          requested_brief: string | null
-          requested_category: string | null
-          revision: number
-          slot_id: string
-          updated_at: string
-          wardrobe_item_id: string | null
-          workspace_id: string
-        }
+          candidate_position: number;
+          category: string;
+          created_at: string;
+          id: string;
+          item_kind: string;
+          look_id: string;
+          missing_brief: Json | null;
+          option_id: string;
+          piece_id: string | null;
+          position: number;
+          product_id: string | null;
+          rationale: string;
+          requested_brief: string | null;
+          requested_category: string | null;
+          revision: number;
+          slot_id: string;
+          updated_at: string;
+          wardrobe_item_id: string | null;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          candidate_position?: number
-          category: string
-          created_at?: string
-          id?: string
-          item_kind: string
-          look_id: string
-          missing_brief?: Json | null
-          option_id: string
-          piece_id?: string | null
-          position?: number
-          product_id?: string | null
-          rationale?: string
-          requested_brief?: string | null
-          requested_category?: string | null
-          revision?: number
-          slot_id: string
-          updated_at?: string
-          wardrobe_item_id?: string | null
-          workspace_id: string
-        }
+          candidate_position?: number;
+          category: string;
+          created_at?: string;
+          id?: string;
+          item_kind: string;
+          look_id: string;
+          missing_brief?: Json | null;
+          option_id: string;
+          piece_id?: string | null;
+          position?: number;
+          product_id?: string | null;
+          rationale?: string;
+          requested_brief?: string | null;
+          requested_category?: string | null;
+          revision?: number;
+          slot_id: string;
+          updated_at?: string;
+          wardrobe_item_id?: string | null;
+          workspace_id: string;
+        };
         Update: {
-          candidate_position?: number
-          category?: string
-          created_at?: string
-          id?: string
-          item_kind?: string
-          look_id?: string
-          missing_brief?: Json | null
-          option_id?: string
-          piece_id?: string | null
-          position?: number
-          product_id?: string | null
-          rationale?: string
-          requested_brief?: string | null
-          requested_category?: string | null
-          revision?: number
-          slot_id?: string
-          updated_at?: string
-          wardrobe_item_id?: string | null
-          workspace_id?: string
-        }
+          candidate_position?: number;
+          category?: string;
+          created_at?: string;
+          id?: string;
+          item_kind?: string;
+          look_id?: string;
+          missing_brief?: Json | null;
+          option_id?: string;
+          piece_id?: string | null;
+          position?: number;
+          product_id?: string | null;
+          rationale?: string;
+          requested_brief?: string | null;
+          requested_category?: string | null;
+          revision?: number;
+          slot_id?: string;
+          updated_at?: string;
+          wardrobe_item_id?: string | null;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "outfit_option_items_workspace_id_look_id_option_id_fkey"
-            columns: ["workspace_id", "look_id", "option_id"]
-            isOneToOne: false
-            referencedRelation: "outfit_options"
-            referencedColumns: ["workspace_id", "look_id", "id"]
+            foreignKeyName: "outfit_option_items_workspace_id_look_id_option_id_fkey";
+            columns: ["workspace_id", "look_id", "option_id"];
+            isOneToOne: false;
+            referencedRelation: "outfit_options";
+            referencedColumns: ["workspace_id", "look_id", "id"];
           },
           {
-            foreignKeyName: "outfit_option_items_workspace_id_look_id_piece_id_fkey"
-            columns: ["workspace_id", "look_id", "piece_id"]
-            isOneToOne: false
-            referencedRelation: "inspiration_pieces"
-            referencedColumns: ["workspace_id", "look_id", "id"]
+            foreignKeyName: "outfit_option_items_workspace_id_look_id_piece_id_fkey";
+            columns: ["workspace_id", "look_id", "piece_id"];
+            isOneToOne: false;
+            referencedRelation: "inspiration_pieces";
+            referencedColumns: ["workspace_id", "look_id", "id"];
           },
           {
-            foreignKeyName: "outfit_option_items_workspace_id_product_id_category_fkey"
-            columns: ["workspace_id", "product_id", "category"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["workspace_id", "id", "category"]
+            foreignKeyName: "outfit_option_items_workspace_id_product_id_category_fkey";
+            columns: ["workspace_id", "product_id", "category"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["workspace_id", "id", "category"];
           },
           {
-            foreignKeyName: "outfit_option_items_workspace_id_wardrobe_item_id_category_fkey"
-            columns: ["workspace_id", "wardrobe_item_id", "category"]
-            isOneToOne: false
-            referencedRelation: "active_owned_wardrobe"
-            referencedColumns: ["workspace_id", "id", "category"]
+            foreignKeyName: "outfit_option_items_workspace_id_wardrobe_item_id_category_fkey";
+            columns: ["workspace_id", "wardrobe_item_id", "category"];
+            isOneToOne: false;
+            referencedRelation: "active_owned_wardrobe";
+            referencedColumns: ["workspace_id", "id", "category"];
           },
           {
-            foreignKeyName: "outfit_option_items_workspace_id_wardrobe_item_id_category_fkey"
-            columns: ["workspace_id", "wardrobe_item_id", "category"]
-            isOneToOne: false
-            referencedRelation: "wardrobe_items"
-            referencedColumns: ["workspace_id", "id", "category"]
+            foreignKeyName: "outfit_option_items_workspace_id_wardrobe_item_id_category_fkey";
+            columns: ["workspace_id", "wardrobe_item_id", "category"];
+            isOneToOne: false;
+            referencedRelation: "wardrobe_items";
+            referencedColumns: ["workspace_id", "id", "category"];
           },
-        ]
-      }
+        ];
+      };
       outfit_options: {
         Row: {
-          concept: string
-          created_at: string
-          explanation: Json
-          id: string
-          inputs_used: Json
-          is_current: boolean
-          look_id: string
-          option_type: string
-          provider_metadata: Json
-          rationale: string
-          revision: number
-          source_revision: number
-          source_type: string
-          status: string
-          title: string
-          uncertainty: Json
-          updated_at: string
-          workspace_id: string
-        }
+          concept: string;
+          created_at: string;
+          explanation: NonNullable<Json>;
+          id: string;
+          inputs_used: NonNullable<Json>;
+          is_current: boolean;
+          look_id: string;
+          option_type: string;
+          provider_metadata: NonNullable<Json>;
+          rationale: string;
+          revision: number;
+          source_revision: number;
+          source_type: string;
+          status: string;
+          title: string;
+          uncertainty: NonNullable<Json>;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          concept?: string
-          created_at?: string
-          explanation?: Json
-          id?: string
-          inputs_used?: Json
-          is_current?: boolean
-          look_id: string
-          option_type: string
-          provider_metadata?: Json
-          rationale?: string
-          revision?: number
-          source_revision: number
-          source_type?: string
-          status?: string
-          title: string
-          uncertainty?: Json
-          updated_at?: string
-          workspace_id: string
-        }
+          concept?: string;
+          created_at?: string;
+          explanation?: NonNullable<Json>;
+          id?: string;
+          inputs_used?: NonNullable<Json>;
+          is_current?: boolean;
+          look_id: string;
+          option_type: string;
+          provider_metadata?: NonNullable<Json>;
+          rationale?: string;
+          revision?: number;
+          source_revision: number;
+          source_type?: string;
+          status?: string;
+          title: string;
+          uncertainty?: NonNullable<Json>;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          concept?: string
-          created_at?: string
-          explanation?: Json
-          id?: string
-          inputs_used?: Json
-          is_current?: boolean
-          look_id?: string
-          option_type?: string
-          provider_metadata?: Json
-          rationale?: string
-          revision?: number
-          source_revision?: number
-          source_type?: string
-          status?: string
-          title?: string
-          uncertainty?: Json
-          updated_at?: string
-          workspace_id?: string
-        }
+          concept?: string;
+          created_at?: string;
+          explanation?: NonNullable<Json>;
+          id?: string;
+          inputs_used?: NonNullable<Json>;
+          is_current?: boolean;
+          look_id?: string;
+          option_type?: string;
+          provider_metadata?: NonNullable<Json>;
+          rationale?: string;
+          revision?: number;
+          source_revision?: number;
+          source_type?: string;
+          status?: string;
+          title?: string;
+          uncertainty?: NonNullable<Json>;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "outfit_options_workspace_id_look_id_fkey"
-            columns: ["workspace_id", "look_id"]
-            isOneToOne: false
-            referencedRelation: "looks"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "outfit_options_workspace_id_look_id_fkey";
+            columns: ["workspace_id", "look_id"];
+            isOneToOne: false;
+            referencedRelation: "looks";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       products: {
         Row: {
-          attributes: Json
-          category: string
-          commercial_disclosure: string | null
-          corrections: Json
-          created_at: string
-          currency: string | null
-          description: string
-          id: string
-          image_url: string | null
-          price_minor: number | null
-          product_url: string
-          provenance: Json
-          provider: string
-          provider_product_id: string
-          rating: number | null
-          retrieved_at: string
-          review_count: number | null
-          revision: number
-          shipping_minor: number | null
-          source_label: string
-          source_type: string
-          subcategory: string | null
-          title: string
-          uncertainty: Json
-          updated_at: string
-          workspace_id: string
-        }
+          attributes: NonNullable<Json>;
+          category: string;
+          commercial_disclosure: string | null;
+          corrections: NonNullable<Json>;
+          created_at: string;
+          currency: string | null;
+          description: string;
+          id: string;
+          image_url: string | null;
+          price_minor: number | null;
+          product_url: string;
+          provenance: NonNullable<Json>;
+          provider: string;
+          provider_product_id: string;
+          rating: number | null;
+          retrieved_at: string;
+          review_count: number | null;
+          revision: number;
+          shipping_minor: number | null;
+          source_label: string;
+          source_type: string;
+          subcategory: string | null;
+          title: string;
+          uncertainty: NonNullable<Json>;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          attributes?: Json
-          category: string
-          commercial_disclosure?: string | null
-          corrections?: Json
-          created_at?: string
-          currency?: string | null
-          description?: string
-          id?: string
-          image_url?: string | null
-          price_minor?: number | null
-          product_url: string
-          provenance?: Json
-          provider: string
-          provider_product_id: string
-          rating?: number | null
-          retrieved_at?: string
-          review_count?: number | null
-          revision?: number
-          shipping_minor?: number | null
-          source_label: string
-          source_type?: string
-          subcategory?: string | null
-          title: string
-          uncertainty?: Json
-          updated_at?: string
-          workspace_id: string
-        }
+          attributes?: NonNullable<Json>;
+          category: string;
+          commercial_disclosure?: string | null;
+          corrections?: NonNullable<Json>;
+          created_at?: string;
+          currency?: string | null;
+          description?: string;
+          id?: string;
+          image_url?: string | null;
+          price_minor?: number | null;
+          product_url: string;
+          provenance?: NonNullable<Json>;
+          provider: string;
+          provider_product_id: string;
+          rating?: number | null;
+          retrieved_at?: string;
+          review_count?: number | null;
+          revision?: number;
+          shipping_minor?: number | null;
+          source_label: string;
+          source_type?: string;
+          subcategory?: string | null;
+          title: string;
+          uncertainty?: NonNullable<Json>;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          attributes?: Json
-          category?: string
-          commercial_disclosure?: string | null
-          corrections?: Json
-          created_at?: string
-          currency?: string | null
-          description?: string
-          id?: string
-          image_url?: string | null
-          price_minor?: number | null
-          product_url?: string
-          provenance?: Json
-          provider?: string
-          provider_product_id?: string
-          rating?: number | null
-          retrieved_at?: string
-          review_count?: number | null
-          revision?: number
-          shipping_minor?: number | null
-          source_label?: string
-          source_type?: string
-          subcategory?: string | null
-          title?: string
-          uncertainty?: Json
-          updated_at?: string
-          workspace_id?: string
-        }
+          attributes?: NonNullable<Json>;
+          category?: string;
+          commercial_disclosure?: string | null;
+          corrections?: NonNullable<Json>;
+          created_at?: string;
+          currency?: string | null;
+          description?: string;
+          id?: string;
+          image_url?: string | null;
+          price_minor?: number | null;
+          product_url?: string;
+          provenance?: NonNullable<Json>;
+          provider?: string;
+          provider_product_id?: string;
+          rating?: number | null;
+          retrieved_at?: string;
+          review_count?: number | null;
+          revision?: number;
+          shipping_minor?: number | null;
+          source_label?: string;
+          source_type?: string;
+          subcategory?: string | null;
+          title?: string;
+          uncertainty?: NonNullable<Json>;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "products_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "products_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       saved_look_media: {
         Row: {
-          created_at: string
-          id: string
-          operation_id: string
-          output_asset_id: string | null
-          preference_snapshot_hash: string
-          saved_look_id: string
-          status: string
-          updated_at: string
-          workspace_id: string
-        }
+          created_at: string;
+          id: string;
+          operation_id: string;
+          output_asset_id: string | null;
+          preference_snapshot_hash: string;
+          saved_look_id: string;
+          status: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          created_at?: string
-          id?: string
-          operation_id: string
-          output_asset_id?: string | null
-          preference_snapshot_hash: string
-          saved_look_id: string
-          status?: string
-          updated_at?: string
-          workspace_id: string
-        }
+          created_at?: string;
+          id?: string;
+          operation_id: string;
+          output_asset_id?: string | null;
+          preference_snapshot_hash: string;
+          saved_look_id: string;
+          status?: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          operation_id?: string
-          output_asset_id?: string | null
-          preference_snapshot_hash?: string
-          saved_look_id?: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string
-        }
+          created_at?: string;
+          id?: string;
+          operation_id?: string;
+          output_asset_id?: string | null;
+          preference_snapshot_hash?: string;
+          saved_look_id?: string;
+          status?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "saved_look_media_workspace_id_operation_id_fkey"
-            columns: ["workspace_id", "operation_id"]
-            isOneToOne: true
-            referencedRelation: "workflow_operations"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "saved_look_media_workspace_id_operation_id_fkey";
+            columns: ["workspace_id", "operation_id"];
+            isOneToOne: true;
+            referencedRelation: "workflow_operations";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "saved_look_media_workspace_id_output_asset_id_fkey"
-            columns: ["workspace_id", "output_asset_id"]
-            isOneToOne: false
-            referencedRelation: "assets"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "saved_look_media_workspace_id_output_asset_id_fkey";
+            columns: ["workspace_id", "output_asset_id"];
+            isOneToOne: false;
+            referencedRelation: "assets";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "saved_look_media_workspace_id_saved_look_id_fkey"
-            columns: ["workspace_id", "saved_look_id"]
-            isOneToOne: false
-            referencedRelation: "saved_look_snapshots"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "saved_look_media_workspace_id_saved_look_id_fkey";
+            columns: ["workspace_id", "saved_look_id"];
+            isOneToOne: false;
+            referencedRelation: "saved_look_snapshots";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       saved_look_snapshots: {
         Row: {
-          created_at: string
-          id: string
-          idempotency_key: string
-          inputs_used: Json
-          items: Json
-          look_id: string | null
-          option_id: string | null
-          preference_snapshot: Json
-          rationale: string
-          selection_revision: number | null
-          source_kind: string
-          source_revision: number
-          source_type: string
-          spend_currency: string | null
-          spend_minor: number | null
-          title: string
-          uncertainty: Json
-          workspace_id: string
-        }
+          created_at: string;
+          id: string;
+          idempotency_key: string;
+          inputs_used: NonNullable<Json>;
+          items: NonNullable<Json>;
+          look_id: string | null;
+          option_id: string | null;
+          preference_snapshot: NonNullable<Json>;
+          rationale: string;
+          selection_revision: number | null;
+          source_kind: string;
+          source_revision: number;
+          source_type: string;
+          spend_currency: string | null;
+          spend_minor: number | null;
+          title: string;
+          uncertainty: NonNullable<Json>;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          created_at?: string
-          id?: string
-          idempotency_key: string
-          inputs_used?: Json
-          items: Json
-          look_id?: string | null
-          option_id?: string | null
-          preference_snapshot?: Json
-          rationale?: string
-          selection_revision?: number | null
-          source_kind?: string
-          source_revision: number
-          source_type?: string
-          spend_currency?: string | null
-          spend_minor?: number | null
-          title: string
-          uncertainty?: Json
-          workspace_id: string
-        }
+          created_at?: string;
+          id?: string;
+          idempotency_key: string;
+          inputs_used?: NonNullable<Json>;
+          items: NonNullable<Json>;
+          look_id?: string | null;
+          option_id?: string | null;
+          preference_snapshot?: NonNullable<Json>;
+          rationale?: string;
+          selection_revision?: number | null;
+          source_kind?: string;
+          source_revision: number;
+          source_type?: string;
+          spend_currency?: string | null;
+          spend_minor?: number | null;
+          title: string;
+          uncertainty?: NonNullable<Json>;
+          workspace_id: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          idempotency_key?: string
-          inputs_used?: Json
-          items?: Json
-          look_id?: string | null
-          option_id?: string | null
-          preference_snapshot?: Json
-          rationale?: string
-          selection_revision?: number | null
-          source_kind?: string
-          source_revision?: number
-          source_type?: string
-          spend_currency?: string | null
-          spend_minor?: number | null
-          title?: string
-          uncertainty?: Json
-          workspace_id?: string
-        }
+          created_at?: string;
+          id?: string;
+          idempotency_key?: string;
+          inputs_used?: NonNullable<Json>;
+          items?: NonNullable<Json>;
+          look_id?: string | null;
+          option_id?: string | null;
+          preference_snapshot?: NonNullable<Json>;
+          rationale?: string;
+          selection_revision?: number | null;
+          source_kind?: string;
+          source_revision?: number;
+          source_type?: string;
+          spend_currency?: string | null;
+          spend_minor?: number | null;
+          title?: string;
+          uncertainty?: NonNullable<Json>;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "saved_look_snapshots_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "saved_look_snapshots_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "saved_look_snapshots_workspace_id_look_id_fkey"
-            columns: ["workspace_id", "look_id"]
-            isOneToOne: false
-            referencedRelation: "looks"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "saved_look_snapshots_workspace_id_look_id_fkey";
+            columns: ["workspace_id", "look_id"];
+            isOneToOne: false;
+            referencedRelation: "looks";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "saved_look_snapshots_workspace_id_look_id_option_id_fkey"
-            columns: ["workspace_id", "look_id", "option_id"]
-            isOneToOne: false
-            referencedRelation: "outfit_options"
-            referencedColumns: ["workspace_id", "look_id", "id"]
+            foreignKeyName: "saved_look_snapshots_workspace_id_look_id_option_id_fkey";
+            columns: ["workspace_id", "look_id", "option_id"];
+            isOneToOne: false;
+            referencedRelation: "outfit_options";
+            referencedColumns: ["workspace_id", "look_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       share_links: {
         Row: {
-          approved_media_ids: string[]
-          catchphrase: string
-          created_at: string
-          expires_at: string | null
-          id: string
-          public_snapshot: Json
-          revoked_at: string | null
-          saved_look_id: string
-          token_hash: string
-          workspace_id: string
-        }
+          approved_media_ids: string[];
+          catchphrase: string;
+          created_at: string;
+          expires_at: string | null;
+          id: string;
+          public_snapshot: NonNullable<Json>;
+          revoked_at: string | null;
+          saved_look_id: string;
+          token_hash: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          approved_media_ids?: string[]
-          catchphrase?: string
-          created_at?: string
-          expires_at?: string | null
-          id?: string
-          public_snapshot: Json
-          revoked_at?: string | null
-          saved_look_id: string
-          token_hash: string
-          workspace_id: string
-        }
+          approved_media_ids?: string[];
+          catchphrase?: string;
+          created_at?: string;
+          expires_at?: string | null;
+          id?: string;
+          public_snapshot: NonNullable<Json>;
+          revoked_at?: string | null;
+          saved_look_id: string;
+          token_hash: string;
+          workspace_id: string;
+        };
         Update: {
-          approved_media_ids?: string[]
-          catchphrase?: string
-          created_at?: string
-          expires_at?: string | null
-          id?: string
-          public_snapshot?: Json
-          revoked_at?: string | null
-          saved_look_id?: string
-          token_hash?: string
-          workspace_id?: string
-        }
+          approved_media_ids?: string[];
+          catchphrase?: string;
+          created_at?: string;
+          expires_at?: string | null;
+          id?: string;
+          public_snapshot?: NonNullable<Json>;
+          revoked_at?: string | null;
+          saved_look_id?: string;
+          token_hash?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "share_links_workspace_id_saved_look_id_fkey"
-            columns: ["workspace_id", "saved_look_id"]
-            isOneToOne: false
-            referencedRelation: "saved_look_snapshots"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "share_links_workspace_id_saved_look_id_fkey";
+            columns: ["workspace_id", "saved_look_id"];
+            isOneToOne: false;
+            referencedRelation: "saved_look_snapshots";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       shopping_results: {
         Row: {
-          created_at: string
-          explanation: string
-          factors: Json
-          position: number
-          product_id: string
-          score_version: string
-          search_id: string
-          value_score: number | null
-          workspace_id: string
-        }
+          created_at: string;
+          explanation: string;
+          factors: NonNullable<Json>;
+          position: number;
+          product_id: string;
+          score_version: string;
+          search_id: string;
+          value_score: number | null;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          created_at?: string
-          explanation?: string
-          factors?: Json
-          position: number
-          product_id: string
-          score_version?: string
-          search_id: string
-          value_score?: number | null
-          workspace_id: string
-        }
+          created_at?: string;
+          explanation?: string;
+          factors?: NonNullable<Json>;
+          position: number;
+          product_id: string;
+          score_version?: string;
+          search_id: string;
+          value_score?: number | null;
+          workspace_id: string;
+        };
         Update: {
-          created_at?: string
-          explanation?: string
-          factors?: Json
-          position?: number
-          product_id?: string
-          score_version?: string
-          search_id?: string
-          value_score?: number | null
-          workspace_id?: string
-        }
+          created_at?: string;
+          explanation?: string;
+          factors?: NonNullable<Json>;
+          position?: number;
+          product_id?: string;
+          score_version?: string;
+          search_id?: string;
+          value_score?: number | null;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "shopping_results_workspace_id_product_id_fkey"
-            columns: ["workspace_id", "product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "shopping_results_workspace_id_product_id_fkey";
+            columns: ["workspace_id", "product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "shopping_results_workspace_id_search_id_fkey"
-            columns: ["workspace_id", "search_id"]
-            isOneToOne: false
-            referencedRelation: "shopping_searches"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "shopping_results_workspace_id_search_id_fkey";
+            columns: ["workspace_id", "search_id"];
+            isOneToOne: false;
+            referencedRelation: "shopping_searches";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       shopping_searches: {
         Row: {
-          country: string
-          created_at: string
-          error_code: string | null
-          id: string
-          input_fingerprint: string
-          look_id: string
-          option_id: string
-          option_item_id: string
-          option_revision: number
-          provider: string
-          query: string
-          score_version: string
-          score_weights: Json
-          slot_id: string
-          status: string
-          updated_at: string
-          workspace_id: string
-        }
+          country: string;
+          created_at: string;
+          error_code: string | null;
+          id: string;
+          input_fingerprint: string;
+          look_id: string;
+          option_id: string;
+          option_item_id: string;
+          option_revision: number;
+          provider: string;
+          provider_call_count: number;
+          query: string;
+          score_version: string;
+          score_weights: NonNullable<Json>;
+          slot_id: string;
+          status: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          country?: string
-          created_at?: string
-          error_code?: string | null
-          id?: string
-          input_fingerprint: string
-          look_id: string
-          option_id: string
-          option_item_id: string
-          option_revision: number
-          provider: string
-          query: string
-          score_version?: string
-          score_weights?: Json
-          slot_id: string
-          status?: string
-          updated_at?: string
-          workspace_id: string
-        }
+          country?: string;
+          created_at?: string;
+          error_code?: string | null;
+          id?: string;
+          input_fingerprint: string;
+          look_id: string;
+          option_id: string;
+          option_item_id: string;
+          option_revision: number;
+          provider: string;
+          provider_call_count?: number;
+          query: string;
+          score_version?: string;
+          score_weights?: NonNullable<Json>;
+          slot_id: string;
+          status?: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          country?: string
-          created_at?: string
-          error_code?: string | null
-          id?: string
-          input_fingerprint?: string
-          look_id?: string
-          option_id?: string
-          option_item_id?: string
-          option_revision?: number
-          provider?: string
-          query?: string
-          score_version?: string
-          score_weights?: Json
-          slot_id?: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string
-        }
+          country?: string;
+          created_at?: string;
+          error_code?: string | null;
+          id?: string;
+          input_fingerprint?: string;
+          look_id?: string;
+          option_id?: string;
+          option_item_id?: string;
+          option_revision?: number;
+          provider?: string;
+          provider_call_count?: number;
+          query?: string;
+          score_version?: string;
+          score_weights?: NonNullable<Json>;
+          slot_id?: string;
+          status?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "shopping_searches_workspace_id_look_id_option_id_slot_id_o_fkey"
+            foreignKeyName: "shopping_searches_workspace_id_look_id_option_id_slot_id_o_fkey";
             columns: [
               "workspace_id",
               "look_id",
               "option_id",
               "slot_id",
               "option_item_id",
-            ]
-            isOneToOne: false
-            referencedRelation: "outfit_option_items"
+            ];
+            isOneToOne: false;
+            referencedRelation: "outfit_option_items";
             referencedColumns: [
               "workspace_id",
               "look_id",
               "option_id",
               "slot_id",
               "id",
-            ]
+            ];
           },
-        ]
-      }
+        ];
+      };
       user_preferences: {
         Row: {
-          body_profile: Json
-          created_at: string
-          display_name: string | null
-          fit_preferences: Json
-          revision: number
-          style_dna: Json
-          style_notes: string
-          updated_at: string
-          workspace_id: string
-        }
+          body_profile: NonNullable<Json>;
+          created_at: string;
+          display_name: string | null;
+          fit_preferences: NonNullable<Json>;
+          revision: number;
+          style_dna: NonNullable<Json>;
+          style_notes: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          body_profile?: Json
-          created_at?: string
-          display_name?: string | null
-          fit_preferences?: Json
-          revision?: number
-          style_dna?: Json
-          style_notes?: string
-          updated_at?: string
-          workspace_id: string
-        }
+          body_profile?: NonNullable<Json>;
+          created_at?: string;
+          display_name?: string | null;
+          fit_preferences?: NonNullable<Json>;
+          revision?: number;
+          style_dna?: NonNullable<Json>;
+          style_notes?: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          body_profile?: Json
-          created_at?: string
-          display_name?: string | null
-          fit_preferences?: Json
-          revision?: number
-          style_dna?: Json
-          style_notes?: string
-          updated_at?: string
-          workspace_id?: string
-        }
+          body_profile?: NonNullable<Json>;
+          created_at?: string;
+          display_name?: string | null;
+          fit_preferences?: NonNullable<Json>;
+          revision?: number;
+          style_dna?: NonNullable<Json>;
+          style_notes?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "user_preferences_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: true
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "user_preferences_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: true;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       wardrobe_items: {
         Row: {
-          archived_at: string | null
-          asset_id: string | null
-          attributes: Json
-          category: string
-          color: string
-          confidence: number | null
-          corrections: Json
-          created_at: string
-          description: string
-          id: string
-          import_idempotency_key: string | null
-          inferred_attributes: Json
-          inventory_status: string
-          name: string
-          notes: string
-          provenance: Json
-          revision: number
-          source_product_id: string | null
-          source_type: string
-          subcategory: string | null
-          uncertainty: Json
-          updated_at: string
-          workspace_id: string
-        }
+          archived_at: string | null;
+          asset_id: string | null;
+          attributes: NonNullable<Json>;
+          category: string;
+          color: string;
+          confidence: number | null;
+          corrections: NonNullable<Json>;
+          created_at: string;
+          description: string;
+          id: string;
+          import_idempotency_key: string | null;
+          inferred_attributes: NonNullable<Json>;
+          inventory_status: string;
+          name: string;
+          notes: string;
+          provenance: NonNullable<Json>;
+          revision: number;
+          source_product_id: string | null;
+          source_type: string;
+          subcategory: string | null;
+          uncertainty: NonNullable<Json>;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          archived_at?: string | null
-          asset_id?: string | null
-          attributes?: Json
-          category: string
-          color?: string
-          confidence?: number | null
-          corrections?: Json
-          created_at?: string
-          description?: string
-          id?: string
-          import_idempotency_key?: string | null
-          inferred_attributes?: Json
-          inventory_status?: string
-          name: string
-          notes?: string
-          provenance?: Json
-          revision?: number
-          source_product_id?: string | null
-          source_type?: string
-          subcategory?: string | null
-          uncertainty?: Json
-          updated_at?: string
-          workspace_id: string
-        }
+          archived_at?: string | null;
+          asset_id?: string | null;
+          attributes?: NonNullable<Json>;
+          category: string;
+          color?: string;
+          confidence?: number | null;
+          corrections?: NonNullable<Json>;
+          created_at?: string;
+          description?: string;
+          id?: string;
+          import_idempotency_key?: string | null;
+          inferred_attributes?: NonNullable<Json>;
+          inventory_status?: string;
+          name: string;
+          notes?: string;
+          provenance?: NonNullable<Json>;
+          revision?: number;
+          source_product_id?: string | null;
+          source_type?: string;
+          subcategory?: string | null;
+          uncertainty?: NonNullable<Json>;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          archived_at?: string | null
-          asset_id?: string | null
-          attributes?: Json
-          category?: string
-          color?: string
-          confidence?: number | null
-          corrections?: Json
-          created_at?: string
-          description?: string
-          id?: string
-          import_idempotency_key?: string | null
-          inferred_attributes?: Json
-          inventory_status?: string
-          name?: string
-          notes?: string
-          provenance?: Json
-          revision?: number
-          source_product_id?: string | null
-          source_type?: string
-          subcategory?: string | null
-          uncertainty?: Json
-          updated_at?: string
-          workspace_id?: string
-        }
+          archived_at?: string | null;
+          asset_id?: string | null;
+          attributes?: NonNullable<Json>;
+          category?: string;
+          color?: string;
+          confidence?: number | null;
+          corrections?: NonNullable<Json>;
+          created_at?: string;
+          description?: string;
+          id?: string;
+          import_idempotency_key?: string | null;
+          inferred_attributes?: NonNullable<Json>;
+          inventory_status?: string;
+          name?: string;
+          notes?: string;
+          provenance?: NonNullable<Json>;
+          revision?: number;
+          source_product_id?: string | null;
+          source_type?: string;
+          subcategory?: string | null;
+          uncertainty?: NonNullable<Json>;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "wardrobe_items_workspace_id_asset_id_fkey"
-            columns: ["workspace_id", "asset_id"]
-            isOneToOne: false
-            referencedRelation: "assets"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "wardrobe_items_workspace_id_asset_id_fkey";
+            columns: ["workspace_id", "asset_id"];
+            isOneToOne: false;
+            referencedRelation: "assets";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "wardrobe_items_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "wardrobe_items_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "wardrobe_items_workspace_id_source_product_id_fkey"
-            columns: ["workspace_id", "source_product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "wardrobe_items_workspace_id_source_product_id_fkey";
+            columns: ["workspace_id", "source_product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       wardrobe_matches: {
         Row: {
-          confidence: number | null
-          created_at: string
-          differences: Json
-          evidence_coverage: number | null
-          explanation: Json
-          id: string
-          input_metadata: Json
-          is_current: boolean
-          look_id: string
-          match_type: string
-          piece_id: string
-          rationale: string
-          rejected_candidates: Json
-          shared_attributes: Json
-          source_revision: number
-          source_type: string
-          wardrobe_item_id: string | null
-          workspace_id: string
-        }
+          confidence: number | null;
+          created_at: string;
+          differences: NonNullable<Json>;
+          evidence_coverage: number | null;
+          explanation: NonNullable<Json>;
+          id: string;
+          input_metadata: NonNullable<Json>;
+          is_current: boolean;
+          look_id: string;
+          match_type: string;
+          piece_id: string;
+          rationale: string;
+          rejected_candidates: NonNullable<Json>;
+          shared_attributes: NonNullable<Json>;
+          source_revision: number;
+          source_type: string;
+          wardrobe_item_id: string | null;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          confidence?: number | null
-          created_at?: string
-          differences?: Json
-          evidence_coverage?: number | null
-          explanation?: Json
-          id?: string
-          input_metadata?: Json
-          is_current?: boolean
-          look_id: string
-          match_type: string
-          piece_id: string
-          rationale: string
-          rejected_candidates?: Json
-          shared_attributes?: Json
-          source_revision: number
-          source_type?: string
-          wardrobe_item_id?: string | null
-          workspace_id: string
-        }
+          confidence?: number | null;
+          created_at?: string;
+          differences?: NonNullable<Json>;
+          evidence_coverage?: number | null;
+          explanation?: NonNullable<Json>;
+          id?: string;
+          input_metadata?: NonNullable<Json>;
+          is_current?: boolean;
+          look_id: string;
+          match_type: string;
+          piece_id: string;
+          rationale: string;
+          rejected_candidates?: NonNullable<Json>;
+          shared_attributes?: NonNullable<Json>;
+          source_revision: number;
+          source_type?: string;
+          wardrobe_item_id?: string | null;
+          workspace_id: string;
+        };
         Update: {
-          confidence?: number | null
-          created_at?: string
-          differences?: Json
-          evidence_coverage?: number | null
-          explanation?: Json
-          id?: string
-          input_metadata?: Json
-          is_current?: boolean
-          look_id?: string
-          match_type?: string
-          piece_id?: string
-          rationale?: string
-          rejected_candidates?: Json
-          shared_attributes?: Json
-          source_revision?: number
-          source_type?: string
-          wardrobe_item_id?: string | null
-          workspace_id?: string
-        }
+          confidence?: number | null;
+          created_at?: string;
+          differences?: NonNullable<Json>;
+          evidence_coverage?: number | null;
+          explanation?: NonNullable<Json>;
+          id?: string;
+          input_metadata?: NonNullable<Json>;
+          is_current?: boolean;
+          look_id?: string;
+          match_type?: string;
+          piece_id?: string;
+          rationale?: string;
+          rejected_candidates?: NonNullable<Json>;
+          shared_attributes?: NonNullable<Json>;
+          source_revision?: number;
+          source_type?: string;
+          wardrobe_item_id?: string | null;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "wardrobe_matches_workspace_id_look_id_piece_id_fkey"
-            columns: ["workspace_id", "look_id", "piece_id"]
-            isOneToOne: false
-            referencedRelation: "inspiration_pieces"
-            referencedColumns: ["workspace_id", "look_id", "id"]
+            foreignKeyName: "wardrobe_matches_workspace_id_look_id_piece_id_fkey";
+            columns: ["workspace_id", "look_id", "piece_id"];
+            isOneToOne: false;
+            referencedRelation: "inspiration_pieces";
+            referencedColumns: ["workspace_id", "look_id", "id"];
           },
           {
-            foreignKeyName: "wardrobe_matches_workspace_id_wardrobe_item_id_fkey"
-            columns: ["workspace_id", "wardrobe_item_id"]
-            isOneToOne: false
-            referencedRelation: "active_owned_wardrobe"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "wardrobe_matches_workspace_id_wardrobe_item_id_fkey";
+            columns: ["workspace_id", "wardrobe_item_id"];
+            isOneToOne: false;
+            referencedRelation: "active_owned_wardrobe";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "wardrobe_matches_workspace_id_wardrobe_item_id_fkey"
-            columns: ["workspace_id", "wardrobe_item_id"]
-            isOneToOne: false
-            referencedRelation: "wardrobe_items"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "wardrobe_matches_workspace_id_wardrobe_item_id_fkey";
+            columns: ["workspace_id", "wardrobe_item_id"];
+            isOneToOne: false;
+            referencedRelation: "wardrobe_items";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       workflow_drafts: {
         Row: {
-          asset_id: string | null
-          capsule_id: string | null
-          created_at: string
-          current_step: string | null
-          feature_kind: string
-          id: string
-          look_id: string | null
-          payload: Json
-          revision: number
-          status: string
-          updated_at: string
-          visited_steps: Json
-          workspace_id: string
-        }
+          asset_id: string | null;
+          capsule_id: string | null;
+          created_at: string;
+          current_step: string | null;
+          feature_kind: string;
+          id: string;
+          look_id: string | null;
+          payload: NonNullable<Json>;
+          revision: number;
+          status: string;
+          updated_at: string;
+          visited_steps: NonNullable<Json>;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          asset_id?: string | null
-          capsule_id?: string | null
-          created_at?: string
-          current_step?: string | null
-          feature_kind: string
-          id?: string
-          look_id?: string | null
-          payload?: Json
-          revision?: number
-          status?: string
-          updated_at?: string
-          visited_steps?: Json
-          workspace_id: string
-        }
+          asset_id?: string | null;
+          capsule_id?: string | null;
+          created_at?: string;
+          current_step?: string | null;
+          feature_kind: string;
+          id?: string;
+          look_id?: string | null;
+          payload?: NonNullable<Json>;
+          revision?: number;
+          status?: string;
+          updated_at?: string;
+          visited_steps?: NonNullable<Json>;
+          workspace_id: string;
+        };
         Update: {
-          asset_id?: string | null
-          capsule_id?: string | null
-          created_at?: string
-          current_step?: string | null
-          feature_kind?: string
-          id?: string
-          look_id?: string | null
-          payload?: Json
-          revision?: number
-          status?: string
-          updated_at?: string
-          visited_steps?: Json
-          workspace_id?: string
-        }
+          asset_id?: string | null;
+          capsule_id?: string | null;
+          created_at?: string;
+          current_step?: string | null;
+          feature_kind?: string;
+          id?: string;
+          look_id?: string | null;
+          payload?: NonNullable<Json>;
+          revision?: number;
+          status?: string;
+          updated_at?: string;
+          visited_steps?: NonNullable<Json>;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "workflow_drafts_workspace_id_asset_id_fkey"
-            columns: ["workspace_id", "asset_id"]
-            isOneToOne: false
-            referencedRelation: "assets"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "workflow_drafts_workspace_id_asset_id_fkey";
+            columns: ["workspace_id", "asset_id"];
+            isOneToOne: false;
+            referencedRelation: "assets";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "workflow_drafts_workspace_id_capsule_id_fkey"
-            columns: ["workspace_id", "capsule_id"]
-            isOneToOne: false
-            referencedRelation: "capsules"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "workflow_drafts_workspace_id_capsule_id_fkey";
+            columns: ["workspace_id", "capsule_id"];
+            isOneToOne: false;
+            referencedRelation: "capsules";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "workflow_drafts_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "workflow_drafts_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "workflow_drafts_workspace_id_look_id_fkey"
-            columns: ["workspace_id", "look_id"]
-            isOneToOne: false
-            referencedRelation: "looks"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "workflow_drafts_workspace_id_look_id_fkey";
+            columns: ["workspace_id", "look_id"];
+            isOneToOne: false;
+            referencedRelation: "looks";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       workflow_operation_events: {
         Row: {
-          created_at: string
-          event_type: string
-          id: string
-          operation_id: string
-          payload: Json
-          sequence: number
-          source_revision: number
-          workspace_id: string
-        }
+          created_at: string;
+          event_type: string;
+          id: string;
+          operation_id: string;
+          payload: NonNullable<Json>;
+          sequence: number;
+          source_revision: number;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          created_at?: string
-          event_type: string
-          id?: string
-          operation_id: string
-          payload?: Json
-          sequence: number
-          source_revision: number
-          workspace_id: string
-        }
+          created_at?: string;
+          event_type: string;
+          id?: string;
+          operation_id: string;
+          payload?: NonNullable<Json>;
+          sequence: number;
+          source_revision: number;
+          workspace_id: string;
+        };
         Update: {
-          created_at?: string
-          event_type?: string
-          id?: string
-          operation_id?: string
-          payload?: Json
-          sequence?: number
-          source_revision?: number
-          workspace_id?: string
-        }
+          created_at?: string;
+          event_type?: string;
+          id?: string;
+          operation_id?: string;
+          payload?: NonNullable<Json>;
+          sequence?: number;
+          source_revision?: number;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "workflow_operation_events_workspace_id_operation_id_fkey"
-            columns: ["workspace_id", "operation_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_operations"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "workflow_operation_events_workspace_id_operation_id_fkey";
+            columns: ["workspace_id", "operation_id"];
+            isOneToOne: false;
+            referencedRelation: "workflow_operations";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
+        ];
+      };
       workflow_operations: {
         Row: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          attempt_count?: number
-          cancel_requested_at?: string | null
-          completed_at?: string | null
-          created_at?: string
-          id?: string
-          input?: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until?: string | null
-          model?: string | null
-          next_attempt_at?: string | null
-          prompt_version?: string | null
-          provider_call_count?: number
-          provider_inflight?: number
-          provider_request_id?: string | null
-          result_ref?: Json | null
-          safe_error_code?: string | null
-          schema_version?: string | null
-          status?: string
-          subject_id: string
-          subject_type: string
-          updated_at?: string
-          workspace_id: string
-        }
+          attempt_count?: number;
+          cancel_requested_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          id?: string;
+          input?: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until?: string | null;
+          model?: string | null;
+          next_attempt_at?: string | null;
+          prompt_version?: string | null;
+          provider_call_count?: number;
+          provider_inflight?: number;
+          provider_request_id?: string | null;
+          result_ref?: Json | null;
+          safe_error_code?: string | null;
+          schema_version?: string | null;
+          status?: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          attempt_count?: number
-          cancel_requested_at?: string | null
-          completed_at?: string | null
-          created_at?: string
-          id?: string
-          input?: Json
-          input_fingerprint?: string
-          input_revision?: number
-          kind?: string
-          lease_until?: string | null
-          model?: string | null
-          next_attempt_at?: string | null
-          prompt_version?: string | null
-          provider_call_count?: number
-          provider_inflight?: number
-          provider_request_id?: string | null
-          result_ref?: Json | null
-          safe_error_code?: string | null
-          schema_version?: string | null
-          status?: string
-          subject_id?: string
-          subject_type?: string
-          updated_at?: string
-          workspace_id?: string
-        }
+          attempt_count?: number;
+          cancel_requested_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          id?: string;
+          input?: NonNullable<Json>;
+          input_fingerprint?: string;
+          input_revision?: number;
+          kind?: string;
+          lease_until?: string | null;
+          model?: string | null;
+          next_attempt_at?: string | null;
+          prompt_version?: string | null;
+          provider_call_count?: number;
+          provider_inflight?: number;
+          provider_request_id?: string | null;
+          result_ref?: Json | null;
+          safe_error_code?: string | null;
+          schema_version?: string | null;
+          status?: string;
+          subject_id?: string;
+          subject_type?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "workflow_operations_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "workflow_operations_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       workflow_provider_daily_budgets: {
         Row: {
-          budget_date: string
-          image_calls: number
-          text_calls: number
-          updated_at: string
-          workspace_id: string
-        }
+          budget_date: string;
+          image_calls: number;
+          search_calls: number;
+          text_calls: number;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          budget_date: string
-          image_calls?: number
-          text_calls?: number
-          updated_at?: string
-          workspace_id: string
-        }
+          budget_date: string;
+          image_calls?: number;
+          search_calls?: number;
+          text_calls?: number;
+          updated_at?: string;
+          workspace_id: string;
+        };
         Update: {
-          budget_date?: string
-          image_calls?: number
-          text_calls?: number
-          updated_at?: string
-          workspace_id?: string
-        }
+          budget_date?: string;
+          image_calls?: number;
+          search_calls?: number;
+          text_calls?: number;
+          updated_at?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "workflow_provider_daily_budgets_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "workflow_provider_daily_budgets_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       workflow_worker_heartbeats: {
         Row: {
-          active_jobs: number
-          last_seen_at: string
-          version: string
-          worker_id: string
-          workspace_id: string
-        }
+          active_jobs: number;
+          last_seen_at: string;
+          version: string;
+          worker_id: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          active_jobs: number
-          last_seen_at?: string
-          version: string
-          worker_id: string
-          workspace_id: string
-        }
+          active_jobs: number;
+          last_seen_at?: string;
+          version: string;
+          worker_id: string;
+          workspace_id: string;
+        };
         Update: {
-          active_jobs?: number
-          last_seen_at?: string
-          version?: string
-          worker_id?: string
-          workspace_id?: string
-        }
+          active_jobs?: number;
+          last_seen_at?: string;
+          version?: string;
+          worker_id?: string;
+          workspace_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "workflow_worker_heartbeats_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "workflow_worker_heartbeats_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       workspaces: {
         Row: {
-          created_at: string
-          id: string
-          name: string
-          revision: number
-          updated_at: string
-        }
+          created_at: string;
+          id: string;
+          name: string;
+          revision: number;
+          updated_at: string;
+        };
+        ComputedFields: never;
         Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          revision?: number
-          updated_at?: string
-        }
+          created_at?: string;
+          id?: string;
+          name: string;
+          revision?: number;
+          updated_at?: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          revision?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
-    }
+          created_at?: string;
+          id?: string;
+          name?: string;
+          revision?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+    };
     Views: {
       active_owned_wardrobe: {
         Row: {
-          archived_at: string | null
-          asset_id: string | null
-          attributes: Json | null
-          category: string | null
-          color: string | null
-          confidence: number | null
-          corrections: Json | null
-          created_at: string | null
-          description: string | null
-          id: string | null
-          import_idempotency_key: string | null
-          inferred_attributes: Json | null
-          inventory_status: string | null
-          name: string | null
-          notes: string | null
-          provenance: Json | null
-          revision: number | null
-          source_product_id: string | null
-          source_type: string | null
-          subcategory: string | null
-          uncertainty: Json | null
-          updated_at: string | null
-          workspace_id: string | null
-        }
+          archived_at: string | null;
+          asset_id: string | null;
+          attributes: NonNullable<Json>;
+          category: string;
+          color: string;
+          confidence: number | null;
+          corrections: NonNullable<Json>;
+          created_at: string;
+          description: string;
+          id: string;
+          import_idempotency_key: string | null;
+          inferred_attributes: NonNullable<Json>;
+          inventory_status: string;
+          name: string;
+          notes: string;
+          provenance: NonNullable<Json>;
+          revision: number;
+          source_product_id: string | null;
+          source_type: string;
+          subcategory: string | null;
+          uncertainty: NonNullable<Json>;
+          updated_at: string;
+          workspace_id: string;
+        };
+        ComputedFields: never;
         Insert: {
-          archived_at?: string | null
-          asset_id?: string | null
-          attributes?: Json | null
-          category?: string | null
-          color?: string | null
-          confidence?: number | null
-          corrections?: Json | null
-          created_at?: string | null
-          description?: string | null
-          id?: string | null
-          import_idempotency_key?: string | null
-          inferred_attributes?: Json | null
-          inventory_status?: string | null
-          name?: string | null
-          notes?: string | null
-          provenance?: Json | null
-          revision?: number | null
-          source_product_id?: string | null
-          source_type?: string | null
-          subcategory?: string | null
-          uncertainty?: Json | null
-          updated_at?: string | null
-          workspace_id?: string | null
-        }
+          archived_at?: string | null;
+          asset_id?: string | null;
+          attributes?: Json | null;
+          category?: string | null;
+          color?: string | null;
+          confidence?: number | null;
+          corrections?: Json | null;
+          created_at?: string | null;
+          description?: string | null;
+          id?: string | null;
+          import_idempotency_key?: string | null;
+          inferred_attributes?: Json | null;
+          inventory_status?: string | null;
+          name?: string | null;
+          notes?: string | null;
+          provenance?: Json | null;
+          revision?: number | null;
+          source_product_id?: string | null;
+          source_type?: string | null;
+          subcategory?: string | null;
+          uncertainty?: Json | null;
+          updated_at?: string | null;
+          workspace_id?: string | null;
+        };
         Update: {
-          archived_at?: string | null
-          asset_id?: string | null
-          attributes?: Json | null
-          category?: string | null
-          color?: string | null
-          confidence?: number | null
-          corrections?: Json | null
-          created_at?: string | null
-          description?: string | null
-          id?: string | null
-          import_idempotency_key?: string | null
-          inferred_attributes?: Json | null
-          inventory_status?: string | null
-          name?: string | null
-          notes?: string | null
-          provenance?: Json | null
-          revision?: number | null
-          source_product_id?: string | null
-          source_type?: string | null
-          subcategory?: string | null
-          uncertainty?: Json | null
-          updated_at?: string | null
-          workspace_id?: string | null
-        }
+          archived_at?: string | null;
+          asset_id?: string | null;
+          attributes?: Json | null;
+          category?: string | null;
+          color?: string | null;
+          confidence?: number | null;
+          corrections?: Json | null;
+          created_at?: string | null;
+          description?: string | null;
+          id?: string | null;
+          import_idempotency_key?: string | null;
+          inferred_attributes?: Json | null;
+          inventory_status?: string | null;
+          name?: string | null;
+          notes?: string | null;
+          provenance?: Json | null;
+          revision?: number | null;
+          source_product_id?: string | null;
+          source_type?: string | null;
+          subcategory?: string | null;
+          uncertainty?: Json | null;
+          updated_at?: string | null;
+          workspace_id?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "wardrobe_items_workspace_id_asset_id_fkey"
-            columns: ["workspace_id", "asset_id"]
-            isOneToOne: false
-            referencedRelation: "assets"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "wardrobe_items_workspace_id_asset_id_fkey";
+            columns: ["workspace_id", "asset_id"];
+            isOneToOne: false;
+            referencedRelation: "assets";
+            referencedColumns: ["workspace_id", "id"];
           },
           {
-            foreignKeyName: "wardrobe_items_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            foreignKeyName: "wardrobe_items_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "wardrobe_items_workspace_id_source_product_id_fkey"
-            columns: ["workspace_id", "source_product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["workspace_id", "id"]
+            foreignKeyName: "wardrobe_items_workspace_id_source_product_id_fkey";
+            columns: ["workspace_id", "source_product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["workspace_id", "id"];
           },
-        ]
-      }
-    }
+        ];
+      };
+    };
     Functions: {
       append_create_event: {
         Args: {
-          p_attempt: number
-          p_operation_id: string
-          p_payload?: Json
-          p_type: string
-          p_workspace_id: string
-        }
+          p_attempt: number;
+          p_operation_id: string;
+          p_payload?: Json;
+          p_type: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          created_at: string
-          event_type: string
-          id: string
-          operation_id: string
-          payload: Json
-          sequence: number
-          source_revision: number
-          workspace_id: string
-        }
+          created_at: string;
+          event_type: string;
+          id: string;
+          operation_id: string;
+          payload: NonNullable<Json>;
+          sequence: number;
+          source_revision: number;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operation_events"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operation_events";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       append_wardrobe_piece: {
         Args: {
-          p_attempt: number
-          p_operation_id: string
-          p_payload: Json
-          p_workspace_id: string
-        }
-        Returns: undefined
-      }
+          p_attempt: number;
+          p_operation_id: string;
+          p_payload: Json;
+          p_workspace_id: string;
+        };
+        Returns: undefined;
+      };
       append_workflow_operation_event: {
         Args: {
-          p_attempt_count: number
-          p_event_type: string
-          p_input_fingerprint: string
-          p_operation_id: string
-          p_payload: Json
-          p_workspace_id: string
-        }
+          p_attempt_count: number;
+          p_event_type: string;
+          p_input_fingerprint: string;
+          p_operation_id: string;
+          p_payload: Json;
+          p_workspace_id: string;
+        };
         Returns: {
-          created_at: string
-          event_type: string
-          id: string
-          operation_id: string
-          payload: Json
-          sequence: number
-          source_revision: number
-          workspace_id: string
-        }
+          created_at: string;
+          event_type: string;
+          id: string;
+          operation_id: string;
+          payload: NonNullable<Json>;
+          sequence: number;
+          source_revision: number;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operation_events"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operation_events";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       attach_inspiration_upload: {
         Args: {
-          p_asset_id: string
-          p_draft_id: string
-          p_expected_revision: number
-          p_occasion?: string
-          p_workspace_id: string
-        }
+          p_asset_id: string;
+          p_draft_id: string;
+          p_expected_revision: number;
+          p_occasion?: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          created_at: string
-          id: string
-          inspiration_asset_id: string | null
-          notes: string
-          occasion: string | null
-          provider_metadata: Json
-          revision: number
-          selected_option_id: string | null
-          source_type: string
-          status: string
-          title: string
-          updated_at: string
-          workspace_id: string
-        }
+          created_at: string;
+          id: string;
+          inspiration_asset_id: string | null;
+          notes: string;
+          occasion: string | null;
+          provider_metadata: NonNullable<Json>;
+          revision: number;
+          selected_option_id: string | null;
+          source_type: string;
+          status: string;
+          title: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "looks"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "looks";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       attach_product_candidate: {
         Args: {
-          p_expected_option_revision: number
-          p_look_id: string
-          p_option_id: string
-          p_option_item_id: string
-          p_product_id: string
-          p_search_id: string
-          p_workspace_id: string
-        }
+          p_expected_option_revision: number;
+          p_look_id: string;
+          p_option_id: string;
+          p_option_item_id: string;
+          p_product_id: string;
+          p_search_id: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          candidate_position: number
-          category: string
-          created_at: string
-          id: string
-          item_kind: string
-          look_id: string
-          missing_brief: Json | null
-          option_id: string
-          piece_id: string | null
-          position: number
-          product_id: string | null
-          rationale: string
-          requested_brief: string | null
-          requested_category: string | null
-          revision: number
-          slot_id: string
-          updated_at: string
-          wardrobe_item_id: string | null
-          workspace_id: string
-        }
+          candidate_position: number;
+          category: string;
+          created_at: string;
+          id: string;
+          item_kind: string;
+          look_id: string;
+          missing_brief: Json | null;
+          option_id: string;
+          piece_id: string | null;
+          position: number;
+          product_id: string | null;
+          rationale: string;
+          requested_brief: string | null;
+          requested_category: string | null;
+          revision: number;
+          slot_id: string;
+          updated_at: string;
+          wardrobe_item_id: string | null;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "outfit_option_items"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "outfit_option_items";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       cancel_workflow_operation: {
-        Args: { p_operation_id: string; p_workspace_id: string }
+        Args: { p_operation_id: string; p_workspace_id: string };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       checkpoint_workflow_result: {
         Args: {
-          p_attempt: number
-          p_input_fingerprint: string
-          p_metadata?: Json
-          p_operation_id: string
-          p_result: Json
-          p_workspace_id: string
-        }
+          p_attempt: number;
+          p_input_fingerprint: string;
+          p_metadata?: Json;
+          p_operation_id: string;
+          p_result: Json;
+          p_workspace_id: string;
+        };
         Returns: {
-          created_at: string
-          created_attempt: number
-          input_fingerprint: string
-          kind: string
-          metadata: Json
-          model: string
-          operation_id: string
-          prompt_version: string
-          result: Json
-          schema_version: string
-          workspace_id: string
-        }
+          created_at: string;
+          created_attempt: number;
+          input_fingerprint: string;
+          kind: string;
+          metadata: NonNullable<Json>;
+          model: string;
+          operation_id: string;
+          prompt_version: string;
+          result: NonNullable<Json>;
+          schema_version: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "operation_result_checkpoints"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "operation_result_checkpoints";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       claim_workflow_operation: {
         Args: {
-          p_image_daily_limit?: number
-          p_input_revision: number
-          p_lease_seconds?: number
-          p_operation_id: string
-          p_text_daily_limit?: number
-          p_workspace_id: string
-        }
+          p_image_daily_limit?: number;
+          p_input_revision: number;
+          p_lease_seconds?: number;
+          p_operation_id: string;
+          p_text_daily_limit?: number;
+          p_workspace_id: string;
+        };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       commit_capsule_generation: {
         Args: {
-          p_attempt_count: number
-          p_capsule_id: string
-          p_expected_revision: number
-          p_input_fingerprint: string
-          p_missing_additions: Json
-          p_operation_id: string
-          p_outfits: Json
-          p_workspace_id: string
-        }
+          p_attempt_count: number;
+          p_capsule_id: string;
+          p_expected_revision: number;
+          p_input_fingerprint: string;
+          p_missing_additions: Json;
+          p_operation_id: string;
+          p_outfits: Json;
+          p_workspace_id: string;
+        };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       complete_preview_operation: {
         Args: {
-          p_attempt_count: number
-          p_input_fingerprint: string
-          p_operation_id: string
-          p_output_asset_id: string
-          p_render_fingerprint: string
-          p_workspace_id: string
-        }
+          p_attempt_count: number;
+          p_input_fingerprint: string;
+          p_operation_id: string;
+          p_output_asset_id: string;
+          p_render_fingerprint: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       complete_saved_avatar: {
         Args: {
-          p_attempt_count: number
-          p_input_fingerprint: string
-          p_operation_id: string
-          p_output_asset_id: string
-          p_render_fingerprint: string
-          p_workspace_id: string
-        }
+          p_attempt_count: number;
+          p_input_fingerprint: string;
+          p_operation_id: string;
+          p_output_asset_id: string;
+          p_render_fingerprint: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       control_create_operation: {
         Args: {
-          p_action: string
-          p_operation_id: string
-          p_workspace_id: string
-        }
+          p_action: string;
+          p_operation_id: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       defer_workflow_operation: {
         Args: {
-          p_attempt_count: number
-          p_input_fingerprint: string
-          p_operation_id: string
-          p_retry_after_seconds?: number
-          p_safe_error_code: string
-          p_workspace_id: string
-        }
+          p_attempt_count: number;
+          p_input_fingerprint: string;
+          p_operation_id: string;
+          p_retry_after_seconds?: number;
+          p_safe_error_code: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       delete_capsule: {
         Args: {
-          p_capsule_id: string
-          p_expected_revision: number
-          p_workspace_id: string
-        }
-        Returns: Json
-      }
+          p_capsule_id: string;
+          p_expected_revision: number;
+          p_workspace_id: string;
+        };
+        Returns: Json;
+      };
       delete_capsule_outfit: {
         Args: {
-          p_capsule_id: string
-          p_expected_revision: number
-          p_outfit_id: string
-          p_workspace_id: string
-        }
-        Returns: Json
-      }
+          p_capsule_id: string;
+          p_expected_revision: number;
+          p_outfit_id: string;
+          p_workspace_id: string;
+        };
+        Returns: Json;
+      };
       delete_saved_look: {
-        Args: { p_saved_look_id: string; p_workspace_id: string }
-        Returns: string
-      }
+        Args: { p_saved_look_id: string; p_workspace_id: string };
+        Returns: string;
+      };
       finish_create_operation: {
         Args: {
-          p_attempt: number
-          p_metadata: Json
-          p_operation_id: string
-          p_result: Json
-          p_workspace_id: string
-        }
+          p_attempt: number;
+          p_metadata: Json;
+          p_operation_id: string;
+          p_result: Json;
+          p_workspace_id: string;
+        };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       finish_wardrobe_description: {
         Args: {
-          p_attempt: number
-          p_fingerprint: string
-          p_operation_id: string
-          p_payload: Json
-          p_workspace_id: string
-        }
-        Returns: undefined
-      }
+          p_attempt: number;
+          p_fingerprint: string;
+          p_operation_id: string;
+          p_payload: Json;
+          p_workspace_id: string;
+        };
+        Returns: undefined;
+      };
       finish_workflow_operation: {
         Args: {
-          p_attempt_count: number
-          p_input_fingerprint: string
-          p_operation_id: string
-          p_result_ref?: Json
-          p_safe_error_code?: string
-          p_status: string
-          p_workspace_id: string
-        }
+          p_attempt_count: number;
+          p_input_fingerprint: string;
+          p_operation_id: string;
+          p_result_ref?: Json;
+          p_safe_error_code?: string;
+          p_status: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       list_saved_looks: {
         Args: {
-          p_cursor_created_at?: string
-          p_cursor_id?: string
-          p_filter?: string
-          p_limit?: number
-          p_workspace_id: string
-        }
-        Returns: Json
-      }
+          p_cursor_created_at?: string;
+          p_cursor_id?: string;
+          p_filter?: string;
+          p_limit?: number;
+          p_workspace_id: string;
+        };
+        Returns: Json;
+      };
       record_workflow_worker_heartbeat: {
         Args: {
-          p_active_jobs: number
-          p_version: string
-          p_worker_id: string
-          p_workspace_id: string
-        }
+          p_active_jobs: number;
+          p_version: string;
+          p_worker_id: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          active_jobs: number
-          last_seen_at: string
-          version: string
-          worker_id: string
-          workspace_id: string
-        }
+          active_jobs: number;
+          last_seen_at: string;
+          version: string;
+          worker_id: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_worker_heartbeats"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_worker_heartbeats";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       regenerate_saved_look_media: {
         Args: {
-          p_expected_media_id: string
-          p_idempotency_key: string
-          p_saved_look_id: string
-          p_workspace_id: string
-        }
+          p_expected_media_id: string;
+          p_idempotency_key: string;
+          p_saved_look_id: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          created_at: string
-          id: string
-          operation_id: string
-          output_asset_id: string | null
-          preference_snapshot_hash: string
-          saved_look_id: string
-          status: string
-          updated_at: string
-          workspace_id: string
-        }
+          created_at: string;
+          id: string;
+          operation_id: string;
+          output_asset_id: string | null;
+          preference_snapshot_hash: string;
+          saved_look_id: string;
+          status: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "saved_look_media"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "saved_look_media";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       release_create_provider_call: {
         Args: {
-          p_attempt: number
-          p_operation_id: string
-          p_workspace_id: string
-        }
-        Returns: undefined
-      }
+          p_attempt: number;
+          p_operation_id: string;
+          p_workspace_id: string;
+        };
+        Returns: undefined;
+      };
       release_workflow_provider_call: {
         Args: {
-          p_attempt: number
-          p_input_fingerprint: string
-          p_operation_id: string
-          p_workspace_id: string
-        }
-        Returns: undefined
-      }
+          p_attempt: number;
+          p_input_fingerprint: string;
+          p_operation_id: string;
+          p_workspace_id: string;
+        };
+        Returns: undefined;
+      };
       reserve_create_provider_call: {
         Args: {
-          p_attempt: number
-          p_operation_id: string
-          p_workspace_id: string
-        }
-        Returns: undefined
-      }
+          p_attempt: number;
+          p_operation_id: string;
+          p_workspace_id: string;
+        };
+        Returns: undefined;
+      };
+      reserve_shopping_provider_call: {
+        Args: {
+          p_daily_limit?: number;
+          p_search_id: string;
+          p_workspace_id: string;
+        };
+        Returns: undefined;
+      };
       reserve_wardrobe_provider_call: {
         Args: {
-          p_attempt: number
-          p_operation_id: string
-          p_workspace_id: string
-        }
-        Returns: undefined
-      }
+          p_attempt: number;
+          p_operation_id: string;
+          p_workspace_id: string;
+        };
+        Returns: undefined;
+      };
       reserve_workflow_provider_call: {
         Args: {
-          p_attempt: number
-          p_image_daily_limit?: number
-          p_input_fingerprint: string
-          p_operation_id: string
-          p_text_daily_limit?: number
-          p_workspace_id: string
-        }
-        Returns: undefined
-      }
+          p_attempt: number;
+          p_image_daily_limit?: number;
+          p_input_fingerprint: string;
+          p_operation_id: string;
+          p_text_daily_limit?: number;
+          p_workspace_id: string;
+        };
+        Returns: undefined;
+      };
       retry_saved_look_media: {
-        Args: { p_saved_look_id: string; p_workspace_id: string }
+        Args: { p_saved_look_id: string; p_workspace_id: string };
         Returns: {
-          created_at: string
-          id: string
-          operation_id: string
-          output_asset_id: string | null
-          preference_snapshot_hash: string
-          saved_look_id: string
-          status: string
-          updated_at: string
-          workspace_id: string
-        }
+          created_at: string;
+          id: string;
+          operation_id: string;
+          output_asset_id: string | null;
+          preference_snapshot_hash: string;
+          saved_look_id: string;
+          status: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "saved_look_media"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "saved_look_media";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       retry_wardrobe_description: {
-        Args: { p_operation_id: string; p_workspace_id: string }
-        Returns: undefined
-      }
+        Args: { p_operation_id: string; p_workspace_id: string };
+        Returns: undefined;
+      };
       retry_workflow_operation: {
-        Args: { p_operation_id: string; p_workspace_id: string }
+        Args: { p_operation_id: string; p_workspace_id: string };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       save_capsule_draft: {
         Args: {
-          p_brief: Json
-          p_capsule_id: string
-          p_expected_revision: number
-          p_item_ids: string[]
-          p_title: string
-          p_workspace_id: string
-        }
-        Returns: Json
-      }
+          p_brief: Json;
+          p_capsule_id: string;
+          p_expected_revision: number;
+          p_item_ids: string[];
+          p_title: string;
+          p_workspace_id: string;
+        };
+        Returns: Json;
+      };
       save_inspiration_pieces: {
         Args: {
-          p_expected_revision: number
-          p_look_id: string
-          p_pieces: Json
-          p_workspace_id: string
-        }
+          p_expected_revision: number;
+          p_look_id: string;
+          p_pieces: Json;
+          p_workspace_id: string;
+        };
         Returns: {
-          created_at: string
-          id: string
-          inspiration_asset_id: string | null
-          notes: string
-          occasion: string | null
-          provider_metadata: Json
-          revision: number
-          selected_option_id: string | null
-          source_type: string
-          status: string
-          title: string
-          updated_at: string
-          workspace_id: string
-        }
+          created_at: string;
+          id: string;
+          inspiration_asset_id: string | null;
+          notes: string;
+          occasion: string | null;
+          provider_metadata: NonNullable<Json>;
+          revision: number;
+          selected_option_id: string | null;
+          source_type: string;
+          status: string;
+          title: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "looks"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "looks";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       save_look_selection: {
         Args: {
-          p_choices: Json
-          p_expected_revision: number
-          p_look_id: string
-          p_option_id: string
-          p_workspace_id: string
-        }
+          p_choices: Json;
+          p_expected_revision: number;
+          p_look_id: string;
+          p_option_id: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          created_at: string
-          id: string
-          look_id: string
-          option_id: string
-          revision: number
-          source_option_revision: number
-          updated_at: string
-          workspace_id: string
-        }
+          created_at: string;
+          id: string;
+          look_id: string;
+          option_id: string;
+          revision: number;
+          source_option_revision: number;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "look_selections"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "look_selections";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       save_look_snapshot: {
         Args: {
-          p_expected_revision: number
-          p_idempotency_key: string
-          p_look_id: string
-          p_option_id: string
-          p_title: string
-          p_workspace_id: string
-        }
+          p_expected_revision: number;
+          p_idempotency_key: string;
+          p_look_id: string;
+          p_option_id: string;
+          p_title: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          created_at: string
-          id: string
-          idempotency_key: string
-          inputs_used: Json
-          items: Json
-          look_id: string | null
-          option_id: string | null
-          preference_snapshot: Json
-          rationale: string
-          selection_revision: number | null
-          source_kind: string
-          source_revision: number
-          source_type: string
-          spend_currency: string | null
-          spend_minor: number | null
-          title: string
-          uncertainty: Json
-          workspace_id: string
-        }
+          created_at: string;
+          id: string;
+          idempotency_key: string;
+          inputs_used: NonNullable<Json>;
+          items: NonNullable<Json>;
+          look_id: string | null;
+          option_id: string | null;
+          preference_snapshot: NonNullable<Json>;
+          rationale: string;
+          selection_revision: number | null;
+          source_kind: string;
+          source_revision: number;
+          source_type: string;
+          spend_currency: string | null;
+          spend_minor: number | null;
+          title: string;
+          uncertainty: NonNullable<Json>;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "saved_look_snapshots"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "saved_look_snapshots";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       save_studio_look: {
         Args: {
-          p_expected_revision: number
-          p_idempotency_key: string
-          p_parent_id: string
-          p_source_id: string
-          p_source_kind: string
-          p_title: string
-          p_workspace_id: string
-        }
-        Returns: Json
-      }
+          p_expected_revision: number;
+          p_idempotency_key: string;
+          p_parent_id: string;
+          p_source_id: string;
+          p_source_kind: string;
+          p_title: string;
+          p_workspace_id: string;
+        };
+        Returns: Json;
+      };
       start_workflow_operation: {
         Args: {
-          p_input?: Json
-          p_input_fingerprint: string
-          p_input_revision: number
-          p_kind: string
-          p_model?: string
-          p_prompt_version?: string
-          p_schema_version?: string
-          p_subject_id: string
-          p_subject_type: string
-          p_workspace_id: string
-        }
+          p_input?: Json;
+          p_input_fingerprint: string;
+          p_input_revision: number;
+          p_kind: string;
+          p_model?: string;
+          p_prompt_version?: string;
+          p_schema_version?: string;
+          p_subject_id: string;
+          p_subject_type: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       stylora_complete_image_operation: {
         Args: {
-          p_attempt_count: number
-          p_input_fingerprint: string
-          p_kind: string
-          p_operation_id: string
-          p_output_asset_id: string
-          p_render_fingerprint: string
-          p_workspace_id: string
-        }
+          p_attempt_count: number;
+          p_input_fingerprint: string;
+          p_kind: string;
+          p_operation_id: string;
+          p_output_asset_id: string;
+          p_render_fingerprint: string;
+          p_workspace_id: string;
+        };
         Returns: {
-          attempt_count: number
-          cancel_requested_at: string | null
-          completed_at: string | null
-          created_at: string
-          id: string
-          input: Json
-          input_fingerprint: string
-          input_revision: number
-          kind: string
-          lease_until: string | null
-          model: string | null
-          next_attempt_at: string | null
-          prompt_version: string | null
-          provider_call_count: number
-          provider_inflight: number
-          provider_request_id: string | null
-          result_ref: Json | null
-          safe_error_code: string | null
-          schema_version: string | null
-          status: string
-          subject_id: string
-          subject_type: string
-          updated_at: string
-          workspace_id: string
-        }
+          attempt_count: number;
+          cancel_requested_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          input: NonNullable<Json>;
+          input_fingerprint: string;
+          input_revision: number;
+          kind: string;
+          lease_until: string | null;
+          model: string | null;
+          next_attempt_at: string | null;
+          prompt_version: string | null;
+          provider_call_count: number;
+          provider_inflight: number;
+          provider_request_id: string | null;
+          result_ref: Json | null;
+          safe_error_code: string | null;
+          schema_version: string | null;
+          status: string;
+          subject_id: string;
+          subject_type: string;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operations"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       stylora_create_draft_active: {
-        Args: { p_draft_id?: string; p_look_id: string; p_workspace_id: string }
-        Returns: boolean
-      }
+        Args: {
+          p_draft_id?: string;
+          p_look_id: string;
+          p_workspace_id: string;
+        };
+        Returns: boolean;
+      };
       stylora_record_operation_event: {
         Args: {
-          p_event_type: string
-          p_operation_id: string
-          p_payload?: Json
-          p_workspace_id: string
-        }
+          p_event_type: string;
+          p_operation_id: string;
+          p_payload?: Json;
+          p_workspace_id: string;
+        };
         Returns: {
-          created_at: string
-          event_type: string
-          id: string
-          operation_id: string
-          payload: Json
-          sequence: number
-          source_revision: number
-          workspace_id: string
-        }
+          created_at: string;
+          event_type: string;
+          id: string;
+          operation_id: string;
+          payload: NonNullable<Json>;
+          sequence: number;
+          source_revision: number;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "workflow_operation_events"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+          from: "*";
+          to: "workflow_operation_events";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       stylora_subject_revision: {
         Args: {
-          p_subject_id: string
-          p_subject_type: string
-          p_workspace_id: string
-        }
-        Returns: number
-      }
+          p_subject_id: string;
+          p_subject_type: string;
+          p_workspace_id: string;
+        };
+        Returns: number;
+      };
       stylora_workflow_retryable_code: {
-        Args: { p_code: string }
-        Returns: boolean
-      }
+        Args: { p_code: string };
+        Returns: boolean;
+      };
       wardrobe_draft_command: {
         Args: {
-          p_action: string
-          p_draft_id: string
-          p_expected_revision: number
-          p_payload?: Json
-          p_workspace_id: string
-        }
-        Returns: Json
-      }
+          p_action: string;
+          p_draft_id: string;
+          p_expected_revision: number;
+          p_payload?: Json;
+          p_workspace_id: string;
+        };
+        Returns: Json;
+      };
       wardrobe_item_command: {
         Args: {
-          p_action: string
-          p_expected_revision: number
-          p_item_id: string
-          p_payload?: Json
-          p_workspace_id: string
-        }
+          p_action: string;
+          p_expected_revision: number;
+          p_item_id: string;
+          p_payload?: Json;
+          p_workspace_id: string;
+        };
         Returns: {
-          archived_at: string | null
-          asset_id: string | null
-          attributes: Json
-          category: string
-          color: string
-          confidence: number | null
-          corrections: Json
-          created_at: string
-          description: string
-          id: string
-          import_idempotency_key: string | null
-          inferred_attributes: Json
-          inventory_status: string
-          name: string
-          notes: string
-          provenance: Json
-          revision: number
-          source_product_id: string | null
-          source_type: string
-          subcategory: string | null
-          uncertainty: Json
-          updated_at: string
-          workspace_id: string
-        }
+          archived_at: string | null;
+          asset_id: string | null;
+          attributes: NonNullable<Json>;
+          category: string;
+          color: string;
+          confidence: number | null;
+          corrections: NonNullable<Json>;
+          created_at: string;
+          description: string;
+          id: string;
+          import_idempotency_key: string | null;
+          inferred_attributes: NonNullable<Json>;
+          inventory_status: string;
+          name: string;
+          notes: string;
+          provenance: NonNullable<Json>;
+          revision: number;
+          source_product_id: string | null;
+          source_type: string;
+          subcategory: string | null;
+          uncertainty: NonNullable<Json>;
+          updated_at: string;
+          workspace_id: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "wardrobe_items"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-    }
+          from: "*";
+          to: "wardrobe_items";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+    };
     Enums: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      [_ in never]: never;
+    };
+  };
+};
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<
+  keyof Database,
+  "public"
+>];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+      Row: infer R;
     }
     ? R
     : never
@@ -2864,99 +2909,95 @@ export type Tables<
         DefaultSchema["Views"])
     ? (DefaultSchema["Tables"] &
         DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+      Insert: infer I;
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+      Update: infer U;
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+    : never;
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+    : never;
 
 export const Constants = {
   public: {
     Enums: {},
   },
-} as const
-
+} as const;
