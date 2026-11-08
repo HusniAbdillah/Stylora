@@ -37,7 +37,10 @@ describe("avatar provider direction", () => {
       items,
       images,
       visualDirection,
-      renderSettings: getImageRenderSettings({ OPENAI_IMAGE_QUALITY: "high" }),
+      renderSettings: getImageRenderSettings({
+        OPENAI_IMAGE_QUALITY: "high",
+        OPENAI_IMAGE_MODEL: "gpt-image-1.5",
+      }),
     });
     const body = fetchMock.mock.calls[0]?.[1]?.body;
     if (!(body instanceof FormData))
@@ -70,11 +73,49 @@ describe("avatar provider direction", () => {
   });
   it("uses the captured newer image model without a legacy fidelity parameter", async () => {
     const fetchMock = interceptRequest();
-    await generateFashionImage({ items, images, visualDirection: buildAvatarVisualDirection({}, items), renderSettings: getImageRenderSettings({ OPENAI_IMAGE_MODEL: "gpt-image-2.6-flare" }) });
+    await generateFashionImage({
+      items,
+      images,
+      visualDirection: buildAvatarVisualDirection({}, items),
+      renderSettings: getImageRenderSettings({
+        OPENAI_IMAGE_MODEL: "gpt-image-2.6-flare",
+      }),
+    });
     const body = fetchMock.mock.calls[0]?.[1]?.body;
-    if (!(body instanceof FormData)) throw new Error("Expected image edit form.");
+    if (!(body instanceof FormData))
+      throw new Error("Expected image edit form.");
     expect(body.get("model")).toBe("gpt-image-2.6-flare");
     expect(body.has("input_fidelity")).toBe(false);
+  });
+  it("states selected skin, body and fit plainly after the garment context", async () => {
+    const fetchMock = interceptRequest();
+    await generateFashionImage({
+      items,
+      images,
+      visualDirection: buildAvatarVisualDirection(
+        {
+          skinSwatchId: "depth_06",
+          skinSwatchHex: "#543526",
+          undertone: "warm",
+          bodyIllustrationGroup: "women",
+          bodyIllustrationId: "rectangle",
+          fit: "oversized",
+        },
+        items,
+      ),
+    });
+    const body = fetchMock.mock.calls[0]?.[1]?.body;
+    if (!(body instanceof FormData))
+      throw new Error("Expected image edit form.");
+    const prompt = String(body.get("prompt"));
+    expect(prompt).toContain("deep dark brown");
+    expect(prompt).toContain("sRGB #543526");
+    expect(prompt).toContain("Shoulders, waist and hips aligned");
+    expect(prompt).toContain("selected fit intent is oversized");
+    expect(prompt.lastIndexOf("sRGB #543526")).toBeGreaterThan(
+      prompt.indexOf("</outfit>"),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("rejects contradictory slot partitions before making a request", async () => {

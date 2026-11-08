@@ -28,10 +28,10 @@ export const FASHION_SCHEMA_VERSION = "fashion-item.v1";
 export const FASHION_KNOWLEDGE_VERSION =
   getFashionVersions().knowledgeSourceHash;
 export const FASHION_PROMPT_VERSION = `stylora-fashion-v1.openai-2.${FASHION_KNOWLEDGE_VERSION}`;
-export const AVATAR_PROMPT_VERSION = `stylora-fashion-v1.avatar-4.${FASHION_KNOWLEDGE_VERSION}`;
+export const AVATAR_PROMPT_VERSION = `stylora-fashion-v1.avatar-5.${FASHION_KNOWLEDGE_VERSION}`;
 export const TEXT_MODEL = getFashionTaskSettings("capsule_generation").model;
 export const IMAGE_MODEL =
-  process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1.5";
+  process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-2.6-flare";
 const capsulePrompt = buildFashionPrompt("capsule_generation");
 const capsuleDirections =
   "Return exactly brief.targetOutfits complete, meaningfully distinct outfits. Every item ID and evidence reference must be one of the supplied owned IDs. inputsUsed must use exact allowedSignals strings, not paraphrases. Use exactly two concise Why this reasons per outfit, with short summaries, differences and uncertainty. Do not recommend additions unless a real role gap unlocks at least two listed outfits. All addition indices are zero-based and every claimed use must reference the addition in that outfit. Required IDs must appear somewhere in the capsule. Never repair an unknown ID by guessing.";
@@ -520,6 +520,33 @@ const AVATAR_COMPOSITION_RULES =
 const AVATAR_RENDER_RULES =
   "Full-length figure on a warm porcelain studio background with soft diffuse light. Render believable fabric texture, seams, drape and construction from the supplied garment references. Keep the exact selected garment colors, patterns, logos and silhouette; do not invent branding, clothing or accessories. Apply only the supplied visual preferences and outfit pose. Keep garment fronts, hems and selected accessories readable. The skin swatch is an approximate appearance reference under neutral lighting, never an ethnicity. Fit intent affects the illustrative styling without redesigning the garment. Avoid beauty filters, extreme proportions, text labels and impossible anatomy.";
 
+export function avatarPersonalizationInstructions(
+  direction: AvatarVisualDirection,
+) {
+  const { skin, body, fit } = direction.preferences;
+  const shades: Record<string, string> = {
+    depth_01: "light warm beige",
+    depth_02: "light tan",
+    depth_03: "medium tan",
+    depth_04: "medium brown",
+    depth_05: "dark brown",
+    depth_06: "deep dark brown",
+  };
+  return [
+    "Garment photographs specify clothing only. Do not copy any reference wearer's skin, body or identity.",
+    skin?.hex
+      ? `Paint every exposed mannequin surface ${shades[skin.swatchId ?? ""] ?? skin.depthLabel}, using sRGB ${skin.hex} as the diffuse material color${skin.undertone ? ` with the selected ${skin.undertone} undertone` : ""}. Match this paint reference across the head, neck, arms, hands and visible legs. Preserve its selected depth under neutral light; do not substitute the neutral warm-stone default or bleach dark paint to beige, peach or ivory. Highlights may vary without changing the broad material midtone. This paint direction applies to the mannequin, not the clothes or background.`
+      : "No skin swatch was selected. Use the neutral warm-stone mannequin material.",
+    body?.id
+      ? `Use the selected ${body.label} body reference: ${body.description}. Preserve this body silhouette beneath the garments; garment reference wearers do not override it.`
+      : "No body reference was selected. Keep neutral, natural mannequin proportions.",
+    fit
+      ? `The selected fit intent is ${fit}. Show its ease and drape where the existing garment cut permits it, while preserving the garment's construction and length. Do not change sizes, patterns or garment design to promise a physical fit.`
+      : "No fit intent was selected. Preserve the referenced garment cut.",
+    direction.pose.instructions,
+  ].join("\n");
+}
+
 export function buildAvatarImagePrompt(input: {
   instructions: string;
   items: unknown[];
@@ -537,6 +564,7 @@ export function buildAvatarImagePrompt(input: {
       items: input.items,
       visualDirection: input.visualDirection,
     })}\n</outfit>`,
+    `<appearance_requirements>\n${avatarPersonalizationInstructions(input.visualDirection)}\n</appearance_requirements>`,
   ].join("\n\n");
 }
 
