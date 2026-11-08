@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_CAPSULE_DRAFT } from "./capsule-types";
-import { validateCapsuleGeneration } from "./generation-schema";
+import {
+  CapsuleOutputError,
+  capsuleDiagnostics,
+  capsuleProviderSchema,
+  validateCapsuleGeneration,
+} from "./generation-schema";
+import { z } from "zod";
 
 const ids = [1, 2, 3, 4, 5].map(
   (number) => `10000000-0000-4000-8000-${String(number).padStart(12, "0")}`,
@@ -47,6 +53,56 @@ function fixture() {
 }
 
 describe("capsule output integrity", () => {
+  it("bounds provider output to exact counts, references, signals and reuse indices", () => {
+    const schema = z.toJSONSchema(
+      capsuleProviderSchema(draft, items, ["Owned wardrobe"]),
+    );
+    const text = JSON.stringify(schema);
+    expect(text).toContain('"minItems":3');
+    expect(text).toContain('"maxItems":3');
+    expect(text).toContain('"maximum":2');
+    expect(text).toContain('"enum":["Owned wardrobe"]');
+    expect(
+      capsuleProviderSchema(draft, items, ["Owned wardrobe"]).safeParse(
+        fixture(),
+      ).success,
+    ).toBe(true);
+    const invalid = fixture();
+    invalid.outfits[0].inputsUsed = ["Invented preference"];
+    expect(
+      capsuleProviderSchema(draft, items, ["Owned wardrobe"]).safeParse(invalid)
+        .success,
+    ).toBe(false);
+  });
+  it("retains actionable codes and paths without disclosing invalid output values", () => {
+    const invalid = fixture();
+    invalid.outfits[0].itemIds[0] = "20000000-0000-4000-8000-000000000001";
+    try {
+      validateCapsuleGeneration(invalid, draft, items, ["Owned wardrobe"]);
+      throw new Error("Expected rejection.");
+    } catch (error) {
+      expect(error).toBeInstanceOf(CapsuleOutputError);
+      expect(error).toMatchObject({
+        code: "CAPSULE_REFERENCE_INVALID",
+        retryable: false,
+        diagnostics: [
+          { code: "CAPSULE_REFERENCE_INVALID", path: "outfits[0].itemIds[0]" },
+        ],
+      });
+      expect(JSON.stringify(error)).not.toContain(
+        invalid.outfits[0].itemIds[0],
+      );
+    }
+    const diagnostics = capsuleDiagnostics(
+      Array.from({ length: 12 }, () => ({
+        code: "invalid_type",
+        path: ["outfits", 0, "Private body value"],
+      })),
+    );
+    expect(diagnostics).toHaveLength(10);
+    expect(diagnostics[0].path).toBe("outfits[0].*");
+    expect(JSON.stringify(diagnostics)).not.toContain("Private body value");
+  });
   it("accepts distinct complete outfits using supplied owned IDs", () => {
     expect(
       validateCapsuleGeneration(fixture(), draft, items, ["Owned wardrobe"])
