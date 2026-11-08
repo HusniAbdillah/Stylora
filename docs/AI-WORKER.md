@@ -1,151 +1,165 @@
 # AI operation execution
 
-## Runtime contract
+## Deployment modes
 
-The application persists a stable operation before provider work. In `worker`
-mode, Create, Capsule, Preview, wardrobe description and saved-image routes
-acknowledge allocation or an existing job. The browser reads progress. A
-separate Node process executes queued jobs and recovers expired leases through
-the existing atomic claim RPC. Two consumers cannot execute the same live claim.
-Results still pass Zod, domain validation and commit fencing.
+The serverless deployment path is `STYLORA_EXECUTION_MODE=queue`. Vercel Queues
+invokes a private consumer function; Supabase retains operation state, claims,
+checkpoints, provider budgets and a transactional dispatch outbox. This path
+does not need a VPS, a laptop left running or a separate Node worker.
 
-Marketplace uses its separate search rows, request cache and three-slot provider
-pool with a 15-second upstream deadline. It is not dispatched by this worker.
-Saving a look and rendering its image remain independent transactions.
+| Mode     | Executor                                              | Browser behavior                                 |
+| -------- | ----------------------------------------------------- | ------------------------------------------------ |
+| `queue`  | Vercel push consumer, with Supabase repair scheduling | Allocate once, then read progress                |
+| `worker` | Separately running `pnpm worker` process              | Allocate once, then read progress                |
+| `inline` | The allocating HTTP request                           | Await execution; recover through a later request |
 
-## Run locally
+Inline remains the compatibility default. An environment value alone does not
+prove that a queue consumer or repair schedule is deployed. Follow
+[SERVERLESS-DEPLOYMENT.md](SERVERLESS-DEPLOYMENT.md) before enabling queue mode.
 
-Use Node 22 and the installed dependencies. Export configuration in each process;
-do not check secrets into files. The worker does not load `.env.local` itself.
+Create description, confidence, matching, outfit ideas and regeneration,
+wardrobe description, Capsule generation, Preview images and saved avatars use
+the shared operation executor. Marketplace keeps its separate search rows,
+request cache, three-slot pool and 15-second upstream deadline. It is not a
+workflow queue kind. Saving a look and generating its image remain independent
+transactions.
 
-1. Configure the same hosted development workspace and write gate in both
-   processes. Never aim an evaluation at `demo`.
-2. Set `STYLORA_EXECUTION_MODE=worker` and the same `STYLORA_WORKER_SECRET` in
-   both. Generate a dedicated random 32-byte base64url secret (43 characters).
-3. Start the app with `pnpm dev`. Set `STYLORA_WORKER_ORIGIN` to its exact origin,
-   for example `http://127.0.0.1:3000`. Remote origins require HTTPS. Redirects
-   are refused so the bearer secret cannot follow an external redirect.
-4. Run `pnpm worker` in a second terminal. It verifies the protected executor
-   configuration before scanning. Keep it running when the browser closes.
+## Queue lifecycle
 
-For a fenced evaluation, set `STYLORA_WORKER_SUBJECTS_FILE` to an external JSON
-array of run-owned subject UUIDs. The file is reread each scan. An empty array
-dispatches nothing. Without this variable, all eligible jobs in the configured
-workspace may execute, including jobs created before the worker started.
+1. A workspace-scoped transaction persists the operation and dispatch outbox
+   entry. Saved-avatar operations created by the save transaction use the same
+   path. A committed job therefore retains dispatch intent even if its HTTP
+   process exits before publishing.
+2. A Next.js `after` callback attempts prompt dispatch after the allocation
+   response. It claims due outbox entries and awaits publication of small
+   operation references. The outbox and repair schedule survive loss of that
+   callback. Queue messages contain no images, preferences, credentials or
+   provider payloads. Token-fenced completion records publication or a delayed
+   retry.
+3. Vercel delivers each accepted message at least once to its private consumer.
+   The consumer validates the message and workspace, then uses the existing
+   database claim. Duplicate delivery cannot replace a live claim.
+4. The feature executor validates current dependencies, captures the provider
+   settings and reserves a provider slot and UTC daily budget immediately before
+   the actual request. Cache reuse and checkpoint restoration spend no new
+   provider call.
+5. A validated result is checkpointed before the feature's atomic publication.
+   Publication checks operation identity, attempt, fingerprint, source revision,
+   cancellation and lease. A retry restores the same checkpoint before deciding
+   whether another model request is needed.
+6. Supabase Cron reconciles due work and calls the protected dispatch endpoint
+   only when publication is needed. Idle ticks perform SQL without an HTTP
+   invocation. The database remains the recovery source after queue expiry or a
+   lost publication acknowledgment.
 
-## Concurrency and recovery
+Queue publish deduplication supplements the database claim; it does not replace
+it. Delivery count, operation attempts and paid requests are different counters.
+An HTTP 202 response means accepted work, not a completed result. The browser
+may close after allocation without becoming the executor.
 
-Start with one supervised worker per workspace. It has three text slots and one
-image slot, scanned independently. The database enforces the same shared limits
-across Create, wardrobe description, Capsule and image consumers, including
-multiple worker processes. Actual provider requests reserve their own slot and
-UTC daily budget immediately before HTTP dispatch. Cached image reuse and
-checkpoint restoration do not reserve a paid call. Operation attempts and
-provider requests each remain bounded to three.
+## Claims, deadlines and retries
 
-An active lease is never reclaimed. Expired running or partial jobs go through
-the claim RPC, including exhausted attempts so the database can publish their
-terminal state. New Create and generic leases last 280 seconds; provider work
-has a shorter shared deadline within the route's 300-second budget. A stopped
-worker waits for in-flight requests when gracefully signaled. An abrupt stop
-requires lease expiry before recovery. Provider billing cannot be guaranteed
-exactly once when the result of an interrupted request is unknown.
+The database enforces three shared text-provider slots and one image-provider
+slot per workspace across consumers. Each operation has bounded attempts and
+provider requests. Configure the app's daily limits explicitly.
+[.env.production.example](../.env.production.example) starts with 50 text,
+5 image and 30 marketplace requests per UTC day for a small deployment. The
+runtime defaults and compatibility template retain 150, 20 and 100. These are
+application spending controls, not free provider allowances.
 
-The scanner automatically defers explicitly retryable failures through an atomic
-RPC. It retains operation identity, checks current inputs, stores exponential
-backoff with jitter and honors provider Retry-After. The due timestamp survives
-worker restarts. Busy claims do not consume attempts. Validation failures,
-refusals, stale inputs and invalid configuration remain terminal for unchanged
-inputs. Create and Capsule may each request one schema/domain
-correction inside a single attempt, with the same captured inputs, safe error
-paths and a shared deadline. Refusals, incomplete output and uncertain network
-failures do not enter this correction loop. Streamed provisional descriptions
-are never silently replayed for correction.
+The route budget is 300 seconds, the database lease is 280 seconds and provider
+work has a shorter shared deadline. Vercel's JavaScript queue SDK separately
+defaults to a 300-second visibility lease and renews that lease while its handler
+runs. SDK visibility renewal cannot extend the Function's execution limit.
+Vercel Hobby with Fluid Compute supports at most 300 seconds per invocation.
+See the [SDK reference](https://vercel.com/docs/queues/sdk) and
+[Function limits](https://vercel.com/docs/functions/limitations).
 
-## Operations
+Retryable provider and transport failures retain persisted backoff and
+Retry-After. Daily budget exhaustion waits until the next UTC day. Refusals,
+invalid configuration, invalid input and stale dependencies remain terminal for
+unchanged inputs. Schema correction stays inside its bounded feature attempt
+with the same captured input and deadline. Queue redelivery does not authorize
+unbounded provider replay.
 
-Supervise the worker with restart-on-failure on a continuously running host.
-The app's worker secret and mode must match before accepting traffic. Monitor
-`worker_started`, `operation_dispatched`, `worker_scan_unavailable` and
-`worker_connection_interrupted` events, plus oldest queued age, expired leases,
-attempt counts, safe failure codes, provider latency and token usage. Logs must
-not include request payloads, signed URLs, provider text or credentials.
+Dispatch transport retries are separate from paid retries. The outbox uses
+60-second token-fenced leases and backoff capped at 15 minutes; its diagnostic
+attempt counter saturates at 32 rather than abandoning a committed job. A
+published generation still eligible after the seven-day message retention
+window can be reconciled into a new generation. Completed, cancelled,
+superseded and live-lease operations are not blindly re-executed.
 
-The worker verifies the app's workspace as well as its mode and secret. It writes
-a scoped heartbeat every 15 seconds; new worker-mode allocations require one
-within 90 seconds. A missing consumer returns 503 with a saved-draft message.
-The protected GET `/api/internal/workflow-worker` reports executor mode,
-workspace and consumer freshness. HTTP 202 still means acceptance, not task
-completion. Alert on oldest queued age above 60 seconds, expired live leases,
-repeated scan failures and exhausted budgets. A recent heartbeat is not a
-completion guarantee. No host or application deployment is performed by these
-repository changes.
+An interrupted paid request whose response was lost before checkpointing may
+have been billed. Neither Vercel delivery nor the application can guarantee
+exactly-once provider billing in that case. The tested checkpoint-replay case is
+narrower: a received and validated result survives a failed publication without
+another paid request.
 
-Validated results are checkpointed before publication. On a lost commit or
-response, recovery validates the same captured result and publishes it without
-calling the model again. Image checkpoints retain verified pending assets until
-publication. This cannot guarantee exactly-once billing when a provider response
-is lost before a checkpoint can be written.
+## Dispatch repair and security
 
-The database uses UTC daily limits. App and worker should share
-`STYLORA_TEXT_DAILY_LIMIT=150`, `STYLORA_IMAGE_DAILY_LIMIT=20` and
-`STYLORA_SEARCH_DAILY_LIMIT=100`, or explicitly chosen deployment quotas. Existing
-recorded AI requests were conservatively charged to the migration's cutover day;
-operation counters are not reset. Marketplace has its own atomic request budget.
-Cache hits and score-weight changes do not spend another search request.
+`workflow_dispatch_outbox` has one current generation per operation and
+workspace. Its privileged RPCs are `claim_workflow_dispatches`,
+`finish_workflow_dispatch` and `reconcile_workflow_dispatches`. A late publisher
+must present its matching lease token before changing the outbox row.
 
-## Activate on a continuously running host
+The repair endpoint `/api/internal/workflow-dispatch` uses the dedicated
+`STYLORA_DISPATCH_SECRET`. Supabase Vault stores the full approved HTTPS endpoint,
+the matching secret and the configured workspace. The setup script is
+`supabase/setup/activate_workflow_dispatch.sql`. Run it only after reviewing the
+migration, deploying the app and confirming the intended workspace. Application
+deployment does not create Vault secrets or activate Cron automatically.
 
-Vercel request handlers still require a separate consumer process. An example
-systemd unit is in `ops/stylora-worker.service`; it is not installed automatically.
-The hosted schema changes below are applied. App deployment and activation of
-a supervised production consumer remain operational steps to complete.
+Vault encrypts stored secrets, but `pg_net` places decrypted HTTP headers in
+`net.http_request_queue` until sending them. Supabase documents that database
+login roles can read those waiting headers. Use only the dedicated repair
+credential here. Keep OpenAI and Supabase privileged keys out of the Cron
+request, migration text and queue payload. Restrict database login access and
+do not expose Vault or `net` tables through the application. See
+[scheduled HTTP security](https://supabase.com/docs/guides/functions/schedule-functions).
 
-1. Review and deploy the PR to the app with `STYLORA_EXECUTION_MODE=worker`, a
-   dedicated random worker secret and the chosen quotas. Keep the same hosted
-   workspace configuration on both processes. Do not reuse an OpenAI key as the
-   worker secret.
-2. Place this checkout and its installed production dependencies at
-   `/opt/stylora` on a Node 22 host. Configure the service account `stylora`.
-   Put server-only configuration in `/etc/stylora/worker.env`, readable only by
-   the service account and administrators. Set `STYLORA_WORKER_ORIGIN` to the
-   exact deployed HTTPS origin. Remove evaluation subject-file restrictions.
-3. Install the example unit, then run `systemctl daemon-reload` and
-   `systemctl enable --now stylora-worker`. Check `systemctl status` and
-   `journalctl -u stylora-worker`. Its restart policy recovers a failed process;
-   its shutdown allowance lets in-flight requests drain.
-4. Verify the protected readiness response reports the expected workspace and a
-   fresh worker, then allocate a small task. Navigate away and verify that it
-   finishes once, with an asset or result reference. Monitor actual deployed
-   latency and provider receipts before changing concurrency or quality.
+## Local development
 
-Keep credentials out of command arguments, logs and client-visible variables.
-The following migrations were applied to the configured hosted project during
-this audit, in order:
+Use Node 22 and the locked dependencies. For offline tests, mock the queue SDK;
+do not treat a local Next.js server as an offline queue emulator. The pinned
+SDK can use a CLI-managed local broker, but other local configurations may
+publish to the real Vercel service. Authentication and local broker differences
+are recorded in [SERVERLESS-DEPLOYMENT.md](SERVERLESS-DEPLOYMENT.md).
 
-1. `20261108044718_workflow_reliability.sql` — shared provider quotas, result
-   checkpoints, retry scheduling and worker readiness.
-2. `20261108050029_shopping_request_budget.sql` — marketplace request budgets.
-3. `20261108052354_workflow_retry_code_compat.sql` — compatibility for recorded
-   retry codes.
-4. `20261108054402_preview_cached_image_claim.sql` — allow a verified cached
-   Preview result to be claimed without reserving another image request.
+The existing Node worker remains useful for a controlled local evaluation:
 
-The four new rollback-only policy suites passed on hosted PostgreSQL 17. All 15
-SQL suites also passed on disposable PostgreSQL 16. Do not replay applied
-migrations or reset the project.
-Hosted schema application and local worker evidence do not establish an
-activated production consumer. Record its readiness and completion checks after
-the deployment steps above.
+1. Give the app and worker the same hosted development workspace and write gate.
+   Never aim fixture work at `demo`.
+2. Set `STYLORA_EXECUTION_MODE=worker` and the same dedicated random 32-byte
+   base64url `STYLORA_WORKER_SECRET` in both processes.
+3. Start the app, set `STYLORA_WORKER_ORIGIN` to its exact local origin, then run
+   `pnpm worker`. The worker does not load `.env.local` itself. Remote origins
+   require HTTPS; redirects are refused.
+4. For a fenced evaluation, set `STYLORA_WORKER_SUBJECTS_FILE` to an external
+   JSON array of run-owned subject UUIDs. An empty array dispatches nothing.
+   Without it, all eligible jobs in that workspace may run.
 
-The checked-in Vercel region is `hnd1` (Tokyo), matching the current Supabase
-project's `ap-northeast-1` location. This removes the default US region from
-database-heavy routes after a future deployment. Verify actual placement and
-response times after deployment; local timings do not prove that gain.
-[Vercel regions](https://vercel.com/docs/regions) lists the region codes and
-recommends placing functions close to the database.
+Worker mode requires a heartbeat within 90 seconds for new allocations. Queue
+mode requires the dedicated dispatch repair secret and supported deployment
+credentials instead of a worker-process heartbeat. This also applies on Vercel,
+where OIDC is automatic. Neither readiness check proves a completed task. Drain
+live claims before switching execution modes.
 
-To roll back before enabling the worker, keep `inline`. To stop worker mode,
-stop new traffic, drain active worker requests, then switch the app to `inline`.
-Do not start browser execution and a changed executor against an active lease.
-Keep existing operations and results for status recovery.
+## Operations and evidence
+
+Watch oldest due operation and outbox age, expired claims, publish failures,
+queue redeliveries, attempts, provider counts, checkpoint restores and budget
+exhaustion. Vercel's
+[Queues observability](https://vercel.com/docs/queues/observability) shows message
+age and redelivery metrics. Application logs must contain only safe codes and
+operation metadata, without credentials, signed URLs or unrestricted content.
+
+Keep `hnd1` consumers and publishers together beside the current Tokyo
+Supabase project. Verify actual deployed placement and latency; local timing
+does not establish a regional performance gain.
+
+The earlier local worker, hosted claim/checkpoint migrations and recovery test
+are recorded in [PROGRESS-NEW.md](PROGRESS-NEW.md). They do not prove a live
+Vercel queue deployment. The serverless follow-up must record separately:
+outbox policy checks, queue SDK tests, app build, authorized schema application,
+Vault and Cron activation, deployed callback completion after browser closure,
+and recovery after publication failure. Unrun checks remain unrun.

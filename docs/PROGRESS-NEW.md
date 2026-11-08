@@ -320,6 +320,7 @@ src/features/capsules/generate.test.ts` passed all 11 tests. Create upload,
 - Reproduction: `OWNER2_EXPLICIT_ANALYSIS_SMOKE=GO` starts the gated full runner; continuations require `OWNER2_SMOKE_CONTINUE_BUDGET=true` and preserve its atomic counter. Final command used `OWNER2_FINISH_RETAINED_SMOKE=GO`, `OWNER2_SMOKE_WARDROBE_AI=true`, `STYLORA_TEST_APP_DIR=C:/Users/Pongo/Desktop/Stylora-owner2-smoke`, then `node scripts/finish-owner2-retained-smoke.mjs`. The separate detached checkout prevents the user's port 3000 dev server from sharing Next's cache/lock with the smoke runner. No further provider request is planned.
 - Final local checks before delivery synchronization: `pnpm lint`, `pnpm typecheck`, and targeted backend Vitest **43 tests across nine files** passed. Diagnostic test expectations now assert the explicit missing-operation code; integer-key schema tests assert bounds and reject invalid indices. No rule or guard was weakened.
 - User-reviewed UI: matching cards now order owned, alternatives, then missing; excluded candidate lists are hidden from presentation while backend evidence is retained. Missing uses a category icon and `To find`, with `No match yet`, one concise reason and vertically centered reference title. Actual desktop/mobile screenshots were inspected at 1440 and 390 px in a read-only isolated app using the real look, with zero frontend inference. Landing initial Scan and moving blue band were inspected too. Local artifacts: `.next/owner2-recovery-visual/`. No automated frontend interaction test or local production build was run.
+
 ## Owner 1 workspace feedback, 7 November 2026
 
 - Task: O1.5 and the user's explicit request for consistent feedback across all features. Lane B; shared layout, shell, UI primitives and feature request boundaries. Contract and source audit: [FEEDBACK-AUDIT.md](FEEDBACK-AUDIT.md).
@@ -341,7 +342,7 @@ src/features/capsules/generate.test.ts` passed all 11 tests. Create upload,
   initially had zero wardrobe rows, including owned, candidate, archived and
   sample queries. A later read found 45 active owned sample rows. A guarded
   `node --env-file=.env.local scripts/seed-wardrobe.mjs --dry-run
-  --expected-workspace demo` validated 45 images and preserved all 45 existing
+--expected-workspace demo` validated 45 images and preserved all 45 existing
   rows. No seed apply, provider call or hosted mutation was performed here;
   the concurrent data change is not attributed to this task.
 - Removed redundant collection eyebrow labels supplied in the user's
@@ -358,7 +359,7 @@ src/features/capsules/generate.test.ts` passed all 11 tests. Create upload,
   has a manual refresh action and renders one error message per current view.
 - Windows, Node.js 22.23.3, pnpm 10.26.2: frozen install passed. Focused
   `pnpm exec vitest run src/components/shell/navigation.test.tsx
-  src/features/wardrobe/client.test.ts` passed 3 tests across 2 files. Editor
+src/features/wardrobe/client.test.ts` passed 3 tests across 2 files. Editor
   diagnostics reported no errors in navigation, wardrobe collection and capsule
   draft components. `make pr-ready` passed ESLint, Next route type generation
   and TypeScript, then reported Lane B (270 changed lines at that checkpoint).
@@ -382,7 +383,6 @@ src/features/capsules/generate.test.ts` passed all 11 tests. Create upload,
 - Runtime uses an isolated dev server at `http://127.0.0.1:3027`; root env values
   are passed through process environment without copying credential files into
   the worktree. No production deployment or provider-backed feature execution.
-
 
 ## Owner 1 deployment quota policy: 7 November 2026
 
@@ -1395,7 +1395,7 @@ which data, code revision or provider behavior was verified.
   immutable expiry, irreversible revocation, foreign workspace rejection and
   denied direct anon access. Synthetic fixtures were rolled back.
 - Root `corepack pnpm exec vitest run src/features/products/provider.test.ts
-  src/features/products/search-context.test.ts` passed seven tests. Sharing
+src/features/products/search-context.test.ts` passed seven tests. Sharing
   schema tests passed four tests. `corepack pnpm typecheck` and
   `corepack pnpm lint` passed (the fast-gate equivalent; Make is unavailable
   locally). CI remains the full build gate. PR #49 contains the integrated work.
@@ -1505,7 +1505,7 @@ which data, code revision or provider behavior was verified.
   skipped or silently rewritten, and no garment details are invented.
 - The regression failed against the old reader with the reported missing
   fields, then `corepack pnpm exec vitest run
-  src/features/wardrobe/schema.test.ts` passed all four tests. Coverage includes
+src/features/wardrobe/schema.test.ts` passed all four tests. Coverage includes
   unknown confidence, saved candidates becoming owned, user edits, and retained
   rejection of invalid confidence, garment attributes and unrelated provenance.
 - A temporary read-only Vitest harness invoked the actual GET route against
@@ -1547,7 +1547,7 @@ which data, code revision or provider behavior was verified.
   `make pr-ready PNPM="corepack pnpm"` passed lint and typecheck and reported
   Lane B. `corepack pnpm build` passed, including the static manifest route.
 - `corepack pnpm exec vitest run src/components/pwa/service-worker.test.mjs
-  src/components/shell/navigation.test.tsx` passed five tests. The new cache
+src/components/shell/navigation.test.tsx` passed five tests. The new cache
   boundary tests cover excluded requests, live navigation, network failure and
   cache cleanup. No provider, online test or shared-data fixture ran.
 - `node scripts/generate-app-icons.mjs` generated the committed assets. A local
@@ -1622,3 +1622,65 @@ which data, code revision or provider behavior was verified.
   metadata after Mark as owned on desktop and 390 px mobile, without horizontal
   overflow. The initial connection refusal cleared after startup. CI is the
   complete build gate; paid image execution was not repeated.
+
+## Owner 4 serverless queue follow-up, 8 November 2026
+
+- Task O4.1, same `o4/ai-reliability-audit` branch and PR #77. The user approved
+  a serverless deployment path with all existing features and no always-on
+  host. `STYLORA_EXECUTION_MODE=queue` uses Vercel's private
+  `queue/v2beta` consumers, existing database claims and result checkpoints,
+  and an atomic dispatch outbox. Optional Node worker and inline modes remain
+  available. Marketplace keeps its separate bounded request path.
+- The pinned `@vercel/queue` 0.11.0 API, declarations and authentication were
+  checked against official Vercel documentation and the published package.
+  SDK visibility renews separately from the 300-second Function budget.
+  Trigger concurrency is three text consumers and one image consumer; the
+  database's shared three-text and one-image provider limits remain authoritative.
+- The outbox keeps token-fenced publication, persisted backoff and current
+  generations. Supabase Cron repairs only due work; idle ticks issue no HTTP
+  request. The dedicated repair secret is separate from model and Supabase
+  privileged keys. Vault protects it at rest, but `pg_net` temporarily exposes
+  decrypted request headers to database login roles while awaiting send.
+- Callback security relies on Vercel's private trigger. The SDK callback does
+  not authenticate arbitrary incoming HTTP requests. Application guards reject
+  unconfigured execution and non-Vercel production; queue readiness also
+  requires the dispatch secret alongside supported SDK deployment identity.
+- Integration checkpoint: the full Vitest suite passed 610 tests with two
+  online tests skipped. Targeted suites passed 71 queue tests and 32 HTTP
+  boundary tests. All 20 migrations and all 16 SQL policy suites passed
+  on native PostgreSQL 16.4. These are local integration results, not deployed
+  Vercel delivery or hosted migration evidence; later final counts and hosted
+  application are recorded separately.
+- TDD section 8.2, Workflow section 5 and the runbooks now describe queue mode,
+  outbox repair and current shared capacity. `.env.production.example` starts
+  at 50 text, 5 image and 30 search requests per UTC day. Runtime and local
+  compatibility defaults remain 150, 20 and 100. Complete features stay subject
+  to finite infrastructure allowances and separately billed provider usage.
+- [SERVERLESS-DEPLOYMENT.md](SERVERLESS-DEPLOYMENT.md) records official limits
+  checked on 8 November 2026, automatic platform OIDC, local broker behavior,
+  guarded activation, rollback and the release verification matrix. A local
+  SDK configuration can contact real Queues without a selected broker; offline
+  tests mock that boundary. Runbook formatting and scoped `git diff --check`
+  passed using the installed tools.
+- Live Vercel delivery, OIDC, private-trigger verification, Vault and Cron
+  activation, and deployed recovery remain unrun at this checkpoint. Earlier
+  local worker, browser and checkpoint-replay evidence is preserved for its
+  original environment. No additional provider request was needed for the
+  serverless integration checks above.
+- Final integration: `pnpm exec vitest run` passed 642 tests, with two existing
+  online tests skipped. `make pr-ready` passed lint and typecheck and reported
+  Lane B. `pnpm build` passed compilation, TypeScript, generation and tracing.
+  A final callback alignment uses the same bounded `hnd1` QueueClient as
+  publication; exact-head CI is the release build gate after that change.
+- Applied `20261108075309_workflow_dispatch_outbox.sql` to the approved hosted
+  project. Its rollback-only SQL suite passed, including direct access denial,
+  foreign-workspace rejection, lease-token races, saturated transport retries,
+  Retry-After and delayed failed-operation rescheduling. Types were regenerated
+  with the connected Supabase generator. Hosted checks found zero test
+  workspaces and preserved 45 baseline wardrobe items and 45 baseline assets.
+- Bootstrap created four dispatch references for existing queued demo jobs
+  (three Preview images and one saved avatar); it executed none. Review those
+  pending jobs before activating demo consumption. No Cron or queue delivery
+  has been activated. Vault exists; `pg_cron` and `pg_net` were absent at the
+  hosted extension check. There is no linked Vercel project or usable local
+  CLI authentication in this checkout. No new provider calls were made.

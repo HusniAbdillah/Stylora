@@ -292,6 +292,7 @@ project scope; it does not certify build timing.
 - [Product requirements](docs/PRD.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Technical design](docs/TDD.md)
+- [Serverless deployment and production environment](docs/SERVERLESS-DEPLOYMENT.md)
 - [Implementation and verification evidence](docs/PROGRESS-NEW.md)
 - [UI library guide](src/components/ui/README.md)
 - [Delivery workflow](docs/WORKFLOW.md)

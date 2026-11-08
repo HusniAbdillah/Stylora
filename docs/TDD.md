@@ -260,24 +260,41 @@ and fingerprint makes starts idempotent.
 ### 8.2 Execution decision
 
 `STYLORA_EXECUTION_MODE=inline` retains the request executor for compatibility.
-`worker` mode separates allocation from execution: routes persist the operation
-and acknowledge it with HTTP 202; a separately supervised Node process scans the
-configured workspace and invokes the authenticated internal executor. The
-executor claims through the existing database RPC, awaits the provider within
-the route budget, and commits with attempt, fingerprint and revision fences.
-The browser only reads progress in worker mode. Closing it does not stop work.
+`queue` is the serverless deployment path. Allocation commits the operation and
+a transactional dispatch outbox entry, then returns HTTP 202. A bounded
+post-response dispatch attempt publishes operation references to private Vercel
+Queues consumers. Supabase Cron reconciles persisted outbox state each minute
+and invokes the protected repair endpoint only when a current dispatch is due;
+idle ticks remain SQL-only. A lost callback or queue publication does not erase
+the committed dispatch intent. No always-on worker host is required.
 
-The worker uses three text slots and one image slot. The database also enforces
-one live image claim per workspace. Run one worker per workspace: Capsule does
-not yet have a database-wide text-call semaphore across multiple processes.
-Expired leases are recovered without a page visit. Failed tasks require an
-explicit eligible retry; the scanner never blindly replays a paid failure.
-External provider billing is not exactly once after a process crash.
+`worker` remains an optional executor for local or supervised environments. A
+separate Node process scans queued and expired-lease operations and invokes the
+authenticated internal executor. Worker readiness requires a recent heartbeat.
+Queue readiness requires both deployment credentials and the dedicated dispatch
+repair secret. The browser only reads progress in both background modes;
+closing it does not stop the deployed executor.
 
-Both the app and worker must remain available. This change provides an executor
-over persisted operations without adding a queue service or migration. It does
-not provision or deploy that executor. See `docs/AI-WORKER.md` for startup,
-recovery, limits and local evaluation. Never treat a queued row as running work.
+All modes use the existing database claim, input and source-revision checks,
+provider quotas, checkpoints and fenced commit. The database enforces three
+shared text-provider slots and one image-provider slot per workspace across
+Create, wardrobe, Capsule and avatar consumers. Platform consumer concurrency
+is an additional limit, not the shared authority. Cache reuse and validated
+checkpoint replay do not reserve another paid provider call.
+
+The route budget is 300 seconds, the database lease is 280 seconds and provider
+work has a shorter 240-second deadline. Vercel Hobby requires Fluid Compute for
+the 300-second Function limit; queue visibility renewal cannot extend it.
+Retryable failures follow persisted eligibility, due times and bounded provider
+attempts. Budget exhaustion waits until the next UTC day. Invalid input,
+refusals and stale dependencies are not silently replayed. Queue delivery is
+at least once; interrupted provider billing cannot be guaranteed exactly once.
+
+Apply the reviewed outbox migration and activate the private trigger, dedicated
+secret and due-only repair schedule before enabling queue mode. Configuration
+alone is not deployed completion evidence. See `docs/AI-WORKER.md` and
+`docs/SERVERLESS-DEPLOYMENT.md` for setup, finite free-tier quotas, recovery and
+the unrun deployment checks. Never treat a queued row as an executor.
 
 ### 8.3 Readiness and task graph
 
