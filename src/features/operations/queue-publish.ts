@@ -17,7 +17,7 @@ import {
 import { operationKindSchema } from "./schema";
 import { operationLane } from "./worker-policy";
 import { queueConfigured } from "./queue-config";
-import { workflowQueueClient } from "./queue-client";
+import { workflowQueueClient, workflowQueueHostname } from "./queue-client";
 import { OperationError } from "./errors";
 
 const dispatchesSchema = z
@@ -81,6 +81,91 @@ function queuePublishErrorCode(error: unknown) {
   if (error instanceof DOMException && error.name === "TimeoutError")
     return "QUEUE_REQUEST_TIMEOUT";
   return "QUEUE_PUBLISH_UNAVAILABLE";
+}
+
+type ErrorDiagnostic = {
+  name: string;
+  message: string;
+  code: string | null;
+  httpStatus: number | null;
+};
+
+function sanitizeDiagnosticText(value: unknown, maximumLength = 280) {
+  if (typeof value !== "string") return "Unavailable";
+  const withoutUrlCredentials = value.replace(
+    /https?:\/\/[^\s"']+/gi,
+    (rawUrl) => {
+      try {
+        const url = new URL(rawUrl);
+        return `${url.protocol}//${url.hostname}${url.pathname}`;
+      } catch {
+        return "[URL_REDACTED]";
+      }
+    },
+  );
+  return withoutUrlCredentials
+    .replace(
+      /\b(authorization|bearer|token|api[_-]?key|secret|password)\b(\s*[:=]\s*|\s+)(?:Bearer\s+)?[^\s,;]+/gi,
+      "$1$2[REDACTED]",
+    )
+    .slice(0, maximumLength);
+}
+
+function errorProperty(error: unknown, key: string): unknown {
+  if (typeof error !== "object" || error === null) return undefined;
+  return (error as Record<string, unknown>)[key];
+}
+
+function diagnosticCode(error: unknown) {
+  const code = errorProperty(error, "code");
+  return typeof code === "string" && /^[A-Z0-9_:-]{1,64}$/.test(code)
+    ? code
+    : null;
+}
+
+function diagnosticHttpStatus(error: unknown) {
+  const candidates = [
+    errorProperty(error, "status"),
+    errorProperty(error, "statusCode"),
+    errorProperty(errorProperty(error, "response"), "status"),
+  ];
+  return (
+    candidates.find(
+      (value): value is number =>
+        typeof value === "number" &&
+        Number.isInteger(value) &&
+        value >= 100 &&
+        value <= 599,
+    ) ?? null
+  );
+}
+
+function diagnosticError(error: unknown): ErrorDiagnostic {
+  return {
+    name: sanitizeDiagnosticText(errorProperty(error, "name"), 120),
+    message: sanitizeDiagnosticText(errorProperty(error, "message")),
+    code: diagnosticCode(error),
+    httpStatus: diagnosticHttpStatus(error),
+  };
+}
+
+function queuePublishDiagnostic(error: unknown) {
+  const causes: ErrorDiagnostic[] = [];
+  const seen = new Set<object>();
+  let current = errorProperty(error, "cause");
+  for (let depth = 0; depth < 4 && current; depth += 1) {
+    if (typeof current === "object") {
+      if (seen.has(current)) break;
+      seen.add(current);
+    }
+    causes.push(diagnosticError(current));
+    current = errorProperty(current, "cause");
+  }
+  return {
+    targetHostname: workflowQueueHostname(),
+    error: diagnosticError(error),
+    causes,
+  };
 }
 
 export async function publishWorkflowDispatches(limit = 3, reconcile = false) {
@@ -169,6 +254,7 @@ export async function publishWorkflowDispatches(limit = 3, reconcile = false) {
             event: "workflow_queue_publish_failed",
             code: errorCode,
             operationId: row.operation_id,
+            ...queuePublishDiagnostic(error),
           }),
         );
       }
