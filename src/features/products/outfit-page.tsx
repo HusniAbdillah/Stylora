@@ -20,7 +20,11 @@ import {
   type ValueWeights,
 } from "./outfit-detail";
 import { scoreOffer } from "./score";
-import { selectionChoices, type Choice } from "./outfit-choice";
+import {
+  productChoiceContext,
+  selectionChoices,
+  type Choice,
+} from "./outfit-choice";
 import type { OutfitPageData } from "./page-data";
 import { startOperationRequest } from "@/features/operations/client";
 
@@ -666,12 +670,13 @@ export function OutfitPage({
     if (!writesEnabled || !activeId || mutationLock.current) return;
     const id = activeId;
     const state = cacheRef.current[id];
-    const search = state.shopping.searches.find(
-      (entry) => entry.slotId === slotId && entry.status === "succeeded",
-    );
-    const slot = state.detail.slots.find((entry) => entry.slotId === slotId);
-    const missing = slot?.candidates.find((entry) => entry.kind === "missing");
-    if (!search || !missing) return;
+    const context = productChoiceContext(state, slotId);
+    if (!context) {
+      setMessage(
+        "Shopping results are no longer current. Refresh saved results before choosing this product.",
+      );
+      return;
+    }
     mutationLock.current = true;
     setChoosing(offer.id);
     setMessage(null);
@@ -682,8 +687,8 @@ export function OutfitPage({
           method: "POST",
           body: JSON.stringify({
             optionId: id,
-            optionItemId: missing.optionItemId,
-            searchId: search.id,
+            optionItemId: context.optionItemId,
+            searchId: context.searchId,
             productId: offer.id,
             expectedOptionRevision: state.detail.option.revision,
           }),
