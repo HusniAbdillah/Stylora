@@ -144,6 +144,45 @@ describe("queue publisher", () => {
     ).toBe(true);
   });
 
+  it.each([
+    ["ECONNRESET", "QUEUE_NETWORK_ECONNRESET"],
+    ["UND_ERR_CONNECT_TIMEOUT", "QUEUE_NETWORK_UND_ERR_CONNECT_TIMEOUT"],
+  ])("records an allowlisted transport cause: %s", async (causeCode, expected) => {
+    const { rpc } = setup();
+    const cause = Object.assign(new Error("transport detail"), {
+      code: causeCode,
+    });
+    mocks.send.mockRejectedValueOnce(
+      new TypeError("fetch failed", { cause }),
+    );
+
+    expect(await publishWorkflowDispatches()).toEqual({
+      claimed: 1,
+      published: 0,
+      deferred: 1,
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      "finish_workflow_dispatch",
+      expect.objectContaining({ p_error_code: expected }),
+    );
+  });
+
+  it("does not persist unrecognized transport details", async () => {
+    const { rpc } = setup();
+    const cause = Object.assign(new Error("transport detail"), {
+      code: "PRIVATE_INTERNAL_DETAIL",
+    });
+    mocks.send.mockRejectedValueOnce(
+      new TypeError("fetch failed", { cause }),
+    );
+
+    await publishWorkflowDispatches();
+    expect(rpc).toHaveBeenCalledWith(
+      "finish_workflow_dispatch",
+      expect.objectContaining({ p_error_code: "QUEUE_NETWORK_ERROR" }),
+    );
+  });
+
   it.each(["08006", "40001", "P0002"])(
     "reports a send with a lost or fenced acknowledgement as deferred: %s",
     async (code) => {

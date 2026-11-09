@@ -1720,3 +1720,21 @@ src/components/shell/navigation.test.tsx` passed five tests. The new cache
 - Added safe Queue SDK failure classification and structured logs containing only the error category and operation ID. The next deployed dispatch attempt can distinguish authentication, access, consumer registry/discovery, rate limit, request and network failures. This change has not been deployed or verified live yet.
 - Provider budget was read from hosted `dev-owner-4`: 0 text, 0 image and 0 search attempts before the production dispatcher probe. The production demo workspace was not included in that developer budget. Provider usage after the probe was not independently verified. Queue acceptance and consumer delivery remain unverified.
 - `make pr-ready` passed after commit: ESLint and TypeScript typecheck succeeded; diff is 48 lines and Lane A. Tests and production build were not run locally. Pull-request CI remains the full check.
+
+## Queue transport-cause follow-up, 9 November 2026
+
+- Re-read the merged queue publisher and pinned `@vercel/queue` 0.11.0 source.
+  Its custom Undici dispatcher is explicitly supported by the SDK. The existing
+  `QUEUE_NETWORK_ERROR` therefore does not establish that the dispatcher is the
+  cause; production runtime logs are still needed to distinguish DNS, connect,
+  socket and timeout failures.
+- Added allowlisted nested Undici/system transport codes to the persisted safe
+  dispatch error code. Unknown causes keep the generic code; messages, URLs,
+  headers, tokens and arbitrary error properties are not recorded.
+- Re-read hosted dispatch state: 15 current queued operations are visible, with
+  9 `QUEUE_NETWORK_ERROR`, 4 `QUEUE_PUBLISH_UNAVAILABLE`, and 2 without a
+  previous publish error. Recovery remains bounded to three claims per request.
+  Cron is not being activated while the queue transport is unresolved, so this
+  change did not dispatch demo work or make provider calls.
+- Targeted publisher tests passed: 15 tests. No hosted mutation, Queue send,
+  OpenAI request or production deployment was performed for this change.

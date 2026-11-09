@@ -30,6 +30,37 @@ const dispatchesSchema = z
   )
   .max(10);
 
+const transportErrorCodes = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ETIMEDOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  "UND_ERR_SOCKET",
+]);
+
+function queueTransportErrorCode(error: unknown) {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
+    const cause = current.cause;
+    if (
+      typeof cause === "object" &&
+      cause !== null &&
+      "code" in cause &&
+      typeof cause.code === "string" &&
+      transportErrorCodes.has(cause.code)
+    )
+      return cause.code;
+    current = cause;
+  }
+  return null;
+}
+
 function queuePublishErrorCode(error: unknown) {
   if (error instanceof UnauthorizedError) return "QUEUE_AUTH_UNAUTHORIZED";
   if (error instanceof ForbiddenError) return "QUEUE_ACCESS_FORBIDDEN";
@@ -41,7 +72,12 @@ function queuePublishErrorCode(error: unknown) {
   if (error instanceof BadRequestError) return "QUEUE_REQUEST_INVALID";
   if (error instanceof PayloadTooLargeError) return "QUEUE_PAYLOAD_TOO_LARGE";
   if (error instanceof InternalServerError) return "QUEUE_SERVICE_ERROR";
-  if (error instanceof TypeError) return "QUEUE_NETWORK_ERROR";
+  if (error instanceof TypeError) {
+    const transportCode = queueTransportErrorCode(error);
+    return transportCode
+      ? `QUEUE_NETWORK_${transportCode}`
+      : "QUEUE_NETWORK_ERROR";
+  }
   if (error instanceof DOMException && error.name === "TimeoutError")
     return "QUEUE_REQUEST_TIMEOUT";
   return "QUEUE_PUBLISH_UNAVAILABLE";
