@@ -1777,3 +1777,14 @@ src/components/shell/navigation.test.tsx` passed five tests. The new cache
   of a generic network error. Targeted queue client and publisher tests passed:
   18 tests. No hosted dispatch, provider call, database write or Cron change was
   performed by this repair.
+
+## Queue platform dispatcher repair, 9 November 2026
+
+- After `9821154` deployed, the next publisher attempt still reported
+  `QUEUE_CLIENT_UND_ERR_INVALID_ARG`. This rules out the interceptor alone:
+  the imported Undici Agent is incompatible with the Vercel runtime fetch
+  dispatcher path before a request reaches Queue.
+- Removed the custom dispatcher entirely. The Queue SDK now uses the platform
+  dispatcher with its automatic OIDC path and retains the fixed `hnd1` region.
+  The next deployment must prove publication before provider execution is
+  considered available.
