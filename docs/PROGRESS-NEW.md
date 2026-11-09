@@ -1763,3 +1763,17 @@ src/components/shell/navigation.test.tsx` passed five tests. The new cache
   model key and SerpAPI key, but not `STYLORA_EXECUTION_MODE` or
   `STYLORA_DISPATCH_SECRET`. Queue mode requires both values; no Production
   environment was changed by this audit.
+
+## Queue dispatcher compatibility repair, 9 November 2026
+
+- Production diagnostic log identified `UND_ERR_INVALID_ARG` with `invalid
+  onRequestStart method`, before an HTTP status was available. The failure is
+  local to the composed Undici dispatcher, not OIDC, the regional queue host or
+  provider execution.
+- Replaced the dispatcher interceptor with native Agent connect, headers and
+  body timeout options. Queue publishing keeps the fixed `hnd1` region and
+  automatic platform OIDC when no explicit local token is configured.
+- Persist `UND_ERR_INVALID_ARG` as `QUEUE_CLIENT_UND_ERR_INVALID_ARG` instead
+  of a generic network error. Targeted queue client and publisher tests passed:
+  18 tests. No hosted dispatch, provider call, database write or Cron change was
+  performed by this repair.
