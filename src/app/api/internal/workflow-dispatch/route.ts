@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import { workflowExecutionMode } from "@/features/operations/execution-mode";
 import { publishWorkflowDispatches } from "@/features/operations/queue-publish";
 import { operationResponse } from "@/features/operations/http";
+import { OperationError } from "@/features/operations/errors";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,6 +25,15 @@ export async function POST(request: Request) {
   return operationResponse(async () => {
     if (workflowExecutionMode() !== "queue")
       return { executionMode: workflowExecutionMode() };
-    return publishWorkflowDispatches(3, true);
+    const limit = z.coerce.number().int().min(1).max(3).safeParse(
+      new URL(request.url).searchParams.get("limit") ?? "3",
+    );
+    if (!limit.success)
+      throw new OperationError(
+        "DISPATCH_LIMIT_INVALID",
+        "Dispatch limit must be between one and three.",
+        400,
+      );
+    return publishWorkflowDispatches(limit.data, true);
   });
 }

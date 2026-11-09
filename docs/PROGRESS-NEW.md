@@ -1738,3 +1738,11 @@ src/components/shell/navigation.test.tsx` passed five tests. The new cache
   change did not dispatch demo work or make provider calls.
 - Targeted publisher tests passed: 15 tests. No hosted mutation, Queue send,
   OpenAI request or production deployment was performed for this change.
+- PR #80 merged as `3ac93a4d491af9b26a69f8954ea18a3c2e078058`; its Check and
+  GitGuardian checks both passed. The custom-domain health endpoint still
+  served `8998804` at the first post-merge probe, so queue transport diagnostics
+  are not yet confirmed deployed.
+- A read-only hosted query found seven queued Preview images among the due work.
+  Added an authenticated recovery `limit` parameter bounded to one through
+  three, defaulting to the existing three, to allow a one-job smoke attempt
+  without changing Cron behavior or claiming an entire batch.
