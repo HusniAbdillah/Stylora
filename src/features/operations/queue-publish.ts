@@ -1,4 +1,14 @@
 import "server-only";
+import {
+  BadRequestError,
+  ConsumerDiscoveryError,
+  ConsumerRegistryNotConfiguredError,
+  ForbiddenError,
+  InternalServerError,
+  PayloadTooLargeError,
+  TooManyRequestsError,
+  UnauthorizedError,
+} from "@vercel/queue";
 import { z } from "zod";
 import {
   getWorkspaceDatabase,
@@ -19,6 +29,23 @@ const dispatchesSchema = z
     }),
   )
   .max(10);
+
+function queuePublishErrorCode(error: unknown) {
+  if (error instanceof UnauthorizedError) return "QUEUE_AUTH_UNAUTHORIZED";
+  if (error instanceof ForbiddenError) return "QUEUE_ACCESS_FORBIDDEN";
+  if (error instanceof ConsumerRegistryNotConfiguredError)
+    return "QUEUE_CONSUMER_REGISTRY_MISSING";
+  if (error instanceof ConsumerDiscoveryError)
+    return "QUEUE_CONSUMER_DISCOVERY_FAILED";
+  if (error instanceof TooManyRequestsError) return "QUEUE_RATE_LIMITED";
+  if (error instanceof BadRequestError) return "QUEUE_REQUEST_INVALID";
+  if (error instanceof PayloadTooLargeError) return "QUEUE_PAYLOAD_TOO_LARGE";
+  if (error instanceof InternalServerError) return "QUEUE_SERVICE_ERROR";
+  if (error instanceof TypeError) return "QUEUE_NETWORK_ERROR";
+  if (error instanceof DOMException && error.name === "TimeoutError")
+    return "QUEUE_REQUEST_TIMEOUT";
+  return "QUEUE_PUBLISH_UNAVAILABLE";
+}
 
 export async function publishWorkflowDispatches(limit = 3, reconcile = false) {
   if (!queueConfigured())
@@ -82,6 +109,7 @@ export async function publishWorkflowDispatches(limit = 3, reconcile = false) {
   const results = await Promise.allSettled(
     rows.map(async (row) => {
       let success = false;
+      let errorCode = "QUEUE_PUBLISH_UNAVAILABLE";
       try {
         const kind = operationKindSchema.parse(
           kinds.data.find((op) => op.id === row.operation_id)?.kind,
@@ -97,8 +125,16 @@ export async function publishWorkflowDispatches(limit = 3, reconcile = false) {
           { idempotencyKey: row.id, retentionSeconds: 604800 },
         );
         success = true;
-      } catch {
+      } catch (error) {
         // An ambiguous send is retried with the same key after its durable lease.
+        errorCode = queuePublishErrorCode(error);
+        console.warn(
+          JSON.stringify({
+            event: "workflow_queue_publish_failed",
+            code: errorCode,
+            operationId: row.operation_id,
+          }),
+        );
       }
       const finished = await client
         .rpc("finish_workflow_dispatch", {
@@ -106,7 +142,7 @@ export async function publishWorkflowDispatches(limit = 3, reconcile = false) {
           p_outbox_id: row.id,
           p_lease_token: row.lease_token,
           p_success: success,
-          p_error_code: success ? undefined : "QUEUE_PUBLISH_UNAVAILABLE",
+          p_error_code: success ? undefined : errorCode,
         })
         .abortSignal(AbortSignal.timeout(10000));
       if (finished.error)
