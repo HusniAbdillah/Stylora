@@ -1,5 +1,33 @@
 export type Choice = { slotId: string; optionItemId: string };
 
+export function productChoiceContext(
+  state: {
+    detail: {
+      slots: {
+        slotId: string;
+        candidates: Record<string, unknown>[];
+      }[];
+    };
+    shopping: {
+      searches: { id: string; slotId: string; status: string }[];
+    };
+  },
+  slotId: string,
+) {
+  const search = state.shopping.searches.find(
+    (entry) => entry.slotId === slotId && entry.status === "succeeded",
+  );
+  const missing = state.detail.slots
+    .find((entry) => entry.slotId === slotId)
+    ?.candidates.find(
+      (entry) =>
+        entry.kind === "missing" && typeof entry.optionItemId === "string",
+    );
+  if (!search || !missing || typeof missing.optionItemId !== "string")
+    return null;
+  return { searchId: search.id, optionItemId: missing.optionItemId };
+}
+
 export function selectionChoices(
   detail: {
     option: { revision: number };

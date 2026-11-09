@@ -1,5 +1,44 @@
 import { expect, it } from "vitest";
-import { selectionChoices } from "./outfit-choice";
+import { productChoiceContext, selectionChoices } from "./outfit-choice";
+
+it("requires a current successful search and missing-slot reference before attaching a product", () => {
+  const state = {
+    detail: {
+      slots: [
+        {
+          slotId: "top",
+          candidates: [{ kind: "missing", optionItemId: "missing-top" }],
+        },
+      ],
+    },
+    shopping: {
+      searches: [{ id: "search-top", slotId: "top", status: "succeeded" }],
+    },
+  };
+  expect(productChoiceContext(state, "top")).toEqual({
+    searchId: "search-top",
+    optionItemId: "missing-top",
+  });
+  expect(
+    productChoiceContext({ ...state, shopping: { searches: [] } }, "top"),
+  ).toBeNull();
+  expect(
+    productChoiceContext(
+      {
+        ...state,
+        detail: {
+          slots: [
+            {
+              slotId: "top",
+              candidates: [{ kind: "product", optionItemId: "product" }],
+            },
+          ],
+        },
+      },
+      "top",
+    ),
+  ).toBeNull();
+});
 
 it("requires review of an unavailable saved or proposed choice instead of silently substituting a candidate", () => {
   const detail = {

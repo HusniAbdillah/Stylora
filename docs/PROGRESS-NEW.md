@@ -1788,3 +1788,13 @@ src/components/shell/navigation.test.tsx` passed five tests. The new cache
   dispatcher with its automatic OIDC path and retains the fixed `hnd1` region.
   The next deployment must prove publication before provider execution is
   considered available.
+
+## Marketplace choice stale recovery, 9 November 2026
+
+- Replaced the silent product-choice exit when the cached search or missing
+  slot is no longer current. The detail view now keeps the selection unchanged
+  and tells the visitor to refresh saved results before choosing again.
+- Added a focused contract test for the required succeeded search and missing
+  slot reference. `pnpm exec vitest run src/features/products/outfit-choice.test.ts`
+  passed with 2 tests. Targeted ESLint and `pnpm typecheck` also passed. No
+  provider call, hosted write, queue dispatch or schema change was made.
