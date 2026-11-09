@@ -15,6 +15,7 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("./queue-config", () => ({ queueConfigured: mocks.configured }));
 vi.mock("./queue-client", () => ({
   workflowQueueClient: () => ({ send: mocks.send }),
+  workflowQueueHostname: () => "hnd1.vercel-queue.com",
 }));
 
 const workspaceId = "00000000-0000-4000-8000-000000000001";
@@ -180,6 +181,56 @@ describe("queue publisher", () => {
     expect(rpc).toHaveBeenCalledWith(
       "finish_workflow_dispatch",
       expect.objectContaining({ p_error_code: "QUEUE_NETWORK_ERROR" }),
+    );
+  });
+
+  it("logs sanitized nested transport diagnostics", async () => {
+    setup();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const nestedCause = Object.assign(
+      new Error("DNS failed for https://queue.example/?access_token=hidden"),
+      { code: "ENOTFOUND", statusCode: 502 },
+    );
+    const cause = Object.assign(
+      new Error("Authorization: Bearer queue-secret"),
+      { code: "UND_ERR_CONNECT_TIMEOUT", cause: nestedCause },
+    );
+    mocks.send.mockRejectedValueOnce(
+      new TypeError(
+        "fetch https://hnd1.vercel-queue.com/api?token=hidden failed",
+        {
+          cause,
+        },
+      ),
+    );
+
+    await publishWorkflowDispatches();
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(JSON.parse(warn.mock.calls[0][0])).toEqual(
+      expect.objectContaining({
+        targetHostname: "hnd1.vercel-queue.com",
+        error: expect.objectContaining({
+          name: "TypeError",
+          message: "fetch https://hnd1.vercel-queue.com/api failed",
+          code: null,
+          httpStatus: null,
+        }),
+        causes: [
+          expect.objectContaining({
+            name: "Error",
+            message: "Authorization: [REDACTED]",
+            code: "UND_ERR_CONNECT_TIMEOUT",
+            httpStatus: null,
+          }),
+          expect.objectContaining({
+            name: "Error",
+            message: "DNS failed for https://queue.example/",
+            code: "ENOTFOUND",
+            httpStatus: 502,
+          }),
+        ],
+      }),
     );
   });
 

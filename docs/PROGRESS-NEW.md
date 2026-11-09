@@ -1746,3 +1746,20 @@ src/components/shell/navigation.test.tsx` passed five tests. The new cache
   Added an authenticated recovery `limit` parameter bounded to one through
   three, defaulting to the existing three, to allow a one-job smoke attempt
   without changing Cron behavior or claiming an entire batch.
+
+## Queue transport diagnostics and Production environment audit, 9 November 2026
+
+- Added one sanitized `workflow_queue_publish_failed` log event. It records the
+  safe error name, sanitized message, direct and nested cause codes, HTTP status
+  when present, and the fixed `hnd1.vercel-queue.com` target hostname. URL query
+  strings, URL credentials, and token or Authorization-like values are redacted;
+  no headers, raw error objects, or secrets are emitted.
+- Targeted `queue-publish` Vitest suite passed: 16 tests, including nested
+  cause, HTTP status and redaction coverage. No provider call, database write,
+  queue send, deployment, or recovery attempt was made.
+- Read-only Vercel CLI audit linked this worktree temporarily to
+  `husniabdillahs-projects/styloraaaa`. Its Production environment lists the
+  Supabase credentials, workspace ID, writes flag, Supabase CLI token, legacy
+  model key and SerpAPI key, but not `STYLORA_EXECUTION_MODE` or
+  `STYLORA_DISPATCH_SECRET`. Queue mode requires both values; no Production
+  environment was changed by this audit.
