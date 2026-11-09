@@ -10,11 +10,14 @@ vi.mock("./queue-publish", () => ({
 }));
 
 const secret = "a".repeat(43);
-function request(authorization?: string) {
-  return new Request("http://localhost/api/internal/workflow-dispatch", {
+function request(authorization?: string, query = "") {
+  return new Request(
+    `http://localhost/api/internal/workflow-dispatch${query}`,
+    {
     method: "POST",
     headers: authorization ? { Authorization: authorization } : {},
-  });
+    },
+  );
 }
 
 beforeEach(() => {
@@ -74,6 +77,23 @@ describe("dispatch repair HTTP boundary", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(mocks.publish).toHaveBeenCalledExactlyOnceWith(3, true);
   });
+
+  it("supports a single-row smoke dispatch without changing the default", async () => {
+    const response = await POST(request(`Bearer ${secret}`, "?limit=1"));
+    expect(response.status).toBe(200);
+    expect(mocks.publish).toHaveBeenCalledExactlyOnceWith(1, true);
+  });
+
+  it.each(["0", "4", "1.5", "NaN"])(
+    "rejects an invalid dispatch limit before claiming work: %s",
+    async (limit) => {
+      const response = await POST(
+        request(`Bearer ${secret}`, `?limit=${limit}`),
+      );
+      expect(response.status).toBe(400);
+      expect(mocks.publish).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(["inline", "worker"])(
     "does not publish while the execution mode is %s",
