@@ -148,6 +148,7 @@ describe("queue publisher", () => {
   it.each([
     ["ECONNRESET", "QUEUE_NETWORK_ECONNRESET"],
     ["UND_ERR_CONNECT_TIMEOUT", "QUEUE_NETWORK_UND_ERR_CONNECT_TIMEOUT"],
+    ["UND_ERR_INVALID_ARG", "QUEUE_CLIENT_UND_ERR_INVALID_ARG"],
   ])("records an allowlisted transport cause: %s", async (causeCode, expected) => {
     const { rpc } = setup();
     const cause = Object.assign(new Error("transport detail"), {

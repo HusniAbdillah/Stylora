@@ -11,17 +11,11 @@ export function workflowQueueHostname() {
 
 export function workflowQueueClient() {
   if (!client) {
-    const dispatcher = new Agent({ connect: { timeout: 5000 } }).compose(
-      (dispatch) => (options, handler) =>
-        dispatch(
-          {
-            ...options,
-            headersTimeout: 15000,
-            bodyTimeout: 15000,
-          },
-          handler,
-        ),
-    );
+    const dispatcher = new Agent({
+      connect: { timeout: 5000 },
+      headersTimeout: 15000,
+      bodyTimeout: 15000,
+    });
     client = new QueueClient({
       region: workflowQueueRegion,
       dispatcher,

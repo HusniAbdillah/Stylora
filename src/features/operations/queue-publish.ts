@@ -44,7 +44,12 @@ const transportErrorCodes = new Set([
   "UND_ERR_SOCKET",
 ]);
 
-function queueTransportErrorCode(error: unknown) {
+const clientErrorCodes = new Set(["UND_ERR_INVALID_ARG"]);
+
+function queueTransportErrorCode(
+  error: unknown,
+  codes = transportErrorCodes,
+) {
   let current: unknown = error;
   for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
     const cause = current.cause;
@@ -53,7 +58,7 @@ function queueTransportErrorCode(error: unknown) {
       cause !== null &&
       "code" in cause &&
       typeof cause.code === "string" &&
-      transportErrorCodes.has(cause.code)
+      codes.has(cause.code)
     )
       return cause.code;
     current = cause;
@@ -74,6 +79,8 @@ function queuePublishErrorCode(error: unknown) {
   if (error instanceof InternalServerError) return "QUEUE_SERVICE_ERROR";
   if (error instanceof TypeError) {
     const transportCode = queueTransportErrorCode(error);
+    const clientCode = queueTransportErrorCode(error, clientErrorCodes);
+    if (clientCode) return `QUEUE_CLIENT_${clientCode}`;
     return transportCode
       ? `QUEUE_NETWORK_${transportCode}`
       : "QUEUE_NETWORK_ERROR";
