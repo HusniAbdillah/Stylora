@@ -57,7 +57,9 @@ export function publishFeedback(input: Input) {
     return;
   const item: Feedback = {
     ...input,
-    toast: input.toast ?? (changed ? true : (previous?.toast ?? true)),
+    toast:
+      input.toast ??
+      (changed ? !isPending(input.state) : (previous?.toast ?? false)),
     updatedAt: changed ? Date.now() : previous!.updatedAt,
   };
   // Running tasks remain available even when many short actions finish.

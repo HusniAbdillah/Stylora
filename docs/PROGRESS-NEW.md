@@ -1798,3 +1798,24 @@ src/components/shell/navigation.test.tsx` passed five tests. The new cache
   slot reference. `pnpm exec vitest run src/features/products/outfit-choice.test.ts`
   passed with 2 tests. Targeted ESLint and `pnpm typecheck` also passed. No
   provider call, hosted write, queue dispatch or schema change was made.
+
+## Activity and toast containment, 10 November 2026
+
+- Background stages now remain in the Activity bell. A toast is emitted only
+  when an operation changes to completed or failed; the latest failure takes
+  precedence and the viewport renders one notification, preventing stacked
+  mobile cards from obscuring controls.
+- Moved the toast to the top edge beneath the mobile bar and changed the phone
+  Activity popover into a bottom sheet. Desktop keeps the compact top-right
+  toast and Activity panel. The failure action is offered only when the
+  server-derived operation metadata explicitly marks it retryable; no private
+  result data is returned to the browser.
+- `pnpm exec vitest run src/lib/feedback/store.test.ts
+  src/features/operations/notifications.test.ts` passed with 4 tests; the full
+  `pnpm test` suite passed with 718 tests and 2 existing skips. `make pr-ready`
+  passed ESLint, TypeScript and the 164-line Lane B report; `pnpm build` also
+  passed. The local Storybook fixture was visually checked at desktop and 390
+  by 844 px: progress stayed in Activity, the completed toast sat below the
+  mobile bar, and Activity opened as a bottom sheet. Fixtures make no API or
+  provider calls. No hosted write, queue dispatch, provider call or deployment
+  was performed.

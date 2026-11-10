@@ -18,6 +18,7 @@ const activitySchema = z.object({
   input_revision: z.number().int().positive(),
   attempt_count: z.number().int().min(0).max(3),
   safe_error_code: z.string().nullable(),
+  result_ref: z.record(z.string(), z.json()).nullable(),
   created_at: z.iso.datetime({ offset: true }),
   updated_at: z.iso.datetime({ offset: true }),
 });
@@ -36,7 +37,7 @@ export async function readOperationActivity(
   let query = context.client
     .from("workflow_operations")
     .select(
-      "id,kind,status,subject_type,subject_id,input_revision,attempt_count,safe_error_code,created_at,updated_at,input",
+      "id,kind,status,subject_type,subject_id,input_revision,attempt_count,safe_error_code,result_ref,created_at,updated_at,input",
     )
     .eq("workspace_id", context.workspaceId)
     .order("updated_at", { ascending: false })
@@ -73,6 +74,7 @@ export async function readOperationActivity(
       inputRevision: row.input_revision,
       attemptCount: row.attempt_count,
       safeErrorCode: row.safe_error_code,
+      retryable: row.result_ref?.retryable === true,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
