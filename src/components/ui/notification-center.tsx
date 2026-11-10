@@ -16,7 +16,7 @@ function Notification({ item }: { item: Feedback }) {
   const [paused, setPaused] = useState(false);
   useEffect(() => {
     if (paused || isPending(item.state) || item.state === "failed") return;
-    let remaining = 8000;
+    let remaining = 5000;
     let started = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     function schedule() {
@@ -87,18 +87,21 @@ export function NotificationCenter() {
 
 export function FeedbackViewport() {
   const items = useFeedback();
-  const visible = items.filter((item) => item.toast);
+  const visible = items
+    .filter((item) => item.toast)
+    .sort((left, right) => {
+      const priority = (item: Feedback) => (item.state === "failed" ? 1 : 0);
+      return (
+        priority(right) - priority(left) || right.updatedAt - left.updatedAt
+      );
+    })
+    .slice(0, 1);
   return (
     <section
       className={styles.viewport}
       aria-label="Notifications"
       tabIndex={visible.length ? 0 : undefined}
     >
-      {visible.length > 3 && (
-        <p className={styles.summary}>
-          {visible.length} updates. Scroll to review all.
-        </p>
-      )}
       <ol className={styles.list}>
         {visible.map((item) => (
           <Notification key={item.id} item={item} />

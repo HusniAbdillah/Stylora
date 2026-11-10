@@ -32,8 +32,9 @@ function Example() {
         <ActivityMenu items={[]} />
       </div>
       <p className="my-5 max-w-xl text-secondary">
-        Explicit UI fixtures. Use one task to check transitions, or add
-        concurrent tasks. No API requests or provider calls.
+        Progress stays in Activity. This surface only announces a completed or
+        failed task, one at a time. These fixtures make no API requests or
+        provider calls.
       </p>
       <div className="flex max-w-2xl flex-wrap gap-3">
         {(

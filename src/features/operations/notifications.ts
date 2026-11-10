@@ -12,6 +12,7 @@ const rowSchema = z.object({
   subjectType: z.string(),
   subjectId: z.uuid(),
   safeErrorCode: z.string().nullable().optional(),
+  retryable: z.boolean().optional(),
   updatedAt: z.iso.datetime({ offset: true }),
 });
 type Row = z.infer<typeof rowSchema>;
@@ -113,12 +114,11 @@ export function acceptOperationActivity(input: unknown, writesEnabled = false) {
       onRetry:
         writesEnabled &&
         state === "failed" &&
+        row.retryable === true &&
         ["capsule_generation", "saved_avatar"].includes(row.kind)
           ? () => void retry(row)
           : undefined,
-      ...(changed || ["queued", "running", "partial"].includes(state)
-        ? {}
-        : { toast: false }),
+      toast: changed && ["complete", "failed"].includes(state),
     });
   }
   initialized = true;

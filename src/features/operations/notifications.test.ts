@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe("operation notification reconciliation", () => {
-  it("keeps old completions quiet, preserves dismissals, and announces a real transition", async () => {
+  it("keeps old completions quiet and only announces a completed or failed transition", async () => {
     const { acceptOperationActivity } = await import("./notifications");
     const { dismissFeedback, getFeedbackSnapshot } =
       await import("@/lib/feedback/store");
@@ -26,7 +26,7 @@ describe("operation notification reconciliation", () => {
     acceptOperationActivity([
       { ...row, status: "running", updatedAt: "2026-11-07T01:01:00Z" },
     ]);
-    expect(getFeedbackSnapshot()[0].toast).toBe(true);
+    expect(getFeedbackSnapshot()[0].toast).toBe(false);
     dismissFeedback(`operation:${row.id}`);
     acceptOperationActivity([
       { ...row, status: "running", updatedAt: "2026-11-07T01:02:00Z" },
@@ -56,5 +56,25 @@ describe("operation notification reconciliation", () => {
     ]);
     expect(getFeedbackSnapshot()[0].state).toBe("complete");
     expect(getFeedbackSnapshot()[0].href).toBe(`/saved-looks/${row.subjectId}`);
+  });
+  it("only offers retry after the server marks the failed operation retryable", async () => {
+    const { acceptOperationActivity } = await import("./notifications");
+    const { getFeedbackSnapshot } = await import("@/lib/feedback/store");
+    const row = {
+      id: "cc5424b7-06ba-4bbb-9fbe-e0375654560b",
+      kind: "saved_avatar" as const,
+      status: "failed" as const,
+      subjectType: "saved_look",
+      subjectId: "4e6f0fdb-d17a-496c-bddb-54be3b13fe69",
+      updatedAt: "2026-11-07T03:00:00Z",
+    };
+    acceptOperationActivity([row], true);
+    expect(getFeedbackSnapshot()[0].onRetry).toBeUndefined();
+
+    acceptOperationActivity(
+      [{ ...row, retryable: true, updatedAt: "2026-11-07T03:01:00Z" }],
+      true,
+    );
+    expect(getFeedbackSnapshot()[0].onRetry).toEqual(expect.any(Function));
   });
 });

@@ -97,6 +97,7 @@ const activitySchema = z.array(
     inputRevision: z.number().int().positive(),
     attemptCount: z.number().int().nonnegative(),
     safeErrorCode: z.string().nullable(),
+    retryable: z.boolean(),
     updatedAt: z.iso.datetime({ offset: true }),
   }),
 );
